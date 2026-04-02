@@ -1,0 +1,120 @@
+:root {
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --ink: #1c2633;
+  --muted: #627086;
+  --accent: #1756d1;
+  --danger: #a12727;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top right, #d9e6ff 0%, var(--bg) 45%);
+}
+
+.layout {
+  max-width: 980px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid #d8e0ee;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 8px 20px rgba(14, 29, 56, 0.08);
+}
+
+h1,
+h2 {
+  margin: 0 0 0.6rem;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+#task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.task-item {
+  border: 1px solid #c8d6ef;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  user-select: none;
+  touch-action: none;
+  cursor: pointer;
+  background: #f8fbff;
+}
+
+.task-item.recording {
+  border-color: var(--accent);
+  background: #e8f0ff;
+}
+
+.voice-main {
+  width: 100%;
+  margin: 0 0 0.8rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.voice-main.recording {
+  background: #0d3f9f;
+}
+
+textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #c8d6ef;
+  padding: 0.7rem;
+  font: inherit;
+}
+
+.row {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #4b5d7a;
+}
+
+.status {
+  min-height: 1.2rem;
+  color: var(--muted);
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+.transcript {
+  font-size: 0.95rem;
+  color: #364a66;
+}
