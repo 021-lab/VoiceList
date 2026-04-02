@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoiceList</title>
+    <link rel="stylesheet" href="static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel">
+        <h1>VoiceList</h1>
+        <p class="hint">Hold a task, speak command, release.</p>
+        <button id="general-voice" class="voice-main">Hold to speak general command</button>
+        <ul id="task-list"></ul>
+        <p id="voice-status" class="status"></p>
+        <p id="transcript" class="transcript"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Prompt for model</h2>
+        <textarea id="prompt-input" rows="10"></textarea>
+        <div class="row">
+          <button id="save-prompt">Save</button>
+          <button id="reset-prompt" class="secondary">Reset default</button>
+        </div>
+        <p id="prompt-status" class="status"></p>
+      </section>
+    </main>
+
+    <script src="static/app.js" defer></script>
+  </body>
+</html>
