@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="preview-build-hash" content="__PREVIEW_BUILD_HASH__">
+<title>Список</title>
+<style>
+__INLINE_CSS__
+</style>
+</head>
+<body>
+<div id="app-root" data-view-mode="list">
+  <header>
+    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
+    <h1>Мой список</h1>
+    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
+    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
+  </header>
+
+  <div id="list-container"></div>
+
+  <section id="action-log-panel" hidden>
+    <div class="action-log-header">
+      <h2>Журнал действий</h2>
+    </div>
+    <div id="action-log-list"></div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+  <button class="add-btn" id="add-btn" aria-label="Добавить задачу">+</button>
+
+  <div id="tag-panel" class="swipe-panel"></div>
+
+  <div id="drop-zone-panel" class="swipe-panel"></div>
+
+  <section class="task-page" id="task-page" aria-hidden="true">
+    <div class="task-page-bar">
+      <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
+      <h2 id="task-page-title">Задача</h2>
+      <button class="task-page-save" id="task-page-save" type="button">Сохранить</button>
+    </div>
+    <div class="task-page-body">
+      <label class="task-page-field">
+        <span>Название</span>
+        <input type="text" id="task-page-line1" maxlength="60">
+      </label>
+      <label class="task-page-field">
+        <span>Подпись</span>
+        <input type="text" id="task-page-line2" maxlength="80">
+      </label>
+      <label class="task-page-field">
+        <span>Статус</span>
+        <select id="task-page-status">
+          <option>Open</option>
+          <option>Done</option>
+          <option>Focus</option>
+          <option>Archive</option>
+          <option>Pause</option>
+        </select>
+      </label>
+      <section class="task-page-subtasks">
+        <h3>Подзадачи</h3>
+        <div id="task-page-subtasks"></div>
+        <div class="task-page-add-child">
+          <input type="text" id="task-page-child-input" placeholder="Новая подзадача" maxlength="60">
+          <button id="task-page-add-child" type="button">Добавить</button>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <h2 id="modal-title">Новый элемент</h2>
+      <div id="modal-view-content" style="display:none; margin-bottom:12px;">
+        <div id="view-line1" style="font-size:17px; font-weight:600; color:#1a1a2e; margin-bottom:5px;"></div>
+        <div id="view-line2" style="font-size:14px; color:#888; margin-bottom:8px;"></div>
+        <div id="view-tags" class="item-tags"></div>
+      </div>
+      <input type="text" id="input-line1" placeholder="Название (обязательно)" maxlength="60">
+      <input type="text" id="input-line2" placeholder="Подпись (необязательно)" maxlength="80">
+      <div class="modal-actions">
+        <button class="btn btn-cancel" id="btn-cancel">Отмена</button>
+        <button class="btn btn-add" id="btn-confirm">Добавить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.__LIST_MANAGER_BUILD_HASH__ = "__PREVIEW_BUILD_HASH__";
+</script>
+<script>
+__INLINE_JS__
+</script>
+</body>
+</html>

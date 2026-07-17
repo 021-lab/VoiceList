@@ -1,6 +1,4 @@
-.venv/
-__pycache__/
-.pytest_cache/
+node_modules/
+playwright-report/
+test-results/
 .DS_Store
-data/tasks.json
-data/prompt.json
