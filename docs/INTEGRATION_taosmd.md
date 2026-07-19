@@ -1,76 +1,66 @@
 # INTEGRATION_taosmd — интеграция VoiceList с бэкендом taosmd
 
-Статус: rev 2. Скоуп v1: отображение графа + фронтир; focus/pause и смена статусов.
+Статус: rev 3. Скоуп v1: модуль синхронизации (см. [CODER_TASK_sync-module.md](./CODER_TASK_sync-module.md) — точка входа) + инфраструктура доступа.
 
 ## 0. Координаты разработки
 
 | Роль | Репозиторий | Ветка |
 |---|---|---|
 | Фронт (этот репо) | `021-lab/VoiceList` | `taosmd-backend` |
-| Бэкенд taosmd (форк) | **`021-lab/TaOS`** — https://github.com/021-lab/TaOS/tree/feat/user-statuses | `feat/user-statuses` |
+| Бэкенд taosmd | **`021-lab/TaOS`** — https://github.com/021-lab/TaOS/tree/feat/user-statuses | `feat/user-statuses` |
 
-Канон спецификаций бэкенда — `TAOSMD_API_CONTRACT.md` и `TASK_LIFECYCLE.md` в `021-lab/TaOS` (docs/), ссылки по PINNED_COMMIT SHA. Этот документ описывает только интеграцию фронта.
+Канон спецификаций бэкенда — `docs/specs/` в `021-lab/TaOS` (начинать с `00-INDEX-focus-harness.md`): контракт API, жизненный цикл задач, задания бэкенд-кодеру. Здесь копий нет.
 
-**Правила координации:** любое изменение поведения API (новые статусы, поля, endpoints) сначала попадает амендментом в контракт в `021-lab/TaOS`, затем — в этот документ ссылкой на SHA; фронт не подстраивается под незадокументированное поведение. Обратно: потребность фронта в новом endpoint оформляется issue в `021-lab/TaOS`, не форком логики на клиенте. Пин бэкенда, против которого собран фронт, фиксируется в `/deploy/README.md`.
+**Правила координации:** изменение поведения API сначала попадает амендментом в контракт в TaOS, затем сюда; потребность фронта в новом endpoint — issue в TaOS, не обход на клиенте. Пин бэкенда (PINNED_COMMIT) фиксируется в `/deploy/README.md` после реализации статусов в TaOS.
 
 ## 1. Архитектура доступа (recorder.smileme.ai)
 
-- **Cloudflare Pages** — статика фронта (pure HTML+JS, как есть).
-- **Worker-proxy**: route `recorder.smileme.ai/api/*` → strip `/api` → Cloudflare Tunnel hostname → taosmd на Mac Mini (`127.0.0.1:7900`, наружу только через cloudflared). Bearer-токен taosmd хранится secret'ом Worker'а и добавляется в Authorization на проксировании — в браузер токен не попадает никогда.
-- **Cloudflare Access** на весь хост: allowlist владельца (email/passkey).
-- Same-origin по построению: CORS в проекте отсутствует.
+- **Cloudflare Pages** — статика фронта (self-contained `list-manager.html`).
+- **Worker-proxy**: route `recorder.smileme.ai/api/*` → strip `/api` → Cloudflare Tunnel → taosmd на Mac Mini (`127.0.0.1:7900`, наружу только через cloudflared). Bearer-токен taosmd — secret Worker'а, добавляется на проксировании; в браузер не попадает никогда.
+- **Cloudflare Access** на весь хост: allowlist владельца.
+- Same-origin по построению: CORS отсутствует; в коде фронта — относительный `/api/*` (конфигурируемый base URL для локальной разработки, без хардкода доменов).
 
-## 2. Структура репозитория
+## 2. Структура репозитория (фактическая)
 
 ```
-/                — фронт (index.html, js/, css/) — как есть
-/docs/           — этот документ
-/proxy/          — Worker: wrangler.toml, src/index.js
-/deploy/         — README деплоя: Pages, wrangler, cloudflared; PINNED_COMMIT бэкенда
+list-manager.html            — собранный self-contained фронт (артефакт сборки)
+list-manager.template.html   — шаблон сборки
+list-manager.css, list-data.js, src/, scripts/, tests/ — исходники, seed, сборка, тесты
+list-manager-docs.md         — документация приложения, вкл. статусы и фронтир/резолвер (Θ)
+docs/                        — интеграционные спеки (этот файл + задание sync-модуля)
+proxy/                       — (создаётся) Worker: wrangler.toml, src/index.js
+deploy/                      — (создаётся) README деплоя: Pages, wrangler, cloudflared, PINNED_COMMIT
 ```
 
-Работа в ветке `taosmd-backend`, PR в main после приёмки.
+Сборка: `npm run prepare-preview`; единственный деплой-артефакт — `list-manager.html`. Sync-модуль живёт в исходниках и собирается в этот же файл.
 
 ## 3. Используемое подмножество API (все пути через /api/*)
 
+v1 (sync-модуль):
 - `GET /health` — индикатор соединения
-- `GET /tasks?limit=&status=&project=` — полный список для построения дерева
-- `GET /tasks/edges` — граф рёбер (fork-endpoint)
-- `GET /tasks/{id}` — задача с embedded edges (fork-endpoint)
-- `POST /tasks` — создание `{title, body?, project?, priority?}`
-- `POST /tasks/{id}` — мутация `{status?, body?, priority?}`
-- `POST /tasks/{id}/edges`, `POST /tasks/{id}/edges/remove`
+- `POST /a2a/send` — пуш записей журнала (thread `voicelist-log`, from `user`)
+- `GET /a2a/messages` — bootstrap-чтение канала (пагинация по `since`)
 
-Не используются в v1: `/tasks/ready`, `/tasks/prime` (агентские), память (`/ingest`, `/search`), A2A. Worker-proxy держит allowlist ровно этого подмножества.
+v2 (зарезервировано, не реализуется сейчас): `GET/POST /tasks*`, `GET /tasks/edges` — двусторонний синк с графом задач и статусами focus/pause бэкенда.
 
-## 4. Обязательные правила интеграции (из TASK_LIFECYCLE)
+Worker-proxy держит allowlist ровно актуального подмножества (v1: три пути выше; расширяется вместе с v2).
 
-1. **Провенанс**: каждая мутация фронта — `created_by=user`. Как HTTP-слой принимает `created_by` (параметр тела или заголовок) — берётся из результатов шага 0 контракт-задания в `021-lab/TaOS`; если сервер значение не принимает, его добавляет Worker-proxy. Оставлять серверный дефолт запрещено.
-2. **Статусы**: enum `{open, in_progress, blocked, closed, superseded, focus, pause}` (амендмент rev 2, ветка `feat/user-statuses` в `021-lab/TaOS`). `focus`/`pause` ставит только пользователь; фронт не ставит их на задачи в `in_progress`.
-3. **Создание ребёнка** — единый хелпер: `POST /tasks` + ребро `parent` + ребро `blocks` ребёнок→родитель. Пара обязательна и неделима (lifecycle §1); никакой код не создаёт ребёнка одним ребром.
-4. **Фронтир** вычисляется на клиенте из полного графа (tasks + edges): видимые открытые листья parent-дерева с применением focus/pause-правил существующего Θ-резолвера (focus/pause теперь читаются из поля `status`, не из локального состояния). НЕ через `/tasks/ready` — это агентский срез.
-5. **Инвариант stateless-фронта**: слой приложения не хранит данных — никакого localStorage/IndexedDB/кэшей состояния между сессиями; источник истины всегда taosmd, reload = полная загрузка с сервера.
+## 4. Обязательные правила интеграции
+
+1. **Модель данных v1**: Приложение → localStorage → sync-модуль → taosmd. localStorage — рабочая реплика; долговременная истина — архив taosmd (каждое A2A-сообщение = событие append-only архива). Синк односторонний + bootstrap на пустом localStorage.
+2. **Провенанс**: все отправки фронта — от имени `user` (`from=user`; в v2 для мутаций задач — `created_by=user`). Серверные дефолты не используются.
+3. **Статусы**: локальные статусы приложения (`Open/Done/Focus/Archive/Pause`) в v1 не маппятся — едут внутри операций журнала как есть. Бэкенд-enum (с нативными `focus`/`pause`, амендмент rev 2 контракта) задействуется в v2.
+4. **Фронтир/резолвер (Θ)**: логика описана в `list-manager-docs.md` и реализована в исходниках `src/`; в v1 не меняется и считается на клиенте.
+5. **Секреты**: токен только в Worker-secret; в бандле и network-трафике браузера его нет.
 
 ## 5. Задачи
 
-A. **Worker-proxy** (`/proxy`): маршрутизация `/api/*`, allowlist §3, secret `TAOSMD_TOKEN`, таймауты, честный 502/504 при недоступности tunnel.
-B. **Адаптер данных фронта**: заменить текущий бэкенд-слой на подмножество §3; статусы focus/pause маппятся в существующий резолвер из `status`.
-C. **Хелпер create-child** по правилу §4.3 — единственная точка создания детей.
-D. **Деплой** (`/deploy`): Pages-проект на recorder.smileme.ai, `wrangler deploy` Worker'а с route, конфиг cloudflared (ingress → 127.0.0.1:7900), порядок включения Cloudflare Access, зафиксированный PINNED_COMMIT бэкенда из `021-lab/TaOS`.
-E. **Smoke-чеклист** по §6.
+A. **Sync-модуль** — главная задача, полное ТЗ: [CODER_TASK_sync-module.md](./CODER_TASK_sync-module.md).
+B. **Worker-proxy** (`/proxy`): маршрутизация `/api/*`, allowlist §3-v1, secret `TAOSMD_TOKEN`, таймауты, честный 502/504 при недоступности tunnel.
+C. **Деплой** (`/deploy`): Pages-проект на recorder.smileme.ai, `wrangler deploy` с route, конфиг cloudflared (ingress → 127.0.0.1:7900), порядок включения Cloudflare Access, PINNED_COMMIT бэкенда.
 
-## 6. Приёмка
+## 6. Приёмка инфраструктуры (помимо приёмки sync-модуля)
 
-1. С телефона вне tailnet: recorder.smileme.ai открывается через Access, дерево грузится из живого taosmd.
-2. Создание задачи и ребёнка: пара рёбер видна в `GET /api/tasks/edges`.
-3. focus/pause/закрытие меняют статус в taosmd; после reload состояние идентично серверному (клиентского хранения нет).
-4. Токен в браузере отсутствует (network-инспекция + грep бандла); Authorization добавляет Worker.
-5. Фронтир после focus/pause соответствует правилам Θ-резолвера.
-6. В архиве taosmd все мутации фронта видны с `created_by=user`.
-7. Прямой запрос к `/api/*` без Access-сессии отклоняется.
-
-## 7. Зависимости от бэкенда (`021-lab/TaOS`)
-
-- Ветка `feat/user-statuses` (статусы focus/pause + `tasks reset`) собрана и задеплоена на Mac Mini за Tunnel.
-- Результат шага 0 контракт-задания: механизм передачи `created_by` в HTTP-слое.
-- Fork-endpoints `GET /tasks/edges` и `GET /tasks/{id}` доступны в задеплоенной сборке.
+1. С телефона вне tailnet: recorder.smileme.ai открывается через Access, приложение работает, синк доходит до живого taosmd.
+2. Токен в браузере отсутствует; Authorization добавляет Worker.
+3. Прямой запрос к `/api/*` без Access-сессии отклоняется; пути вне allowlist — 404.

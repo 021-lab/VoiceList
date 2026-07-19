@@ -10,6 +10,10 @@
 - единый контракт ввода через интерпретатор команд;
 - self-contained `list-manager.html` для деплоя через GitHub + `htmlpreview`.
 
+## Бэкенд: taosmd (ветка `taosmd-backend`)
+
+Ведётся интеграция с бэкендом [taosmd](https://github.com/021-lab/TaOS/tree/feat/user-statuses) (архив-первая память + граф задач + A2A): приложение продолжает работать на localStorage, модуль синхронизации односторонне синкает журнал действий в taosmd и восстанавливает состояние на пустом localStorage. См. `docs/CODER_TASK_sync-module.md` и `docs/INTEGRATION_taosmd.md` в ветке `taosmd-backend`.
+
 ## Как использовать как базу для форка
 
 1. Форкните репозиторий.
