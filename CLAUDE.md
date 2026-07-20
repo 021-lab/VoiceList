@@ -3,9 +3,9 @@
 ## Ветка и точка входа для интеграции с taosmd
 
 Если ты в ветке `taosmd-backend` — твоя задача описана здесь, читать в этом порядке:
-1. `docs/CODER_TASK_sync-module.md` — что делать (модуль синхронизации localStorage ↔ taosmd);
-2. `docs/INTEGRATION_taosmd.md` — архитектура доступа (Cloudflare Pages + Worker-proxy + Tunnel) и правила;
-3. Канон спецификаций бэкенда (контракт API, жизненный цикл задач): https://github.com/021-lab/TaOS/tree/feat/user-statuses/docs/specs — начинать с `00-INDEX-focus-harness.md`.
+1. `docs/CODER_TASK_storage-module.md` — что делать (storage-модуль: localStorage + write-through в taosmd `/tasks`, bootstrap из бэкенда, удаление `list-data.js`);
+2. `docs/INTEGRATION_taosmd.md` — архитектура доступа (Cloudflare Pages + Worker-proxy + Tunnel), подмножество API и правила;
+3. Канон спецификаций бэкенда: https://github.com/021-lab/TaOS/tree/feat/user-statuses/docs/specs — начинать с `00-INDEX-focus-harness.md`.
 
 Для интеграционных работ работай в `taosmd-backend` (или ветках от неё); правило `codex-*` ниже относится к остальной разработке фронта.
 
