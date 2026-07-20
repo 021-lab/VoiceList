@@ -44,23 +44,42 @@ async function triggerRightPanelActionUntil(page, rowLocator, actionLabel, verif
   throw lastError;
 }
 
-test('preview app can create task, create subtask, and change status', async ({ page }) => {
+async function backendTasks(page) {
+  return page.evaluate(async () => {
+    const response = await fetch('api/tasks?limit=500&project=voicelist');
+    if (!response.ok) throw new Error(`tasks request failed: ${response.status}`);
+    return (await response.json()).tasks || [];
+  });
+}
+
+async function backendMessages(page) {
+  return page.evaluate(async () => {
+    const response = await fetch('api/a2a/messages?thread=voicelist-log&limit=200');
+    if (!response.ok) throw new Error(`messages request failed: ${response.status}`);
+    return (await response.json()).messages || [];
+  });
+}
+
+test('deployed app persists task, child, status, restore, and backend action log', async ({ page }) => {
   const taskTitle = `E2E Task ${Date.now()}`;
   const subtaskTitle = `E2E Subtask ${Date.now()}`;
 
   await page.goto('');
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
+  await expect.poll(() => page.evaluate(() => window.__LIST_MANAGER_READY__ === true), { timeout: 10000 }).toBe(true);
   await expect(page.locator('#list-container')).toBeVisible();
-  await expect(page.locator('.list-item-wrapper').first()).toContainText('Молоко 3.2%');
 
-  await page.getByRole('button', { name: 'Добавить задачу' }).click();
+  await page.locator('#add-btn').click();
   await page.locator('#input-line1').fill(taskTitle);
   await confirmModal(page);
 
   const taskRow = page.locator('.list-item-wrapper', { hasText: taskTitle });
   await expect(taskRow).toContainText(taskTitle);
   await expect(taskRow).toContainText('Open');
+  await expect.poll(async () => (
+    (await backendTasks(page)).some((task) => task.title === taskTitle && task.status === 'open')
+  ), { timeout: 10000 }).toBe(true);
 
   await page.locator('#view-toggle-btn').click();
   await expect(page.locator('#action-log-list')).toContainText(`Создана задача: ${taskTitle}`);
@@ -78,11 +97,17 @@ test('preview app can create task, create subtask, and change status', async ({ 
   const subtaskRow = page.locator('.list-item-wrapper', { hasText: subtaskTitle });
   await expect(subtaskRow).toContainText(subtaskTitle);
   expect(Number(await subtaskRow.getAttribute('data-level'))).toBeGreaterThan(Number(await taskRow.getAttribute('data-level')));
+  await expect.poll(async () => (
+    (await backendTasks(page)).some((task) => task.title === subtaskTitle && task.status === 'open')
+  ), { timeout: 10000 }).toBe(true);
 
   await triggerRightPanelActionUntil(page, taskRow.locator('.list-item'), 'Focus', async () => (
     (await taskRow.textContent()).includes('Focus')
   ));
   await expect(taskRow).toContainText('Focus');
+  await expect.poll(async () => (
+    (await backendTasks(page)).some((task) => task.title === taskTitle && task.status === 'focus')
+  ), { timeout: 10000 }).toBe(true);
 
   await page.locator('#frontier-tab-btn').click();
   await expect(page.locator('#list-container')).toContainText(subtaskTitle);
@@ -98,6 +123,25 @@ test('preview app can create task, create subtask, and change status', async ({ 
     (await taskRow.textContent()).includes('Done')
   ));
   await expect(taskRow).toContainText('Done');
-  await page.locator('#view-toggle-btn').click();
-  await expect(page.locator('#action-log-list')).toContainText('Статус изменён: Done');
+  await expect.poll(async () => (
+    (await backendTasks(page)).some((task) => task.title === taskTitle && task.status === 'closed')
+  ), { timeout: 10000 }).toBe(true);
+
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toContainText(taskTitle);
+  await expect(page.locator('#list-container')).toContainText(subtaskTitle);
+  await expect(page.locator('.list-item-wrapper', { hasText: taskTitle })).toContainText('Done');
+
+  await expect.poll(async () => (
+    (await backendMessages(page)).some((message) => {
+      try {
+        const body = JSON.parse(message.body);
+        return body.schema === 'voicelist.action.v1'
+          && JSON.stringify(body).includes(taskTitle);
+      } catch {
+        return false;
+      }
+    })
+  ), { timeout: 10000 }).toBe(true);
 });

@@ -1,245 +1,209 @@
-const firebaseConfig = {
-  apiKey: 'AIzaSyBtttOmje8yQvU1mf1-zDbOq5OlBHLt6Ic',
-  projectId: 'ai-labg'
-};
-
-export const firestoreCollections = Object.freeze({
-  state: 'lists',
-  history: 'list_state_history',
-  backups: 'list_state_backups'
+const LOCAL_TO_BACKEND_STATUS = Object.freeze({
+  Open: 'open',
+  Done: 'closed',
+  Focus: 'focus',
+  Pause: 'pause',
+  Archive: 'superseded'
 });
 
-export const defaultTarget = Object.freeze({
-  collection: firestoreCollections.state,
-  id: 'main'
+const BACKEND_TO_LOCAL_STATUS = Object.freeze({
+  open: 'Open',
+  closed: 'Done',
+  focus: 'Focus',
+  pause: 'Pause',
+  superseded: 'Archive',
+  in_progress: 'Open',
+  blocked: 'Open'
 });
 
-async function fetchWithTimeout(fetchImpl, url, options, timeoutMs) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetchImpl(url, {
-      ...options,
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
-function pad(value) {
-  return String(value).padStart(2, '0');
+function withQuery(path, params) {
+  const query = new URLSearchParams(params);
+  return `${path}?${query.toString()}`;
 }
 
-function formatMinuteStamp(date) {
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+function jsonHeaders() {
+  return { 'Content-Type': 'application/json' };
 }
 
-function formatDayStamp(date) {
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+function sortByOrder(items) {
+  return [...items].sort((left, right) => {
+    const leftParent = left.parentId || '';
+    const rightParent = right.parentId || '';
+    if (leftParent !== rightParent) return leftParent.localeCompare(rightParent);
+    return (left.order || 0) - (right.order || 0);
+  });
 }
 
-function formatMonthStamp(date) {
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}`;
-}
-
-function formatWeekStamp(date) {
-  const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = utcDate.getUTCDay() || 7;
-  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
-  const weekNumber = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
-  return `${utcDate.getUTCFullYear()}-W${pad(weekNumber)}`;
-}
-
-function buildDocumentUrl(target) {
-  const path = `projects/${firebaseConfig.projectId}/databases/(default)/documents/${target.collection}/${target.id}`;
-  return `https://firestore.googleapis.com/v1/${path}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
-}
-
-function extractState(snapshotData) {
-  if (!snapshotData || typeof snapshotData !== 'object') return null;
-  if (snapshotData.snapshot?.items && Array.isArray(snapshotData.actionLog)) return snapshotData;
-  return null;
-}
-
-function encodeDocument(state, target, metadata) {
+function buildActionLogBody(actionLogEntry) {
+  const command = actionLogEntry?.command || {};
   return {
-    fields: {
-      payload: {
-        stringValue: JSON.stringify({
-          snapshot: state.snapshot,
-          actionLog: state.actionLog
-        })
-      },
-      target: {
-        stringValue: `${target.collection}/${target.id}`
-      },
-      reason: {
-        stringValue: metadata.reason
-      },
-      backupKind: {
-        stringValue: metadata.backupKind
-      },
-      updatedAtMs: {
-        integerValue: String(metadata.updatedAtMs)
-      }
+    schema: 'voicelist.action.v1',
+    id: actionLogEntry?.id,
+    ts: actionLogEntry?.createdAt,
+    op: command.command,
+    payload: {
+      taskId: command.actId,
+      source: command.source,
+      ...(command.payload || {})
     }
   };
 }
 
-function decodeDocument(documentData) {
-  const payload = documentData?.fields?.payload?.stringValue;
-  if (!payload) return null;
-
-  try {
-    return extractState(JSON.parse(payload));
-  } catch (error) {
-    console.warn('Firestore payload parse skipped', error);
-    return null;
-  }
+export function localStatusToBackend(status) {
+  return LOCAL_TO_BACKEND_STATUS[status] || 'open';
 }
 
-export function createBackupTargets(target = defaultTarget, currentDate = new Date()) {
-  const baseId = target.id;
-
-  return {
-    history: {
-      collection: firestoreCollections.history,
-      id: `${baseId}--minute--${formatMinuteStamp(currentDate)}`
-    },
-    day: {
-      collection: firestoreCollections.backups,
-      id: `${baseId}--day--${formatDayStamp(currentDate)}`
-    },
-    week: {
-      collection: firestoreCollections.backups,
-      id: `${baseId}--week--${formatWeekStamp(currentDate)}`
-    },
-    month: {
-      collection: firestoreCollections.backups,
-      id: `${baseId}--month--${formatMonthStamp(currentDate)}`
-    }
-  };
-}
-
-export function describeFirestoreAccess(target = defaultTarget, currentDate = new Date()) {
-  const backups = createBackupTargets(target, currentDate);
-  return {
-    current: {
-      collection: target.collection,
-      id: target.id,
-      path: `${target.collection}/${target.id}`
-    },
-    collections: {
-      state: firestoreCollections.state,
-      history: firestoreCollections.history,
-      backups: firestoreCollections.backups
-    },
-    backups: Object.fromEntries(
-      Object.entries(backups).map(([key, value]) => [
-        key,
-        {
-          ...value,
-          path: `${value.collection}/${value.id}`
-        }
-      ])
-    )
-  };
+export function backendStatusToLocal(status) {
+  return BACKEND_TO_LOCAL_STATUS[status] || 'Open';
 }
 
 export function createBackendAdapter({
-  target = defaultTarget,
+  apiBase = '/api',
   fetchImpl = fetch,
-  now = () => new Date(),
-  timeouts = { load: 1500, save: 4000 }
+  createdBy = 'user',
+  actionThread = 'voicelist-log',
+  project = 'voicelist'
 } = {}) {
-  async function writeDocument(documentTarget, state, metadata) {
-    const response = await fetchWithTimeout(
-      fetchImpl,
-      buildDocumentUrl(documentTarget),
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(encodeDocument(state, documentTarget, metadata))
-      },
-      timeouts.save
-    );
+  const base = apiBase.replace(/\/$/, '');
 
-    if (!response.ok) {
-      throw new Error(`Firestore save failed: ${response.status}`);
+  async function request(path, options = {}) {
+    const response = await fetchImpl(`${base}${path}`, options);
+    if (!response.ok) throw new Error(`taosmd request failed: ${response.status} ${path}`);
+    return response.json();
+  }
+
+  async function post(path, body) {
+    return request(path, {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify(body)
+    });
+  }
+
+  async function loadBackend() {
+    const [tasksBody, edgesBody] = await Promise.all([
+      request(withQuery('/tasks', { limit: 500, project })),
+      request(withQuery('/tasks/edges', { limit: 2000 }))
+    ]);
+    return {
+      tasks: tasksBody.tasks || [],
+      edges: edgesBody.edges || []
+    };
+  }
+
+  function stateFromBackend(tasks, edges) {
+    const parentByChild = new Map();
+    for (const edge of edges) {
+      if (edge.type === 'parent' && !edge.removed_ts) parentByChild.set(edge.from_id, edge.to_id);
+    }
+
+    const items = tasks.map((task, index) => ({
+      id: task.id,
+      parentId: parentByChild.get(task.id) || null,
+      order: Number.isFinite(task.priority) ? task.priority : (index + 1) * 10,
+      status: backendStatusToLocal(task.status),
+      line1: task.title || '',
+      collapsed: false,
+      tags: []
+    }));
+
+    return {
+      snapshot: { items: sortByOrder(items) },
+      actionLog: []
+    };
+  }
+
+  async function ensureTask(item, backendById) {
+    if (backendById.has(item.id)) {
+      const backend = backendById.get(item.id);
+      const payload = {
+        title: item.line1,
+        status: localStatusToBackend(item.status),
+        priority: item.order || 0,
+        created_by: createdBy
+      };
+      if ((backend.title || '') !== item.line1 || backend.status !== payload.status || backend.priority !== payload.priority) {
+        await post(`/tasks/${encodeURIComponent(item.id)}`, payload);
+      }
+      return item.id;
+    }
+
+    const created = await post('/tasks', {
+      title: item.line1,
+      status: localStatusToBackend(item.status),
+      priority: item.order || 0,
+      project,
+      created_by: createdBy
+    });
+    backendById.set(created.id, created);
+    return created.id;
+  }
+
+  async function ensureChildEdges(childId, parentId, edgeKeys) {
+    for (const type of ['parent', 'blocks']) {
+      const key = `${childId}->${parentId}:${type}`;
+      if (edgeKeys.has(key)) continue;
+      await post(`/tasks/${encodeURIComponent(childId)}/edges`, {
+        to_id: parentId,
+        type,
+        created_by: createdBy
+      });
+      edgeKeys.add(key);
     }
   }
 
-  return {
-    getAccessInfo(currentDate = now()) {
-      return describeFirestoreAccess(target, currentDate);
-    },
+  async function sendActionLog(actionLogEntry) {
+    if (!actionLogEntry) return;
+    await post('/a2a/send', {
+      from: createdBy,
+      thread: actionThread,
+      body: JSON.stringify(buildActionLogBody(actionLogEntry))
+    });
+  }
 
+  return {
     async load() {
       try {
-        const response = await fetchWithTimeout(fetchImpl, buildDocumentUrl(target), { method: 'GET' }, timeouts.load);
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error(`Firestore load failed: ${response.status}`);
-        return decodeDocument(await response.json());
+        const { tasks, edges } = await loadBackend();
+        return stateFromBackend(tasks, edges);
       } catch (error) {
-        console.warn('Firestore load skipped', error);
+        console.warn('taosmd bootstrap skipped', error);
         return null;
       }
     },
 
-    async loadVersion(versionTarget) {
-      try {
-        const response = await fetchWithTimeout(fetchImpl, buildDocumentUrl(versionTarget), { method: 'GET' }, timeouts.load);
-        if (response.status === 404) return null;
-        if (!response.ok) throw new Error(`Firestore load version failed: ${response.status}`);
-        return decodeDocument(await response.json());
-      } catch (error) {
-        console.warn('Firestore version load skipped', error);
-        return null;
+    async save(state, { actionLogEntry = null } = {}) {
+      const nextState = clone(state);
+      const { tasks, edges } = await loadBackend();
+      const backendById = new Map(tasks.map((task) => [task.id, task]));
+      const edgeKeys = new Set(
+        edges
+          .filter((edge) => !edge.removed_ts)
+          .map((edge) => `${edge.from_id}->${edge.to_id}:${edge.type}`)
+      );
+      const idMap = new Map();
+
+      for (const item of sortByOrder(nextState.snapshot.items)) {
+        const backendId = await ensureTask(item, backendById);
+        idMap.set(item.id, backendId);
+        item.id = backendId;
       }
-    },
 
-    async save(state, { reason = 'mutation', createBackup = false } = {}) {
-      const timestamp = now();
-      const updatedAtMs = timestamp.getTime();
+      for (const item of nextState.snapshot.items) {
+        if (!item.parentId) continue;
+        item.parentId = idMap.get(item.parentId) || item.parentId;
+        await ensureChildEdges(item.id, item.parentId, edgeKeys);
+      }
 
-      await writeDocument(target, state, {
-        reason,
-        backupKind: 'live',
-        updatedAtMs
-      });
-
-      if (!createBackup) return state;
-
-      const backupTargets = createBackupTargets(target, timestamp);
-      await Promise.all([
-        writeDocument(backupTargets.history, state, {
-          reason,
-          backupKind: 'minute',
-          updatedAtMs
-        }),
-        writeDocument(backupTargets.day, state, {
-          reason,
-          backupKind: 'day',
-          updatedAtMs
-        }),
-        writeDocument(backupTargets.week, state, {
-          reason,
-          backupKind: 'week',
-          updatedAtMs
-        }),
-        writeDocument(backupTargets.month, state, {
-          reason,
-          backupKind: 'month',
-          updatedAtMs
-        })
-      ]);
-
-      return state;
+      const fullLogEntry = actionLogEntry?.command
+        ? actionLogEntry
+        : nextState.actionLog.find((entry) => entry.id === actionLogEntry?.id);
+      await sendActionLog(fullLogEntry);
+      return nextState;
     }
   };
 }

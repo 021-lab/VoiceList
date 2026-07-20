@@ -1,4 +1,3 @@
-import { seedState } from '../list-data.js';
 import { createApp } from './list-app.js';
 import { createBackendAdapter } from './list-backend-adapter.js';
 import { createInterpreter } from './list-interpreter.js';
@@ -9,13 +8,21 @@ import { createUI } from './list-ui.js';
 
 const PREVIEW_BUILD_HASH = __PREVIEW_BUILD_HASH__;
 
+function previewApiBase() {
+  const pathname = window.location.pathname;
+  const directory = pathname.endsWith('/')
+    ? pathname.replace(/\/$/, '')
+    : pathname.slice(0, pathname.lastIndexOf('/'));
+  return `${directory}/api` || '/api';
+}
+
 async function bootstrapListManagerPreview() {
   document.documentElement.dataset.previewBuildHash = PREVIEW_BUILD_HASH;
+  window.__LIST_MANAGER_READY__ = false;
 
   const store = createStore({
     storageKey: 'voicelist.universal-interface.state',
-    storage: window.localStorage,
-    seedState
+    storage: window.localStorage
   });
 
   let app = null;
@@ -32,13 +39,11 @@ async function bootstrapListManagerPreview() {
     tagPanel: document.getElementById('tag-panel'),
     overlay: document.getElementById('modal-overlay'),
     input1: document.getElementById('input-line1'),
-    input2: document.getElementById('input-line2'),
     modalTitle: document.getElementById('modal-title'),
     btnConfirm: document.getElementById('btn-confirm'),
     btnCancel: document.getElementById('btn-cancel'),
     viewContent: document.getElementById('modal-view-content'),
     viewLine1: document.getElementById('view-line1'),
-    viewLine2: document.getElementById('view-line2'),
     viewTagsEl: document.getElementById('view-tags'),
     actionLogPanel: document.getElementById('action-log-panel'),
     taskPage: document.getElementById('task-page'),
@@ -46,7 +51,6 @@ async function bootstrapListManagerPreview() {
     taskPageSave: document.getElementById('task-page-save'),
     taskPageTitle: document.getElementById('task-page-title'),
     taskPageLine1: document.getElementById('task-page-line1'),
-    taskPageLine2: document.getElementById('task-page-line2'),
     taskPageStatus: document.getElementById('task-page-status'),
     taskPageSubtasks: document.getElementById('task-page-subtasks'),
     taskPageChildInput: document.getElementById('task-page-child-input'),
@@ -62,7 +66,7 @@ async function bootstrapListManagerPreview() {
     onRendered: ui.onRendered
   });
 
-  const adapter = createBackendAdapter();
+  const adapter = createBackendAdapter({ apiBase: previewApiBase() });
   let sync = null;
 
   app = createApp({
@@ -87,6 +91,7 @@ async function bootstrapListManagerPreview() {
   });
 
   await app.init();
+  window.__LIST_MANAGER_READY__ = true;
 }
 
 bootstrapListManagerPreview().catch((error) => {

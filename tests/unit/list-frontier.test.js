@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { calculateFrontier } from '../../src/list-frontier.js';
 
 function task(id, parentId, status, order = 10) {
-  return { id, parentId, status, order, line1: id, line2: '', tags: [], collapsed: false };
+  return { id, parentId, status, order, line1: id, tags: [], collapsed: false };
 }
 
 describe('task frontier', () => {

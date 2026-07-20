@@ -195,10 +195,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 16px; font-weight: 600; color: #1a1a2e;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.item-line2 {
-  font-size: 13px; color: #888;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
 
 .status-badge {
   display: inline-flex;

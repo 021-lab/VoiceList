@@ -33,10 +33,12 @@ function buildLabel(command, payload = {}) {
 }
 
 function createLogEntry(input, patch) {
+  const command = clone(input);
+  if (command.payload) delete command.payload.line2;
   return {
     id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
     createdAt: new Date().toISOString(),
-    command: clone(input),
+    command,
     patch,
     label: buildLabel(input.command, input.payload),
     syncStatus: 'pending'
@@ -100,7 +102,6 @@ export function createInterpreter() {
           order: nextOrder(nextItems, null),
           status: 'Open',
           line1: payload.line1,
-          line2: payload.line2 || '',
           collapsed: false,
           tags: []
         });
@@ -111,7 +112,6 @@ export function createInterpreter() {
           order: nextOrder(nextItems, input.actId),
           status: 'Open',
           line1: payload.line1,
-          line2: payload.line2 || '',
           collapsed: false,
           tags: []
         });
@@ -119,7 +119,6 @@ export function createInterpreter() {
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         if (item) {
           item.line1 = payload.line1;
-          item.line2 = payload.line2 || '';
         }
       } else if (input.command === 'setStatus') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);

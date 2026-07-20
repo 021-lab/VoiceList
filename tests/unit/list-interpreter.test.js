@@ -17,6 +17,8 @@ describe('list interpreter', () => {
     expect(result.patch.length).toBeGreaterThan(0);
     expect(result.actionLogEntry.command.command).toBe('addItem');
     expect(result.actionLogEntry.command.payload.line1).toBe('Task from test');
+    expect(result.patch[0].value[0]).not.toHaveProperty('line2');
+    expect(result.actionLogEntry.command.payload).not.toHaveProperty('line2');
   });
 
   test('switches to frontier view without mutating state', () => {

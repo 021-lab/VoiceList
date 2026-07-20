@@ -5,7 +5,7 @@
 Если ты в ветке `taosmd-backend` — твоя задача описана здесь, читать в этом порядке:
 1. `docs/CODER_TASK_storage-module.md` — что делать (storage-модуль: localStorage + write-through в taosmd `/tasks`, bootstrap из бэкенда, удаление `list-data.js`);
 2. `docs/INTEGRATION_taosmd.md` — архитектура доступа (Cloudflare Pages + Worker-proxy + Tunnel), подмножество API и правила;
-3. Канон спецификаций бэкенда: https://github.com/021-lab/TaOS/tree/feat/user-statuses/docs/specs — начинать с `00-INDEX-focus-harness.md`.
+3. Канон спецификаций бэкенда: https://github.com/021-lab/TaOS/tree/codex-voicelist-task-provenance/docs/specs — начинать с `TAOSMD_API_CONTRACT.md`.
 
 Для интеграционных работ работай в `taosmd-backend` (или ветках от неё); правило `codex-*` ниже относится к остальной разработке фронта.
 
@@ -14,13 +14,7 @@
 2. End every message with a working link to the live page.
 
 ## Live page link format
-Generate the link with these commands and include it at the end of every message:
-```bash
-SHA=$(git rev-parse HEAD)
-ORIGIN=$(git remote get-url origin)
-OWNER_REPO=$(printf '%s\n' "$ORIGIN" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')
-echo "https://htmlpreview.github.io/?https://raw.githubusercontent.com/${OWNER_REPO}/${SHA}/list-manager.html"
-```
+For taosmd integration, report the deployed Cloudflare Worker URL after `npm run build:worker` and Worker deployment. Do not use htmlpreview for this branch.
 
 ## Development branch
 - Work in `codex-` branches (кроме интеграции с taosmd — см. выше).

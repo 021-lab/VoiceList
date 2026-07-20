@@ -16,8 +16,8 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'root1', parentId: null, order: 10, status: 'Open', line1: 'Root', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'root1', order: 10, status: 'Focus', line1: 'Child', line2: '', tags: [], collapsed: false }
+          { id: 'root1', parentId: null, order: 10, status: 'Open', line1: 'Root', tags: [], collapsed: false },
+          { id: 'child', parentId: 'root1', order: 10, status: 'Focus', line1: 'Child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -47,9 +47,9 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'parent', parentId: null, order: 10, status: 'Open', line1: 'Parent', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'parent', order: 10, status: 'Open', line1: 'Child', line2: '', tags: [], collapsed: false },
-          { id: 'paused', parentId: null, order: 20, status: 'Pause', line1: 'Paused', line2: '', tags: [], collapsed: false }
+          { id: 'parent', parentId: null, order: 10, status: 'Open', line1: 'Parent', tags: [], collapsed: false },
+          { id: 'child', parentId: 'parent', order: 10, status: 'Open', line1: 'Child', tags: [], collapsed: false },
+          { id: 'paused', parentId: null, order: 20, status: 'Pause', line1: 'Paused', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -78,8 +78,8 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'focus', parentId: null, order: 10, status: 'Focus', line1: 'Focused task', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'focus', order: 10, status: 'Open', line1: 'Action child', line2: '', tags: [], collapsed: false }
+          { id: 'focus', parentId: null, order: 10, status: 'Focus', line1: 'Focused task', tags: [], collapsed: false },
+          { id: 'child', parentId: 'focus', order: 10, status: 'Open', line1: 'Action child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -99,8 +99,8 @@ describe('list renderer', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'parent', parentId: null, order: 10, status: 'Open', line1: 'Parent task', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'parent', order: 10, status: 'Open', line1: 'Frontier child', line2: '', tags: [], collapsed: false }
+          { id: 'parent', parentId: null, order: 10, status: 'Open', line1: 'Parent task', tags: [], collapsed: false },
+          { id: 'child', parentId: 'parent', order: 10, status: 'Open', line1: 'Frontier child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -145,7 +145,7 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'root-task', parentId: null, order: 10, status: 'Open', line1: 'Root frontier task', line2: '', tags: [], collapsed: false }
+          { id: 'root-task', parentId: null, order: 10, status: 'Open', line1: 'Root frontier task', tags: [], collapsed: false }
         ]
       },
       actionLog: []

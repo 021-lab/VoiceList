@@ -4,8 +4,9 @@ import { createSync } from '../../src/list-sync.js';
 
 describe('list sync', () => {
   test('marks action log entry synced after mutation save', async () => {
+    const state = { snapshot: { items: [] }, actionLog: [] };
     const adapter = {
-      save: vi.fn(async () => {})
+      save: vi.fn(async () => state)
     };
     const store = {
       updateActionLogStatus: vi.fn(() => ({ ok: true }))
@@ -13,14 +14,36 @@ describe('list sync', () => {
     const onStateChange = vi.fn();
 
     const sync = createSync({ adapter, onStateChange, store });
-    const state = { snapshot: { items: [] }, actionLog: [] };
     const actionLogEntry = { id: 'log1' };
 
     await sync.enqueue(state, actionLogEntry);
 
-    expect(adapter.save).toHaveBeenCalledWith(state, { reason: 'mutation', createBackup: false });
+    expect(adapter.save).toHaveBeenCalledWith(state, { reason: 'mutation', createBackup: false, actionLogEntry });
     expect(store.updateActionLogStatus).toHaveBeenCalledWith('log1', 'synced');
     expect(onStateChange).toHaveBeenCalledWith({ ok: true });
+  });
+
+  test('replaces local state with reconciled backend ids before marking synced', async () => {
+    const state = { snapshot: { items: [{ id: 'local' }] }, actionLog: [{ id: 'log1', syncStatus: 'pending' }] };
+    const reconciled = { snapshot: { items: [{ id: 't-server' }] }, actionLog: [{ id: 'log1', syncStatus: 'pending' }] };
+    const adapter = {
+      save: vi.fn(async () => reconciled)
+    };
+    const store = {
+      replaceState: vi.fn((nextState) => nextState),
+      updateActionLogStatus: vi.fn(() => ({ ...reconciled, actionLog: [{ id: 'log1', syncStatus: 'synced' }] }))
+    };
+    const onStateChange = vi.fn();
+
+    const sync = createSync({ adapter, onStateChange, store });
+    await sync.enqueue(state, { id: 'log1' });
+
+    expect(store.replaceState).toHaveBeenCalledWith(reconciled);
+    expect(store.updateActionLogStatus).toHaveBeenCalledWith('log1', 'synced');
+    expect(onStateChange).toHaveBeenLastCalledWith({
+      ...reconciled,
+      actionLog: [{ id: 'log1', syncStatus: 'synced' }]
+    });
   });
 
   test('runs autosave every minute with backup snapshots', async () => {

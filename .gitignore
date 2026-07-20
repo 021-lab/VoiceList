@@ -1,4 +1,6 @@
 node_modules/
 playwright-report/
 test-results/
+outside-git-files-backup/
+.wrangler/
 .DS_Store

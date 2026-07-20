@@ -12,7 +12,7 @@
 
 ## Бэкенд: taosmd (ветка `taosmd-backend`)
 
-Состояние хранится в [taosmd](https://github.com/021-lab/TaOS/tree/feat/user-statuses) (архив-первая память + граф задач + A2A). В браузере работает storage-модуль: localStorage как рабочая реплика, write-through в `/tasks` на каждую операцию, bootstrap из бэкенда на пустом localStorage, журнал действий — в A2A-канал лога. Seed-файла `list-data.js` больше нет.
+Состояние хранится в [taosmd](https://github.com/021-lab/TaOS/tree/codex-voicelist-task-provenance) (архив-первая память + граф задач + A2A). В браузере работает storage-модуль: localStorage как рабочая реплика, write-through в `/tasks` на каждую операцию, bootstrap из бэкенда на пустом localStorage, журнал действий — в A2A-канал лога. Seed-файла `list-data.js` больше нет.
 
 См. `docs/CODER_TASK_storage-module.md` и `docs/INTEGRATION_taosmd.md` в ветке `taosmd-backend`.
 
@@ -22,10 +22,11 @@
 npm ci
 npm run test:unit
 npm run prepare-preview
+npm run build:worker
 npm run test:e2e
 ```
 
-Переопределяйте тексты, цвета и интеграции в `src/` и шаблоне `list-manager.template.html`; deployable HTML собирается через `npm run prepare-preview`.
+Переопределяйте тексты, цвета и интеграции в `src/` и шаблоне `list-manager.template.html`; deployable HTML собирается через `npm run prepare-preview`, а Cloudflare Worker-proxy — через `npm run build:worker`.
 
 ## Preview
 

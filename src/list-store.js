@@ -2,6 +2,10 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function emptyState() {
+  return { snapshot: { items: [] }, actionLog: [] };
+}
+
 function decodePathSegment(segment) {
   return segment.replace(/~1/g, '/').replace(/~0/g, '~');
 }
@@ -31,7 +35,7 @@ function applyJsonPatch(document, patch) {
   return nextDocument;
 }
 
-export function createStore({ storageKey = 'voicelist.universal-list.state', storage = window.localStorage, seedState }) {
+export function createStore({ storageKey = 'voicelist.universal-list.state', storage = window.localStorage } = {}) {
   let state = null;
 
   function persist() {
@@ -40,7 +44,7 @@ export function createStore({ storageKey = 'voicelist.universal-list.state', sto
 
   function load() {
     const raw = storage.getItem(storageKey);
-    state = raw ? JSON.parse(raw) : clone(seedState);
+    state = raw ? JSON.parse(raw) : emptyState();
     if (!raw) persist();
     return clone(state);
   }

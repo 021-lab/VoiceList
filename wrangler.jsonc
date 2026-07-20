@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "voicelist-taosmd-integration",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-07-20",
+  "workers_dev": true,
+  "vars": {
+    "TAOSMD_ORIGIN": "https://recorder.smileme.ai/taosmd"
+  }
+}

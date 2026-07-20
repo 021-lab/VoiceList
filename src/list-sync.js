@@ -12,7 +12,8 @@ export function createSync({ adapter, onStateChange, store, autoSaveMs = 60_000 
 
     return chain(async () => {
       try {
-        await adapter.save(state, { reason: 'mutation', createBackup: false });
+        const savedState = await adapter.save(state, { reason: 'mutation', createBackup: false, actionLogEntry });
+        if (savedState && store.replaceState) store.replaceState(savedState);
         const nextState = store.updateActionLogStatus(actionLogEntry.id, 'synced');
         onStateChange(nextState);
       } catch (error) {

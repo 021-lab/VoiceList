@@ -203,10 +203,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 16px; font-weight: 600; color: #1a1a2e;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.item-line2 {
-  font-size: 13px; color: #888;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
 
 .status-badge {
   display: inline-flex;
@@ -551,10 +547,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
         <input type="text" id="task-page-line1" maxlength="60">
       </label>
       <label class="task-page-field">
-        <span>Подпись</span>
-        <input type="text" id="task-page-line2" maxlength="80">
-      </label>
-      <label class="task-page-field">
         <span>Статус</span>
         <select id="task-page-status">
           <option>Open</option>
@@ -580,11 +572,9 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
       <h2 id="modal-title">Новый элемент</h2>
       <div id="modal-view-content" style="display:none; margin-bottom:12px;">
         <div id="view-line1" style="font-size:17px; font-weight:600; color:#1a1a2e; margin-bottom:5px;"></div>
-        <div id="view-line2" style="font-size:14px; color:#888; margin-bottom:8px;"></div>
         <div id="view-tags" class="item-tags"></div>
       </div>
       <input type="text" id="input-line1" placeholder="Название (обязательно)" maxlength="60">
-      <input type="text" id="input-line2" placeholder="Подпись (необязательно)" maxlength="80">
       <div class="modal-actions">
         <button class="btn btn-cancel" id="btn-cancel">Отмена</button>
         <button class="btn btn-add" id="btn-confirm">Добавить</button>
@@ -598,29 +588,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
 </script>
 <script>
 (() => {
-  // list-data.js
-  var seedState = {
-    snapshot: {
-      items: [
-        { id: "milk1", parentId: null, order: 10, status: "Open", line1: "\u041C\u043E\u043B\u043E\u043A\u043E 3.2%", line2: "2 \u043F\u0430\u043A\u0435\u0442\u0430, \u043C\u0430\u0433\u0430\u0437\u0438\u043D \u0443 \u0434\u043E\u043C\u0430", collapsed: false, tags: [] },
-        { id: "bread", parentId: null, order: 20, status: "Open", line1: "\u0425\u043B\u0435\u0431 \u0440\u0436\u0430\u043D\u043E\u0439", line2: "", collapsed: false, tags: [] },
-        { id: "borod", parentId: "bread", order: 10, status: "Open", line1: "\u0411\u043E\u0440\u043E\u0434\u0438\u043D\u0441\u043A\u0438\u0439", line2: "400 \u0433", collapsed: false, tags: [] },
-        { id: "stoli", parentId: "bread", order: 20, status: "Open", line1: "\u0421\u0442\u043E\u043B\u0438\u0447\u043D\u044B\u0439", line2: "500 \u0433", collapsed: false, tags: [] },
-        { id: "apple", parentId: null, order: 30, status: "Focus", line1: "\u042F\u0431\u043B\u043E\u043A\u0438", line2: "\u0413\u043E\u043B\u0434\u0435\u043D, ~1.5 \u043A\u0433", collapsed: false, tags: ["\u041A\u0443\u043F\u0438\u0442\u044C"] },
-        { id: "goldn", parentId: "apple", order: 10, status: "Open", line1: "\u0413\u043E\u043B\u0434\u0435\u043D", line2: "500 \u0433", collapsed: false, tags: [] },
-        { id: "grnsm", parentId: "apple", order: 20, status: "Open", line1: "\u0413\u0440\u0435\u043D\u043D\u0438 \u0421\u043C\u0438\u0442", line2: "400 \u0433", collapsed: false, tags: [] },
-        { id: "fudji", parentId: "apple", order: 30, status: "Pause", line1: "\u0424\u0443\u0434\u0436\u0438", line2: "300 \u0433", collapsed: false, tags: [] },
-        { id: "pozzd", parentId: "fudji", order: 10, status: "Done", line1: "\u041F\u043E\u0437\u0437\u0437\u0434", line2: "", collapsed: false, tags: ["\u0414\u043E\u043C"] },
-        { id: "voovo", parentId: "pozzd", order: 10, status: "Open", line1: "\u0412\u043E\u043E\u0432\u043E\u0430\u0433\u0430", line2: "", collapsed: false, tags: [] },
-        { id: "first", parentId: "voovo", order: 10, status: "Focus", line1: "\u041F\u0435\u0440\u0432\u044B\u0439 \u043F\u043E\u0437\u0430\u0434", line2: "", collapsed: false, tags: ["\u041A\u0443\u043F\u0438\u0442\u044C"] },
-        { id: "cofee", parentId: null, order: 40, status: "Open", line1: "\u041A\u043E\u0444\u0435", line2: "\u0410\u0440\u0430\u0431\u0438\u043A\u0430, \u0437\u0435\u0440\u043D\u043E, 250 \u0433", collapsed: false, tags: [] },
-        { id: "tooth", parentId: null, order: 50, status: "Open", line1: "\u0417\u0443\u0431\u043D\u0430\u044F \u043F\u0430\u0441\u0442\u0430\u0430\u043E\u0430\u043E\u0430", line2: "", collapsed: false, tags: ["\u0414\u043E\u043C", "\u0412\u0430\u0436\u043D\u043E\u0435"] },
-        { id: "shamp", parentId: null, order: 60, status: "Archive", line1: "\u0428\u0430\u043C\u043F\u0443\u043D\u044C", line2: "\u0414\u043B\u044F \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u044B\u0445 \u0432\u043E\u043B\u043E\u0441", collapsed: false, tags: [] }
-      ]
-    },
-    actionLog: []
-  };
-
   // src/list-app.js
   function createApp({ adapter, interpreter, renderer, store, sync, ui }) {
     let state = null;
@@ -671,228 +638,191 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-backend-adapter.js
-  var firebaseConfig = {
-    apiKey: "AIzaSyBtttOmje8yQvU1mf1-zDbOq5OlBHLt6Ic",
-    projectId: "ai-labg"
-  };
-  var firestoreCollections = Object.freeze({
-    state: "lists",
-    history: "list_state_history",
-    backups: "list_state_backups"
+  var LOCAL_TO_BACKEND_STATUS = Object.freeze({
+    Open: "open",
+    Done: "closed",
+    Focus: "focus",
+    Pause: "pause",
+    Archive: "superseded"
   });
-  var defaultTarget = Object.freeze({
-    collection: firestoreCollections.state,
-    id: "main"
+  var BACKEND_TO_LOCAL_STATUS = Object.freeze({
+    open: "Open",
+    closed: "Done",
+    focus: "Focus",
+    pause: "Pause",
+    superseded: "Archive",
+    in_progress: "Open",
+    blocked: "Open"
   });
-  async function fetchWithTimeout(fetchImpl, url, options, timeoutMs) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      return await fetchImpl(url, {
-        ...options,
-        signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
   }
-  function pad(value) {
-    return String(value).padStart(2, "0");
+  function withQuery(path, params) {
+    const query = new URLSearchParams(params);
+    return `${path}?${query.toString()}`;
   }
-  function formatMinuteStamp(date) {
-    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  function jsonHeaders() {
+    return { "Content-Type": "application/json" };
   }
-  function formatDayStamp(date) {
-    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  function sortByOrder(items) {
+    return [...items].sort((left, right) => {
+      const leftParent = left.parentId || "";
+      const rightParent = right.parentId || "";
+      if (leftParent !== rightParent) return leftParent.localeCompare(rightParent);
+      return (left.order || 0) - (right.order || 0);
+    });
   }
-  function formatMonthStamp(date) {
-    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}`;
-  }
-  function formatWeekStamp(date) {
-    const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-    const day = utcDate.getUTCDay() || 7;
-    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
-    const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
-    const weekNumber = Math.ceil(((utcDate - yearStart) / 864e5 + 1) / 7);
-    return `${utcDate.getUTCFullYear()}-W${pad(weekNumber)}`;
-  }
-  function buildDocumentUrl(target) {
-    const path = `projects/${firebaseConfig.projectId}/databases/(default)/documents/${target.collection}/${target.id}`;
-    return `https://firestore.googleapis.com/v1/${path}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
-  }
-  function extractState(snapshotData) {
-    if (!snapshotData || typeof snapshotData !== "object") return null;
-    if (snapshotData.snapshot?.items && Array.isArray(snapshotData.actionLog)) return snapshotData;
-    return null;
-  }
-  function encodeDocument(state, target, metadata) {
+  function buildActionLogBody(actionLogEntry) {
+    const command = actionLogEntry?.command || {};
     return {
-      fields: {
-        payload: {
-          stringValue: JSON.stringify({
-            snapshot: state.snapshot,
-            actionLog: state.actionLog
-          })
-        },
-        target: {
-          stringValue: `${target.collection}/${target.id}`
-        },
-        reason: {
-          stringValue: metadata.reason
-        },
-        backupKind: {
-          stringValue: metadata.backupKind
-        },
-        updatedAtMs: {
-          integerValue: String(metadata.updatedAtMs)
-        }
+      schema: "voicelist.action.v1",
+      id: actionLogEntry?.id,
+      ts: actionLogEntry?.createdAt,
+      op: command.command,
+      payload: {
+        taskId: command.actId,
+        source: command.source,
+        ...command.payload || {}
       }
     };
   }
-  function decodeDocument(documentData) {
-    const payload = documentData?.fields?.payload?.stringValue;
-    if (!payload) return null;
-    try {
-      return extractState(JSON.parse(payload));
-    } catch (error) {
-      console.warn("Firestore payload parse skipped", error);
-      return null;
-    }
+  function localStatusToBackend(status) {
+    return LOCAL_TO_BACKEND_STATUS[status] || "open";
   }
-  function createBackupTargets(target = defaultTarget, currentDate = /* @__PURE__ */ new Date()) {
-    const baseId = target.id;
-    return {
-      history: {
-        collection: firestoreCollections.history,
-        id: `${baseId}--minute--${formatMinuteStamp(currentDate)}`
-      },
-      day: {
-        collection: firestoreCollections.backups,
-        id: `${baseId}--day--${formatDayStamp(currentDate)}`
-      },
-      week: {
-        collection: firestoreCollections.backups,
-        id: `${baseId}--week--${formatWeekStamp(currentDate)}`
-      },
-      month: {
-        collection: firestoreCollections.backups,
-        id: `${baseId}--month--${formatMonthStamp(currentDate)}`
-      }
-    };
-  }
-  function describeFirestoreAccess(target = defaultTarget, currentDate = /* @__PURE__ */ new Date()) {
-    const backups = createBackupTargets(target, currentDate);
-    return {
-      current: {
-        collection: target.collection,
-        id: target.id,
-        path: `${target.collection}/${target.id}`
-      },
-      collections: {
-        state: firestoreCollections.state,
-        history: firestoreCollections.history,
-        backups: firestoreCollections.backups
-      },
-      backups: Object.fromEntries(
-        Object.entries(backups).map(([key, value]) => [
-          key,
-          {
-            ...value,
-            path: `${value.collection}/${value.id}`
-          }
-        ])
-      )
-    };
+  function backendStatusToLocal(status) {
+    return BACKEND_TO_LOCAL_STATUS[status] || "Open";
   }
   function createBackendAdapter({
-    target = defaultTarget,
+    apiBase = "/api",
     fetchImpl = fetch,
-    now = () => /* @__PURE__ */ new Date(),
-    timeouts = { load: 1500, save: 4e3 }
+    createdBy = "user",
+    actionThread = "voicelist-log",
+    project = "voicelist"
   } = {}) {
-    async function writeDocument(documentTarget, state, metadata) {
-      const response = await fetchWithTimeout(
-        fetchImpl,
-        buildDocumentUrl(documentTarget),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(encodeDocument(state, documentTarget, metadata))
-        },
-        timeouts.save
-      );
-      if (!response.ok) {
-        throw new Error(`Firestore save failed: ${response.status}`);
+    const base = apiBase.replace(/\/$/, "");
+    async function request(path, options = {}) {
+      const response = await fetchImpl(`${base}${path}`, options);
+      if (!response.ok) throw new Error(`taosmd request failed: ${response.status} ${path}`);
+      return response.json();
+    }
+    async function post(path, body) {
+      return request(path, {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify(body)
+      });
+    }
+    async function loadBackend() {
+      const [tasksBody, edgesBody] = await Promise.all([
+        request(withQuery("/tasks", { limit: 500, project })),
+        request(withQuery("/tasks/edges", { limit: 2e3 }))
+      ]);
+      return {
+        tasks: tasksBody.tasks || [],
+        edges: edgesBody.edges || []
+      };
+    }
+    function stateFromBackend(tasks, edges) {
+      const parentByChild = /* @__PURE__ */ new Map();
+      for (const edge of edges) {
+        if (edge.type === "parent" && !edge.removed_ts) parentByChild.set(edge.from_id, edge.to_id);
+      }
+      const items = tasks.map((task, index) => ({
+        id: task.id,
+        parentId: parentByChild.get(task.id) || null,
+        order: Number.isFinite(task.priority) ? task.priority : (index + 1) * 10,
+        status: backendStatusToLocal(task.status),
+        line1: task.title || "",
+        collapsed: false,
+        tags: []
+      }));
+      return {
+        snapshot: { items: sortByOrder(items) },
+        actionLog: []
+      };
+    }
+    async function ensureTask(item, backendById) {
+      if (backendById.has(item.id)) {
+        const backend = backendById.get(item.id);
+        const payload = {
+          title: item.line1,
+          status: localStatusToBackend(item.status),
+          priority: item.order || 0,
+          created_by: createdBy
+        };
+        if ((backend.title || "") !== item.line1 || backend.status !== payload.status || backend.priority !== payload.priority) {
+          await post(`/tasks/${encodeURIComponent(item.id)}`, payload);
+        }
+        return item.id;
+      }
+      const created = await post("/tasks", {
+        title: item.line1,
+        status: localStatusToBackend(item.status),
+        priority: item.order || 0,
+        project,
+        created_by: createdBy
+      });
+      backendById.set(created.id, created);
+      return created.id;
+    }
+    async function ensureChildEdges(childId, parentId, edgeKeys) {
+      for (const type of ["parent", "blocks"]) {
+        const key = `${childId}->${parentId}:${type}`;
+        if (edgeKeys.has(key)) continue;
+        await post(`/tasks/${encodeURIComponent(childId)}/edges`, {
+          to_id: parentId,
+          type,
+          created_by: createdBy
+        });
+        edgeKeys.add(key);
       }
     }
+    async function sendActionLog(actionLogEntry) {
+      if (!actionLogEntry) return;
+      await post("/a2a/send", {
+        from: createdBy,
+        thread: actionThread,
+        body: JSON.stringify(buildActionLogBody(actionLogEntry))
+      });
+    }
     return {
-      getAccessInfo(currentDate = now()) {
-        return describeFirestoreAccess(target, currentDate);
-      },
       async load() {
         try {
-          const response = await fetchWithTimeout(fetchImpl, buildDocumentUrl(target), { method: "GET" }, timeouts.load);
-          if (response.status === 404) return null;
-          if (!response.ok) throw new Error(`Firestore load failed: ${response.status}`);
-          return decodeDocument(await response.json());
+          const { tasks, edges } = await loadBackend();
+          return stateFromBackend(tasks, edges);
         } catch (error) {
-          console.warn("Firestore load skipped", error);
+          console.warn("taosmd bootstrap skipped", error);
           return null;
         }
       },
-      async loadVersion(versionTarget) {
-        try {
-          const response = await fetchWithTimeout(fetchImpl, buildDocumentUrl(versionTarget), { method: "GET" }, timeouts.load);
-          if (response.status === 404) return null;
-          if (!response.ok) throw new Error(`Firestore load version failed: ${response.status}`);
-          return decodeDocument(await response.json());
-        } catch (error) {
-          console.warn("Firestore version load skipped", error);
-          return null;
+      async save(state, { actionLogEntry = null } = {}) {
+        const nextState = clone(state);
+        const { tasks, edges } = await loadBackend();
+        const backendById = new Map(tasks.map((task) => [task.id, task]));
+        const edgeKeys = new Set(
+          edges.filter((edge) => !edge.removed_ts).map((edge) => `${edge.from_id}->${edge.to_id}:${edge.type}`)
+        );
+        const idMap = /* @__PURE__ */ new Map();
+        for (const item of sortByOrder(nextState.snapshot.items)) {
+          const backendId = await ensureTask(item, backendById);
+          idMap.set(item.id, backendId);
+          item.id = backendId;
         }
-      },
-      async save(state, { reason = "mutation", createBackup = false } = {}) {
-        const timestamp = now();
-        const updatedAtMs = timestamp.getTime();
-        await writeDocument(target, state, {
-          reason,
-          backupKind: "live",
-          updatedAtMs
-        });
-        if (!createBackup) return state;
-        const backupTargets = createBackupTargets(target, timestamp);
-        await Promise.all([
-          writeDocument(backupTargets.history, state, {
-            reason,
-            backupKind: "minute",
-            updatedAtMs
-          }),
-          writeDocument(backupTargets.day, state, {
-            reason,
-            backupKind: "day",
-            updatedAtMs
-          }),
-          writeDocument(backupTargets.week, state, {
-            reason,
-            backupKind: "week",
-            updatedAtMs
-          }),
-          writeDocument(backupTargets.month, state, {
-            reason,
-            backupKind: "month",
-            updatedAtMs
-          })
-        ]);
-        return state;
+        for (const item of nextState.snapshot.items) {
+          if (!item.parentId) continue;
+          item.parentId = idMap.get(item.parentId) || item.parentId;
+          await ensureChildEdges(item.id, item.parentId, edgeKeys);
+        }
+        const fullLogEntry = actionLogEntry?.command ? actionLogEntry : nextState.actionLog.find((entry) => entry.id === actionLogEntry?.id);
+        await sendActionLog(fullLogEntry);
+        return nextState;
       }
     };
   }
 
   // src/list-interpreter.js
   var STATUS_VALUES = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause"]);
-  function clone(value) {
+  function clone2(value) {
     return JSON.parse(JSON.stringify(value));
   }
   function randomId(existingIds) {
@@ -921,10 +851,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     return command;
   }
   function createLogEntry(input, patch) {
+    const command = clone2(input);
+    if (command.payload) delete command.payload.line2;
     return {
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-      command: clone(input),
+      command,
       patch,
       label: buildLabel(input.command, input.payload),
       syncStatus: "pending"
@@ -947,8 +879,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   function createInterpreter() {
     return {
       execute(state, input) {
-        const currentItems = clone(state.snapshot.items);
-        const nextItems = clone(currentItems);
+        const currentItems = clone2(state.snapshot.items);
+        const nextItems = clone2(currentItems);
         const existingIds = new Set(nextItems.map((item) => item.id));
         let patch = [];
         let actionLogEntry = null;
@@ -978,7 +910,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
             order: nextOrder(nextItems, null),
             status: "Open",
             line1: payload.line1,
-            line2: payload.line2 || "",
             collapsed: false,
             tags: []
           });
@@ -989,7 +920,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
             order: nextOrder(nextItems, input.actId),
             status: "Open",
             line1: payload.line1,
-            line2: payload.line2 || "",
             collapsed: false,
             tags: []
           });
@@ -997,7 +927,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           if (item) {
             item.line1 = payload.line1;
-            item.line2 = payload.line2 || "";
           }
         } else if (input.command === "setStatus") {
           const item = nextItems.find((candidate) => candidate.id === input.actId);
@@ -1032,7 +961,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
             }
           ];
         } else if (input.command === "undo") {
-          patch = [{ op: "replace", path: "/snapshot", value: clone(payload.snapshot) }];
+          patch = [{ op: "replace", path: "/snapshot", value: clone2(payload.snapshot) }];
         }
         if (!patch.length) {
           patch = [{ op: "replace", path: "/snapshot/items", value: nextItems }];
@@ -1051,7 +980,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   function normalizedStatus(task) {
     return String(task.status || "").toLowerCase();
   }
-  function sortByOrder(left, right) {
+  function sortByOrder2(left, right) {
     return (left.task.order || 0) - (right.task.order || 0);
   }
   function createNode(task) {
@@ -1087,8 +1016,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       if (!parent) throw new Error(`Missing parent ${node.parentId} for task ${node.id}`);
       parent.children.push(node);
     }
-    for (const node of nodes.values()) node.children.sort(sortByOrder);
-    root.children.sort(sortByOrder);
+    for (const node of nodes.values()) node.children.sort(sortByOrder2);
+    root.children.sort(sortByOrder2);
     if (tasks.length > 0 && root.children.length === 0) {
       throw new Error("No reachable root tasks found");
     }
@@ -1214,7 +1143,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       <div class="item-head">
         <div class="item-copy">
           <div class="item-line1">${chevron}${escHtml(item.line1)}</div>
-          ${item.line2 ? `<div class="item-line2">${escHtml(item.line2)}</div>` : ""}
           ${item.tags?.length ? `<div class="item-tags">${item.tags.map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join("")}</div>` : ""}
         </div>
         <div class="item-side">
@@ -1243,7 +1171,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       <div class="item-head">
         <div class="item-copy">
           <div class="item-line1">${escHtml(parent.line1)}</div>
-          ${parent.line2 ? `<div class="item-line2">${escHtml(parent.line2)}</div>` : ""}
           ${parent.tags?.length ? `<div class="item-tags">${parent.tags.map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join("")}</div>` : ""}
         </div>
         <div class="item-side">
@@ -1285,7 +1212,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           id: "__root__",
           status: "Open",
           line1: "\u041C\u043E\u0439 \u0441\u043F\u0438\u0441\u043E\u043A",
-          line2: "",
           tags: []
         };
         const parentExpanded = expandedFrontierParents.has(item.id);
@@ -1347,14 +1273,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-store.js
-  function clone2(value) {
+  function clone3(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+  function emptyState() {
+    return { snapshot: { items: [] }, actionLog: [] };
   }
   function decodePathSegment(segment) {
     return segment.replace(/~1/g, "/").replace(/~0/g, "~");
   }
   function applyJsonPatch(document2, patch) {
-    const nextDocument = clone2(document2);
+    const nextDocument = clone3(document2);
     for (const operation of patch) {
       const segments = operation.path.split("/").slice(1).map(decodePathSegment);
       const lastSegment = segments.pop();
@@ -1363,7 +1292,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         target = target[Array.isArray(target) ? Number(segment) : segment];
       }
       if (operation.op === "replace" || operation.op === "add") {
-        target[Array.isArray(target) ? Number(lastSegment) : lastSegment] = clone2(operation.value);
+        target[Array.isArray(target) ? Number(lastSegment) : lastSegment] = clone3(operation.value);
       } else if (operation.op === "remove") {
         if (Array.isArray(target)) target.splice(Number(lastSegment), 1);
         else delete target[lastSegment];
@@ -1373,23 +1302,23 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     }
     return nextDocument;
   }
-  function createStore({ storageKey = "voicelist.universal-list.state", storage = window.localStorage, seedState: seedState2 }) {
+  function createStore({ storageKey = "voicelist.universal-list.state", storage = window.localStorage } = {}) {
     let state = null;
     function persist() {
       storage.setItem(storageKey, JSON.stringify(state));
     }
     function load() {
       const raw = storage.getItem(storageKey);
-      state = raw ? JSON.parse(raw) : clone2(seedState2);
+      state = raw ? JSON.parse(raw) : emptyState();
       if (!raw) persist();
-      return clone2(state);
+      return clone3(state);
     }
     function getState() {
       if (!state) return load();
-      return clone2(state);
+      return clone3(state);
     }
     function replaceState(nextState) {
-      state = clone2(nextState);
+      state = clone3(nextState);
       persist();
       return getState();
     }
@@ -1427,7 +1356,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       if (!actionLogEntry) return queue;
       return chain(async () => {
         try {
-          await adapter.save(state, { reason: "mutation", createBackup: false });
+          const savedState = await adapter.save(state, { reason: "mutation", createBackup: false, actionLogEntry });
+          if (savedState && store.replaceState) store.replaceState(savedState);
           const nextState = store.updateActionLogStatus(actionLogEntry.id, "synced");
           onStateChange(nextState);
         } catch (error) {
@@ -1462,7 +1392,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   var AVAILABLE_TAGS = ["\u0412\u0430\u0436\u043D\u043E\u0435", "\u0421\u0440\u043E\u0447\u043D\u043E", "\u041A\u0443\u043F\u0438\u0442\u044C", "\u0414\u043E\u043C", "\u0420\u0430\u0431\u043E\u0442\u0430", "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"];
   var STATUS_ACTIONS = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause"]);
   var PANEL_ITEM_HEIGHT = 72;
-  function clone3(value) {
+  function clone4(value) {
     return JSON.parse(JSON.stringify(value));
   }
   function escHtml2(value) {
@@ -1486,7 +1416,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       return { id, parentId, order: currentOrder };
     });
   }
-  function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+  function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
     let dispatchUserInput = () => {
     };
     let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
@@ -1618,37 +1548,30 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       modalOpen = true;
       viewContent.style.display = "none";
       input1.style.display = "";
-      input2.style.display = "";
       btnConfirm.style.display = "";
       btnCancel.textContent = "\u041E\u0442\u043C\u0435\u043D\u0430";
       input1.style.borderColor = "";
       if (mode === "view") {
         const item = findItem(state, targetId);
         viewLine1.textContent = item?.line1 || "";
-        viewLine2.textContent = item?.line2 || "";
-        viewLine2.style.display = item?.line2 ? "" : "none";
         viewTagsEl.innerHTML = (item?.tags || []).map((tag) => `<span class="item-tag">${escHtml2(tag)}</span>`).join("");
         viewTagsEl.style.display = item?.tags?.length ? "" : "none";
         viewContent.style.display = "";
         input1.style.display = "none";
-        input2.style.display = "none";
         btnConfirm.style.display = "none";
         btnCancel.textContent = "\u0417\u0430\u043A\u0440\u044B\u0442\u044C";
         modalTitle.textContent = "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440";
       } else if (mode === "edit") {
         const item = findItem(state, targetId);
         input1.value = item?.line1 || "";
-        input2.value = item?.line2 || "";
         modalTitle.textContent = "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C";
         btnConfirm.textContent = "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C";
       } else if (mode === "nest") {
         input1.value = "";
-        input2.value = "";
         modalTitle.textContent = "\u041D\u043E\u0432\u044B\u0439 \u0432\u043B\u043E\u0436\u0435\u043D\u043D\u044B\u0439";
         btnConfirm.textContent = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C";
       } else {
         input1.value = "";
-        input2.value = "";
         modalTitle.textContent = "\u041D\u043E\u0432\u044B\u0439 \u044D\u043B\u0435\u043C\u0435\u043D\u0442";
         btnConfirm.textContent = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C";
       }
@@ -1665,7 +1588,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     }
     function confirmModal() {
       const line1 = input1.value.trim();
-      const line2 = input2.value.trim();
       if (modalMode !== "view" && !line1) {
         input1.focus();
         input1.style.borderColor = "#ff3b30";
@@ -1677,7 +1599,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           actId: modalTargetId,
           actType: "task",
           command: "editItem",
-          payload: { line1, line2 },
+          payload: { line1 },
           source: "modal-confirm"
         });
         showToast("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E");
@@ -1686,7 +1608,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           actId: modalTargetId,
           actType: "task",
           command: "addChild",
-          payload: { line1, line2 },
+          payload: { line1 },
           source: "modal-confirm"
         });
         showToast("\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D \u0432\u043B\u043E\u0436\u0435\u043D\u043D\u044B\u0439");
@@ -1695,7 +1617,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           actId: "list",
           actType: "list",
           command: "addItem",
-          payload: { line1, line2 },
+          payload: { line1 },
           source: "modal-confirm"
         });
         showToast("\u042D\u043B\u0435\u043C\u0435\u043D\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D");
@@ -1711,7 +1633,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       taskPageSubtasks.innerHTML = children.map((child) => `
       <div class="task-page-subtask">
         ${escHtml2(child.line1)}
-        ${child.line2 ? `<small>${escHtml2(child.line2)}</small>` : ""}
       </div>
     `).join("");
     }
@@ -1722,7 +1643,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       taskPageOpen = true;
       taskPageTitle.textContent = item.line1 || "\u0417\u0430\u0434\u0430\u0447\u0430";
       taskPageLine1.value = item.line1 || "";
-      taskPageLine2.value = item.line2 || "";
       taskPageStatus.value = item.status || "Open";
       taskPageChildInput.value = "";
       renderTaskPageSubtasks(itemId, state);
@@ -1739,7 +1659,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     function saveTaskPage() {
       if (!taskPageTargetId) return;
       const line1 = taskPageLine1.value.trim();
-      const line2 = taskPageLine2.value.trim();
       const status = taskPageStatus.value;
       if (!line1) {
         taskPageLine1.focus();
@@ -1749,7 +1668,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         actId: taskPageTargetId,
         actType: "task",
         command: "editItem",
-        payload: { line1, line2 },
+        payload: { line1 },
         source: "task-page-save"
       });
       dispatchUserInput({
@@ -1773,7 +1692,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         actId: taskPageTargetId,
         actType: "task",
         command: "addChild",
-        payload: { line1, line2: "" },
+        payload: { line1 },
         source: "task-page-add-child"
       });
       taskPageChildInput.value = "";
@@ -1791,7 +1710,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         if (event.target === overlay) closeModal();
       });
       btnConfirm.addEventListener("click", confirmModal);
-      [input1, input2].forEach((input) => input.addEventListener("keydown", (event) => {
+      [input1].forEach((input) => input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") confirmModal();
       }));
       taskPageClose?.addEventListener("click", closeTaskPage);
@@ -1806,7 +1725,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           actId: "list",
           actType: "list",
           command: "undo",
-          payload: { snapshot: clone3(undoSnapshot) },
+          payload: { snapshot: clone4(undoSnapshot) },
           source: "undo-button"
         });
         undoSnapshot = null;
@@ -1864,7 +1783,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       });
     }
     function saveUndoSnapshot() {
-      undoSnapshot = clone3(getState().snapshot);
+      undoSnapshot = clone4(getState().snapshot);
       undoButton.disabled = false;
     }
     function startAutoScroll() {
@@ -2269,12 +2188,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
 
   // src/list-preview-entry.js
   var PREVIEW_BUILD_HASH = "mrfy24y0-y3psju";
+  function previewApiBase() {
+    const pathname = window.location.pathname;
+    const directory = pathname.endsWith("/") ? pathname.replace(/\/$/, "") : pathname.slice(0, pathname.lastIndexOf("/"));
+    return `${directory}/api` || "/api";
+  }
   async function bootstrapListManagerPreview() {
     document.documentElement.dataset.previewBuildHash = PREVIEW_BUILD_HASH;
+    window.__LIST_MANAGER_READY__ = false;
     const store = createStore({
       storageKey: "voicelist.universal-interface.state",
-      storage: window.localStorage,
-      seedState
+      storage: window.localStorage
     });
     let app = null;
     const ui = createUI({
@@ -2290,13 +2214,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       tagPanel: document.getElementById("tag-panel"),
       overlay: document.getElementById("modal-overlay"),
       input1: document.getElementById("input-line1"),
-      input2: document.getElementById("input-line2"),
       modalTitle: document.getElementById("modal-title"),
       btnConfirm: document.getElementById("btn-confirm"),
       btnCancel: document.getElementById("btn-cancel"),
       viewContent: document.getElementById("modal-view-content"),
       viewLine1: document.getElementById("view-line1"),
-      viewLine2: document.getElementById("view-line2"),
       viewTagsEl: document.getElementById("view-tags"),
       actionLogPanel: document.getElementById("action-log-panel"),
       taskPage: document.getElementById("task-page"),
@@ -2304,7 +2226,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       taskPageSave: document.getElementById("task-page-save"),
       taskPageTitle: document.getElementById("task-page-title"),
       taskPageLine1: document.getElementById("task-page-line1"),
-      taskPageLine2: document.getElementById("task-page-line2"),
       taskPageStatus: document.getElementById("task-page-status"),
       taskPageSubtasks: document.getElementById("task-page-subtasks"),
       taskPageChildInput: document.getElementById("task-page-child-input"),
@@ -2318,7 +2239,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       bindRow: ui.bindRow,
       onRendered: ui.onRendered
     });
-    const adapter = createBackendAdapter();
+    const adapter = createBackendAdapter({ apiBase: previewApiBase() });
     let sync = null;
     app = createApp({
       adapter,
@@ -2340,6 +2261,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       }
     });
     await app.init();
+    window.__LIST_MANAGER_READY__ = true;
   }
   bootstrapListManagerPreview().catch((error) => {
     console.error("Failed to bootstrap list manager", error);

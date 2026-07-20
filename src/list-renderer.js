@@ -76,7 +76,6 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
       <div class="item-head">
         <div class="item-copy">
           <div class="item-line1">${chevron}${escHtml(item.line1)}</div>
-          ${item.line2 ? `<div class="item-line2">${escHtml(item.line2)}</div>` : ''}
           ${item.tags?.length ? `<div class="item-tags">${item.tags.map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="item-side">
@@ -109,7 +108,6 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
       <div class="item-head">
         <div class="item-copy">
           <div class="item-line1">${escHtml(parent.line1)}</div>
-          ${parent.line2 ? `<div class="item-line2">${escHtml(parent.line2)}</div>` : ''}
           ${parent.tags?.length ? `<div class="item-tags">${parent.tags.map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="item-side">
@@ -158,7 +156,6 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
         id: '__root__',
         status: 'Open',
         line1: 'Мой список',
-        line2: '',
         tags: []
       };
       const parentExpanded = expandedFrontierParents.has(item.id);

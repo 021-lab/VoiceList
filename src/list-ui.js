@@ -37,7 +37,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -187,7 +187,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     viewContent.style.display = 'none';
     input1.style.display = '';
-    input2.style.display = '';
     btnConfirm.style.display = '';
     btnCancel.textContent = 'Отмена';
     input1.style.borderColor = '';
@@ -195,30 +194,24 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     if (mode === 'view') {
       const item = findItem(state, targetId);
       viewLine1.textContent = item?.line1 || '';
-      viewLine2.textContent = item?.line2 || '';
-      viewLine2.style.display = item?.line2 ? '' : 'none';
       viewTagsEl.innerHTML = (item?.tags || []).map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join('');
       viewTagsEl.style.display = item?.tags?.length ? '' : 'none';
       viewContent.style.display = '';
       input1.style.display = 'none';
-      input2.style.display = 'none';
       btnConfirm.style.display = 'none';
       btnCancel.textContent = 'Закрыть';
       modalTitle.textContent = 'Просмотр';
     } else if (mode === 'edit') {
       const item = findItem(state, targetId);
       input1.value = item?.line1 || '';
-      input2.value = item?.line2 || '';
       modalTitle.textContent = 'Редактировать';
       btnConfirm.textContent = 'Сохранить';
     } else if (mode === 'nest') {
       input1.value = '';
-      input2.value = '';
       modalTitle.textContent = 'Новый вложенный';
       btnConfirm.textContent = 'Добавить';
     } else {
       input1.value = '';
-      input2.value = '';
       modalTitle.textContent = 'Новый элемент';
       btnConfirm.textContent = 'Добавить';
     }
@@ -239,7 +232,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function confirmModal() {
     const line1 = input1.value.trim();
-    const line2 = input2.value.trim();
 
     if (modalMode !== 'view' && !line1) {
       input1.focus();
@@ -254,7 +246,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: modalTargetId,
         actType: 'task',
         command: 'editItem',
-        payload: { line1, line2 },
+        payload: { line1 },
         source: 'modal-confirm'
       });
       showToast('Сохранено');
@@ -263,7 +255,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: modalTargetId,
         actType: 'task',
         command: 'addChild',
-        payload: { line1, line2 },
+        payload: { line1 },
         source: 'modal-confirm'
       });
       showToast('Добавлен вложенный');
@@ -272,7 +264,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: 'list',
         actType: 'list',
         command: 'addItem',
-        payload: { line1, line2 },
+        payload: { line1 },
         source: 'modal-confirm'
       });
       showToast('Элемент добавлен');
@@ -294,7 +286,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     taskPageSubtasks.innerHTML = children.map((child) => `
       <div class="task-page-subtask">
         ${escHtml(child.line1)}
-        ${child.line2 ? `<small>${escHtml(child.line2)}</small>` : ''}
       </div>
     `).join('');
   }
@@ -307,7 +298,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     taskPageOpen = true;
     taskPageTitle.textContent = item.line1 || 'Задача';
     taskPageLine1.value = item.line1 || '';
-    taskPageLine2.value = item.line2 || '';
     taskPageStatus.value = item.status || 'Open';
     taskPageChildInput.value = '';
     renderTaskPageSubtasks(itemId, state);
@@ -326,7 +316,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   function saveTaskPage() {
     if (!taskPageTargetId) return;
     const line1 = taskPageLine1.value.trim();
-    const line2 = taskPageLine2.value.trim();
     const status = taskPageStatus.value;
     if (!line1) {
       taskPageLine1.focus();
@@ -337,7 +326,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       actId: taskPageTargetId,
       actType: 'task',
       command: 'editItem',
-      payload: { line1, line2 },
+      payload: { line1 },
       source: 'task-page-save'
     });
     dispatchUserInput({
@@ -363,7 +352,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       actId: taskPageTargetId,
       actType: 'task',
       command: 'addChild',
-      payload: { line1, line2: '' },
+      payload: { line1 },
       source: 'task-page-add-child'
     });
     taskPageChildInput.value = '';
@@ -384,7 +373,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       if (event.target === overlay) closeModal();
     });
     btnConfirm.addEventListener('click', confirmModal);
-    [input1, input2].forEach((input) => input.addEventListener('keydown', (event) => {
+    [input1].forEach((input) => input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') confirmModal();
     }));
     taskPageClose?.addEventListener('click', closeTaskPage);
