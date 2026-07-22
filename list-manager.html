@@ -976,6 +976,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
 
   // src/list-frontier.js
   var CLOSED_STATUSES = /* @__PURE__ */ new Set(["done", "archive"]);
+  var BLOCKED_BRANCH_STATUSES = /* @__PURE__ */ new Set(["archive"]);
   var FRONTIER_STATUSES = /* @__PURE__ */ new Set(["open", "focus"]);
   function normalizedStatus(task) {
     return String(task.status || "").toLowerCase();
@@ -1055,6 +1056,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     const focusHighlights = [];
     function visit(node, paused) {
       const status = normalizedStatus(node.task || {});
+      if (BLOCKED_BRANCH_STATUSES.has(status)) return false;
       if (CLOSED_STATUSES.has(status) && !node.hasFocusInSubtree) return false;
       if (status === "focus") focusHighlights.push(node.task);
       const focusInsidePause = paused && status === "focus";
@@ -1081,6 +1083,9 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-renderer.js
+  function isArchived(item) {
+    return String(item?.status || "").toLowerCase() === "archive";
+  }
   function escHtml(value) {
     return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -1258,8 +1263,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       const fragment = document.createDocumentFragment();
       function walk(parentId, level, hidden) {
         for (const item of byParent.get(parentId) || []) {
+          if (isArchived(item)) continue;
           index += 1;
-          const hasChildren = (byParent.get(item.id) || []).length > 0;
+          const visibleChildren = (byParent.get(item.id) || []).filter((child) => !isArchived(child));
+          const hasChildren = visibleChildren.length > 0;
           renderRow({ fragment, hasChildren, hidden, index, item, level });
           walk(item.id, level + 1, hidden || !!item.collapsed);
         }

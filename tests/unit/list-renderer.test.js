@@ -27,6 +27,34 @@ describe('list renderer', () => {
     expect(document.body.textContent).toContain('Focus');
   });
 
+  test('hides archived tasks and their subtree in list view', () => {
+    document.body.innerHTML = `
+      <div id="list-container"></div>
+      <div id="action-log-panel"></div>
+    `;
+
+    const renderer = createRenderer({
+      container: document.getElementById('list-container'),
+      actionLogPanel: document.getElementById('action-log-panel')
+    });
+
+    renderer.render({
+      snapshot: {
+        items: [
+          { id: 'visible', parentId: null, order: 10, status: 'Open', line1: 'Visible task', tags: [], collapsed: false },
+          { id: 'archived', parentId: null, order: 20, status: 'Archive', line1: 'Archived task', tags: [], collapsed: false },
+          { id: 'archived-child', parentId: 'archived', order: 10, status: 'Open', line1: 'Archived child', tags: [], collapsed: false }
+        ]
+      },
+      actionLog: []
+    });
+
+    expect(document.body.textContent).toContain('Visible task');
+    expect(document.body.textContent).not.toContain('Archived task');
+    expect(document.body.textContent).not.toContain('Archived child');
+    expect(document.querySelectorAll('.list-item-wrapper')).toHaveLength(1);
+  });
+
   test('renders only frontier tasks in frontier view and keeps task bindings', () => {
     document.body.innerHTML = `
       <div id="root"></div>
@@ -155,5 +183,34 @@ describe('list renderer', () => {
 
     expect(document.querySelector('.frontier-parent-wrapper')?.textContent).toContain('Мой список');
     expect(document.querySelector('[data-id="root-task"]').style.marginLeft).toBe('24px');
+  });
+
+  test('does not render frontier rows from archived branches', () => {
+    document.body.innerHTML = `
+      <div id="root"></div>
+      <div id="list-container"></div>
+      <div id="action-log-panel"></div>
+    `;
+
+    const renderer = createRenderer({
+      rootPanel: document.getElementById('root'),
+      container: document.getElementById('list-container'),
+      actionLogPanel: document.getElementById('action-log-panel')
+    });
+
+    renderer.render({
+      snapshot: {
+        items: [
+          { id: 'archived', parentId: null, order: 10, status: 'Archive', line1: 'Archived task', tags: [], collapsed: false },
+          { id: 'archived-focus', parentId: 'archived', order: 10, status: 'Focus', line1: 'Archived focus', tags: [], collapsed: false },
+          { id: 'visible', parentId: null, order: 20, status: 'Open', line1: 'Visible frontier', tags: [], collapsed: false }
+        ]
+      },
+      actionLog: []
+    }, 'frontier');
+
+    expect(document.body.textContent).toContain('Visible frontier');
+    expect(document.body.textContent).not.toContain('Archived task');
+    expect(document.body.textContent).not.toContain('Archived focus');
   });
 });

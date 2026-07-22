@@ -1,5 +1,9 @@
 import { calculateFrontier } from './list-frontier.js';
 
+function isArchived(item) {
+  return String(item?.status || '').toLowerCase() === 'archive';
+}
+
 function escHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -213,8 +217,10 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
 
     function walk(parentId, level, hidden) {
       for (const item of byParent.get(parentId) || []) {
+        if (isArchived(item)) continue;
         index += 1;
-        const hasChildren = (byParent.get(item.id) || []).length > 0;
+        const visibleChildren = (byParent.get(item.id) || []).filter((child) => !isArchived(child));
+        const hasChildren = visibleChildren.length > 0;
         renderRow({ fragment, hasChildren, hidden, index, item, level });
 
         walk(item.id, level + 1, hidden || !!item.collapsed);
