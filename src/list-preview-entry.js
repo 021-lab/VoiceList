@@ -6,6 +6,12 @@ import { createRenderer } from './list-renderer.js';
 import { createStore } from './list-store.js';
 import { createSync } from './list-sync.js';
 import { createUI } from './list-ui.js';
+import {
+  createRecognitionFactory,
+  createVoiceController,
+  createVoiceUI,
+  isSpeechRecognitionSupported
+} from './list-voice.js';
 
 const PREVIEW_BUILD_HASH = __PREVIEW_BUILD_HASH__;
 
@@ -87,6 +93,37 @@ async function bootstrapListManagerPreview() {
   });
 
   await app.init();
+  bootstrapVoiceControl(app);
+}
+
+function bootstrapVoiceControl(app) {
+  const button = document.getElementById('voice-btn');
+  const statusEl = document.getElementById('voice-status');
+  const transcriptEl = document.getElementById('voice-transcript');
+  const helpButton = document.getElementById('voice-help-btn');
+  const helpList = document.getElementById('voice-help');
+
+  if (helpButton && helpList) {
+    helpButton.addEventListener('click', () => {
+      helpList.hidden = !helpList.hidden;
+      helpButton.setAttribute('aria-expanded', String(!helpList.hidden));
+    });
+  }
+
+  const supported = isSpeechRecognitionSupported(window);
+  let voiceUI = null;
+
+  const controller = createVoiceController({
+    recognitionFactory: createRecognitionFactory(window),
+    dispatch: (input) => app.dispatch(input),
+    getState: () => app.getState(),
+    onStatus: (event) => voiceUI?.onStatus(event)
+  });
+
+  voiceUI = createVoiceUI({ button, statusEl, transcriptEl, controller, supported });
+
+  // Exposed so end-to-end tests can drive commands without a real microphone.
+  window.__voiceControl__ = controller;
 }
 
 bootstrapListManagerPreview().catch((error) => {

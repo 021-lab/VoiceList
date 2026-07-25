@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node scripts/prepare-preview.mjs",
+    "start": "node scripts/static-server.mjs",
     "test": "npm run test:unit",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",

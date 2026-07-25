@@ -255,6 +255,80 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .empty-state p { font-size: 15px; }
 
 /* ── FAB ── */
+/* ── Voice control ── */
+.voice-panel {
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.voice-panel-row { display: flex; align-items: center; gap: 10px; }
+.voice-indicator {
+  flex-shrink: 0;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #c8c8c8;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.voice-status { flex: 1; font-size: 13px; color: #555; line-height: 1.35; }
+.voice-status[data-state="listening"] { color: #007aff; font-weight: 600; }
+.voice-status[data-state="accepted"] { color: #1e8b4d; font-weight: 600; }
+.voice-status[data-state="rejected"],
+.voice-status[data-state="error"],
+.voice-status[data-state="unsupported"] { color: #c0392b; font-weight: 600; }
+.voice-panel:has(.voice-status[data-state="listening"]) .voice-indicator {
+  background: #007aff;
+  box-shadow: 0 0 0 4px rgba(0,122,255,0.18);
+}
+.voice-panel:has(.voice-status[data-state="accepted"]) .voice-indicator { background: #1e8b4d; }
+.voice-panel:has(.voice-status[data-state="rejected"]) .voice-indicator,
+.voice-panel:has(.voice-status[data-state="error"]) .voice-indicator { background: #c0392b; }
+.voice-help-btn {
+  flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: #f0f0f0; color: #555;
+  font-size: 13px; font-weight: 700; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.voice-help-btn:active { background: #e0e0e0; }
+.voice-transcript {
+  font-size: 13px; color: #1a1a2e; font-style: italic;
+  margin-top: 6px; min-height: 0;
+}
+.voice-transcript:empty { display: none; }
+.voice-help {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  list-style: none;
+}
+.voice-help li { font-size: 12px; color: #777; padding: 2px 0; }
+
+.voice-btn {
+  position: fixed; bottom: 96px; right: 20px;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #fff; color: #1a1a2e; border: 1px solid #e0e0e0;
+  font-size: 24px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
+}
+.voice-btn:active { transform: scale(0.92); }
+.voice-btn:disabled { opacity: 0.4; pointer-events: none; }
+.voice-btn.listening {
+  background: #ff3b30; border-color: #ff3b30;
+  box-shadow: 0 4px 16px rgba(255,59,48,0.45);
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(255,59,48,0.45); }
+  50% { box-shadow: 0 4px 22px rgba(255,59,48,0.75); }
+}
+
+#app-root[data-view-mode="log"] .voice-panel,
+#app-root[data-view-mode="log"] .voice-btn { display: none; }
+
 .add-btn {
   position: fixed; bottom: 28px; right: 20px;
   width: 56px; height: 56px; border-radius: 50%;
@@ -523,6 +597,28 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
     <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
 
+  <section id="voice-panel" class="voice-panel">
+    <div class="voice-panel-row">
+      <span class="voice-indicator" aria-hidden="true"></span>
+      <p id="voice-status" class="voice-status" data-state="idle" role="status" aria-live="polite">Нажмите микрофон и скажите команду</p>
+      <button id="voice-help-btn" class="voice-help-btn" type="button" aria-expanded="false" title="Список голосовых команд">?</button>
+    </div>
+    <p id="voice-transcript" class="voice-transcript"></p>
+    <ul id="voice-help" class="voice-help" hidden>
+      <li>«добавь задачу купить молоко»</li>
+      <li>«добавь подзадачу голден к яблоки»</li>
+      <li>«отметь хлеб выполнено»</li>
+      <li>«фокус на кофе»</li>
+      <li>«в архив шампунь»</li>
+      <li>«переименуй кофе в чай»</li>
+      <li>«удали зубная паста»</li>
+      <li>«пометь молоко как срочно»</li>
+      <li>«сверни яблоки»</li>
+      <li>«покажи фронтир» / «покажи журнал» / «покажи список»</li>
+      <li>«отмена»</li>
+    </ul>
+  </section>
+
   <div id="list-container"></div>
 
   <section id="action-log-panel" hidden>
@@ -533,6 +629,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   </section>
 
   <div class="toast" id="toast"></div>
+  <button class="voice-btn" id="voice-btn" type="button" aria-pressed="false" aria-label="Голосовая команда">🎤</button>
   <button class="add-btn" id="add-btn" aria-label="Добавить задачу">+</button>
 
   <div id="tag-panel" class="swipe-panel"></div>
@@ -650,6 +747,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       }
     }
     return {
+      dispatch: dispatchUserInput,
       async init() {
         state = store.load();
         const backendState = await adapter.load();
@@ -2267,6 +2365,398 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     };
   }
 
+  // src/list-voice.js
+  var STATUS_PHRASES = [
+    { status: "Done", words: ["\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E", "\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430", "\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D", "\u0433\u043E\u0442\u043E\u0432\u043E", "\u0433\u043E\u0442\u043E\u0432\u0430", "\u0441\u0434\u0435\u043B\u0430\u043D\u043E", "\u0441\u0434\u0435\u043B\u0430\u043D\u0430", "\u0437\u0430\u043A\u0440\u044B\u0442\u043E", "\u0437\u0430\u043A\u0440\u044B\u0442\u0430"] },
+    { status: "Focus", words: ["\u0444\u043E\u043A\u0443\u0441", "\u0444\u043E\u043A\u0443\u0441\u0435", "\u0432\u0430\u0436\u043D\u043E", "\u0433\u043B\u0430\u0432\u043D\u043E\u0435"] },
+    { status: "Pause", words: ["\u043F\u0430\u0443\u0437\u0430", "\u043F\u0430\u0443\u0437\u0443", "\u043F\u0430\u0443\u0437\u0435", "\u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435", "\u043E\u0442\u043B\u043E\u0436\u0435\u043D\u043E", "\u043E\u0442\u043B\u043E\u0436\u0435\u043D\u0430"] },
+    { status: "Archive", words: ["\u0430\u0440\u0445\u0438\u0432", "\u0430\u0440\u0445\u0438\u0432\u0435", "\u0430\u0440\u0445\u0438\u0432\u0438\u0440\u043E\u0432\u0430\u0442\u044C"] },
+    { status: "Open", words: ["\u043E\u0442\u043A\u0440\u044B\u0442\u043E", "\u043E\u0442\u043A\u0440\u044B\u0442\u0430", "\u0437\u0430\u043D\u043E\u0432\u043E", "\u0432\u0435\u0440\u043D\u0443\u0442\u044C", "\u0430\u043A\u0442\u0438\u0432\u043D\u043E", "\u0430\u043A\u0442\u0438\u0432\u043D\u0430"] }
+  ];
+  var TAG_WORDS = ["\u0432\u0430\u0436\u043D\u043E\u0435", "\u0441\u0440\u043E\u0447\u043D\u043E", "\u043A\u0443\u043F\u0438\u0442\u044C", "\u0434\u043E\u043C", "\u0440\u0430\u0431\u043E\u0442\u0430", "\u043E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"];
+  var TAG_CANONICAL = {
+    "\u0432\u0430\u0436\u043D\u043E\u0435": "\u0412\u0430\u0436\u043D\u043E\u0435",
+    "\u0441\u0440\u043E\u0447\u043D\u043E": "\u0421\u0440\u043E\u0447\u043D\u043E",
+    "\u043A\u0443\u043F\u0438\u0442\u044C": "\u041A\u0443\u043F\u0438\u0442\u044C",
+    "\u0434\u043E\u043C": "\u0414\u043E\u043C",
+    "\u0440\u0430\u0431\u043E\u0442\u0430": "\u0420\u0430\u0431\u043E\u0442\u0430",
+    "\u043E\u0442\u043B\u043E\u0436\u0438\u0442\u044C": "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"
+  };
+  var STOP_WORDS = /* @__PURE__ */ new Set(["\u0437\u0430\u0434\u0430\u0447\u0443", "\u0437\u0430\u0434\u0430\u0447\u0430", "\u0437\u0430\u0434\u0430\u0447\u0438", "\u043F\u0443\u043D\u043A\u0442", "\u043F\u0443\u043D\u043A\u0442\u0430", "\u044D\u043B\u0435\u043C\u0435\u043D\u0442", "\u0434\u0435\u043B\u043E", "\u043D\u0430", "\u0432", "\u0432\u043E", "\u043A", "\u043A\u043E", "\u0434\u043B\u044F", "\u0441", "\u0441\u043E", "\u0438\u0437", "\u043F\u043E", "\u0438"]);
+  function clone4(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+  function normalizeSpeech(value) {
+    return String(value || "").toLowerCase().replace(/ё/g, "\u0435").replace(/[.,!?;:«»"'()\-–—]/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function stem(token) {
+    return token.length > 4 ? token.slice(0, token.length - 1) : token;
+  }
+  function tokenize(value) {
+    return normalizeSpeech(value).split(" ").filter(Boolean);
+  }
+  function meaningfulTokens(value) {
+    const tokens = tokenize(value).filter((token) => !STOP_WORDS.has(token));
+    return tokens.length ? tokens : tokenize(value);
+  }
+  function scoreItem(item, queryTokens) {
+    const titleNormalized = normalizeSpeech(item.line1);
+    const queryNormalized = queryTokens.join(" ");
+    if (!queryNormalized) return 0;
+    if (titleNormalized === queryNormalized) return 1;
+    const titleTokens = tokenize(item.line1);
+    if (!titleTokens.length) return 0;
+    let hits = 0;
+    for (const queryToken of queryTokens) {
+      const queryStem = stem(queryToken);
+      const matched = titleTokens.some((titleToken) => {
+        const titleStem = stem(titleToken);
+        return titleToken === queryToken || titleStem === queryStem || titleToken.startsWith(queryStem) || queryToken.startsWith(titleStem);
+      });
+      if (matched) hits += 1;
+    }
+    if (!hits) return 0;
+    const precision = hits / queryTokens.length;
+    const recall = hits / titleTokens.length;
+    return (precision * 0.75 + recall * 0.25) * 0.95;
+  }
+  function findItemByPhrase(items, phrase) {
+    const queryTokens = meaningfulTokens(phrase);
+    if (!queryTokens.length) return null;
+    let best = null;
+    let bestScore = 0;
+    for (const item of items || []) {
+      const score = scoreItem(item, queryTokens);
+      if (score > bestScore) {
+        bestScore = score;
+        best = item;
+      }
+    }
+    return bestScore >= 0.5 ? best : null;
+  }
+  function statusFromPhrase(phrase) {
+    const tokens = tokenize(phrase);
+    for (const entry of STATUS_PHRASES) {
+      if (tokens.some((token) => entry.words.includes(token))) return entry.status;
+    }
+    return null;
+  }
+  function tagFromPhrase(phrase) {
+    const tokens = tokenize(phrase);
+    for (const token of tokens) {
+      if (TAG_WORDS.includes(token)) return TAG_CANONICAL[token];
+    }
+    return null;
+  }
+  function stripLeadingStopWords(phrase) {
+    const tokens = tokenize(phrase);
+    while (tokens.length && STOP_WORDS.has(tokens[0])) tokens.shift();
+    return tokens.join(" ");
+  }
+  function splitDetails(phrase) {
+    const match = phrase.match(/^(.*?)\s+(?:с подписью|подпись|описание|заметка)\s+(.+)$/);
+    if (!match) return { line1: phrase.trim(), line2: "" };
+    return { line1: match[1].trim(), line2: match[2].trim() };
+  }
+  function notFound(phrase) {
+    return { ok: false, reason: "not-found", feedback: `\u041D\u0435 \u043D\u0430\u0448\u0451\u043B \u0437\u0430\u0434\u0430\u0447\u0443 \xAB${phrase}\xBB` };
+  }
+  var RULES = [
+    {
+      name: "showActionLog",
+      patterns: [/^(?:покажи|открой|показать)?\s*журнал(?:\s+действий)?$/],
+      build: () => ({ input: { actId: "log", actType: "tab", command: "showActionLog", payload: {} }, feedback: "\u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u0436\u0443\u0440\u043D\u0430\u043B" })
+    },
+    {
+      name: "showFrontier",
+      patterns: [/^(?:покажи|открой|показать)?\s*фронтир(?:\s+задач)?$/],
+      build: () => ({ input: { actId: "frontier", actType: "tab", command: "showFrontier", payload: {} }, feedback: "\u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u0444\u0440\u043E\u043D\u0442\u0438\u0440" })
+    },
+    {
+      name: "showList",
+      patterns: [/^(?:покажи|открой|показать|вернись\s+в|назад\s+в)?\s*список$/],
+      build: () => ({ input: { actId: "list", actType: "tab", command: "showList", payload: {} }, feedback: "\u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u0441\u043F\u0438\u0441\u043E\u043A" })
+    },
+    {
+      name: "undo",
+      patterns: [/^(?:отмена|отмени|отменить|верни\s+как\s+было|шаг\s+назад)$/],
+      build: () => ({ input: { actId: "list", actType: "list", command: "undo", payload: {} }, feedback: "\u041E\u0442\u043C\u0435\u043D\u044F\u044E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435" })
+    },
+    {
+      name: "addChild",
+      patterns: [
+        /^(?:добавь|добавить|создай|создать)\s+подзадачу\s+(?<child>.+?)\s+(?:к|в|для)\s+(?<target>.+)$/,
+        /^(?:добавь|добавить|создай|создать)\s+(?:к|в|для)\s+(?<target>.+?)\s+подзадачу\s+(?<child>.+)$/
+      ],
+      build: (groups, state) => {
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        const details = splitDetails(stripLeadingStopWords(groups.child));
+        if (!details.line1) return { ok: false, reason: "empty", feedback: "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0438" };
+        return {
+          input: { actId: target.id, actType: "item", command: "addChild", payload: details },
+          feedback: `\u0414\u043E\u0431\u0430\u0432\u0438\u043B \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0443 \xAB${details.line1}\xBB \u0432 \xAB${target.line1}\xBB`
+        };
+      }
+    },
+    {
+      name: "addItem",
+      patterns: [
+        /^(?:добавь|добавить|создай|создать|запиши|записать)\s+(?:новую\s+)?(?:задачу|пункт|дело|элемент)?\s*(?<title>.+)$/,
+        /^(?:новая|новую)\s+задача?у?\s+(?<title>.+)$/
+      ],
+      build: (groups) => {
+        const details = splitDetails(stripLeadingStopWords(groups.title));
+        if (!details.line1) return { ok: false, reason: "empty", feedback: "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438" };
+        return {
+          input: { actId: "list", actType: "list", command: "addItem", payload: details },
+          feedback: `\u0414\u043E\u0431\u0430\u0432\u0438\u043B \u0437\u0430\u0434\u0430\u0447\u0443 \xAB${details.line1}\xBB`
+        };
+      }
+    },
+    {
+      name: "editItem",
+      patterns: [/^(?:переименуй|переименовать|измени|изменить)\s+(?<target>.+?)\s+(?:в|на)\s+(?<title>.+)$/],
+      build: (groups, state) => {
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        const details = splitDetails(groups.title.trim());
+        if (!details.line1) return { ok: false, reason: "empty", feedback: "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B \u043D\u043E\u0432\u043E\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435" };
+        return {
+          input: { actId: target.id, actType: "item", command: "editItem", payload: details },
+          feedback: `\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043B \u0432 \xAB${details.line1}\xBB`
+        };
+      }
+    },
+    {
+      name: "deleteItem",
+      patterns: [/^(?:удали|удалить|убери|убрать|сотри)\s+(?<target>.+)$/],
+      build: (groups, state) => {
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        return {
+          input: { actId: target.id, actType: "item", command: "deleteItem", payload: {} },
+          feedback: `\u0423\u0434\u0430\u043B\u0438\u043B \xAB${target.line1}\xBB`
+        };
+      }
+    },
+    {
+      name: "setTags",
+      patterns: [
+        /^(?:тег|тэг|метка|пометь\s+тегом)\s+(?<tag>.+?)\s+(?:для|у|на)\s+(?<target>.+)$/,
+        /^(?:пометь|отметь)\s+(?<target>.+?)\s+(?:как|тегом)\s+(?<tag>.+)$/
+      ],
+      build: (groups, state) => {
+        const tag = tagFromPhrase(groups.tag);
+        if (!tag) return { ok: false, reason: "unknown-tag", feedback: `\u041D\u0435\u0442 \u0442\u0435\u0433\u0430 \xAB${groups.tag.trim()}\xBB` };
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        return {
+          input: { actId: target.id, actType: "item", command: "setTags", payload: { tag } },
+          feedback: `\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u043B \u0442\u0435\u0433 \xAB${tag}\xBB \u0443 \xAB${target.line1}\xBB`
+        };
+      }
+    },
+    {
+      name: "toggleCollapse",
+      patterns: [/^(?:сверни|свернуть|разверни|развернуть)\s+(?<target>.+)$/],
+      build: (groups, state) => {
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        return {
+          input: { actId: target.id, actType: "item", command: "toggleCollapse", payload: {} },
+          feedback: `\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u043B \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 \xAB${target.line1}\xBB`
+        };
+      }
+    },
+    {
+      name: "setStatusSuffix",
+      patterns: [
+        /^(?:отметь|отметить|пометь|поставь|переведи|сделай)\s+(?<target>.+?)\s+(?:как\s+|в\s+|на\s+)?(?<status>[^\s]+)$/,
+        /^(?<target>.+?)\s+(?:готово|выполнено|сделано)$/
+      ],
+      build: (groups, state) => {
+        const status = statusFromPhrase(groups.status || "\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E");
+        if (!status) return { ok: false, reason: "unknown-status", feedback: `\u041D\u0435 \u0437\u043D\u0430\u044E \u0441\u0442\u0430\u0442\u0443\u0441 \xAB${(groups.status || "").trim()}\xBB` };
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        return {
+          input: { actId: target.id, actType: "item", command: "setStatus", payload: { status } },
+          feedback: `\xAB${target.line1}\xBB \u2192 ${status}`
+        };
+      }
+    },
+    {
+      name: "setStatusPrefix",
+      patterns: [
+        /^(?:фокус|фокусируйся)\s+(?:на\s+)?(?<target>.+)$/,
+        /^(?:в\s+)?(?<status>архив|паузу|пауза|фокус)\s+(?<target>.+)$/,
+        /^(?:архивируй|архивировать)\s+(?<target>.+)$/,
+        /^(?:верни|вернуть|открой\s+заново|активируй)\s+(?<target>.+)$/
+      ],
+      build: (groups, state, matchedPattern) => {
+        const status = groups.status ? statusFromPhrase(groups.status) : /фокус/.test(matchedPattern.source) ? "Focus" : /архивируй/.test(matchedPattern.source) ? "Archive" : "Open";
+        if (!status) return { ok: false, reason: "unknown-status", feedback: "\u041D\u0435 \u043F\u043E\u043D\u044F\u043B \u0441\u0442\u0430\u0442\u0443\u0441" };
+        const target = findItemByPhrase(state.snapshot.items, groups.target);
+        if (!target) return notFound(groups.target.trim());
+        return {
+          input: { actId: target.id, actType: "item", command: "setStatus", payload: { status } },
+          feedback: `\xAB${target.line1}\xBB \u2192 ${status}`
+        };
+      }
+    }
+  ];
+  function createVoiceCommandParser() {
+    return {
+      parse(transcript, state) {
+        const phrase = normalizeSpeech(transcript);
+        if (!phrase) return { ok: false, reason: "empty", feedback: "\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B" };
+        const safeState = state && state.snapshot ? state : { snapshot: { items: [] } };
+        for (const rule of RULES) {
+          for (const pattern of rule.patterns) {
+            const match = phrase.match(pattern);
+            if (!match) continue;
+            const built = rule.build(match.groups || {}, safeState, pattern);
+            if (built.ok === false) return { ...built, transcript: phrase, rule: rule.name };
+            return { ok: true, transcript: phrase, rule: rule.name, ...built };
+          }
+        }
+        return { ok: false, reason: "unknown", feedback: `\u041D\u0435 \u043F\u043E\u043D\u044F\u043B \u043A\u043E\u043C\u0430\u043D\u0434\u0443: \xAB${phrase}\xBB`, transcript: phrase };
+      }
+    };
+  }
+  function isSpeechRecognitionSupported(scope = globalThis) {
+    return Boolean(scope && (scope.SpeechRecognition || scope.webkitSpeechRecognition));
+  }
+  function createRecognitionFactory(scope = globalThis) {
+    const Recognition = scope.SpeechRecognition || scope.webkitSpeechRecognition;
+    if (!Recognition) return null;
+    return () => new Recognition();
+  }
+  function createVoiceController({
+    recognitionFactory,
+    parser = createVoiceCommandParser(),
+    dispatch,
+    getState,
+    onStatus = () => {
+    },
+    lang = "ru-RU"
+  }) {
+    let recognition = null;
+    let listening = false;
+    let undoSnapshot = null;
+    function emit(status, extra = {}) {
+      onStatus({ status, listening, ...extra });
+    }
+    function handleTranscript(rawTranscript) {
+      const state = getState();
+      const result = parser.parse(rawTranscript, state);
+      if (!result.ok) {
+        emit("rejected", { transcript: result.transcript || normalizeSpeech(rawTranscript), message: result.feedback, reason: result.reason });
+        return result;
+      }
+      const input = { ...result.input, source: "voice" };
+      if (input.command === "undo") {
+        if (!undoSnapshot) {
+          const message = "\u041D\u0435\u0447\u0435\u0433\u043E \u043E\u0442\u043C\u0435\u043D\u044F\u0442\u044C";
+          emit("rejected", { transcript: result.transcript, message, reason: "no-undo" });
+          return { ok: false, reason: "no-undo", feedback: message, transcript: result.transcript };
+        }
+        input.payload = { snapshot: clone4(undoSnapshot) };
+        undoSnapshot = null;
+      } else if (!String(input.command).startsWith("show")) {
+        undoSnapshot = state?.snapshot ? clone4(state.snapshot) : null;
+      }
+      dispatch(input);
+      emit("accepted", { transcript: result.transcript, message: result.feedback, command: input.command });
+      return { ...result, input };
+    }
+    function stop() {
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch {
+        }
+      }
+      listening = false;
+      emit("idle");
+    }
+    function start() {
+      if (listening) return false;
+      if (!recognitionFactory) {
+        emit("unsupported", { message: "\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0432\u0432\u043E\u0434 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u044D\u0442\u0438\u043C \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C" });
+        return false;
+      }
+      recognition = recognitionFactory();
+      recognition.lang = lang;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (event) => {
+        const results = Array.from(event.results || []);
+        const last = results[results.length - 1];
+        if (!last) return;
+        const transcript = last[0]?.transcript || "";
+        if (!last.isFinal) {
+          emit("interim", { transcript: normalizeSpeech(transcript) });
+          return;
+        }
+        handleTranscript(transcript);
+      };
+      recognition.onerror = (event) => {
+        listening = false;
+        const message = event?.error === "not-allowed" ? "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443" : `\u041E\u0448\u0438\u0431\u043A\u0430 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u0432\u0430\u043D\u0438\u044F: ${event?.error || "unknown"}`;
+        emit("error", { message, reason: event?.error });
+      };
+      recognition.onend = () => {
+        listening = false;
+        emit("idle");
+      };
+      recognition.start();
+      listening = true;
+      emit("listening", { message: "\u0421\u043B\u0443\u0448\u0430\u044E\u2026" });
+      return true;
+    }
+    return {
+      handleTranscript,
+      isListening: () => listening,
+      start,
+      stop,
+      toggle() {
+        return listening ? (stop(), false) : start();
+      }
+    };
+  }
+  function createVoiceUI({ button, statusEl, transcriptEl, controller, supported = true }) {
+    if (!button) return { destroy() {
+    } };
+    if (!supported) {
+      button.disabled = true;
+      button.title = "\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0432\u0432\u043E\u0434 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u044D\u0442\u0438\u043C \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C";
+      if (statusEl) statusEl.textContent = "\u0413\u043E\u043B\u043E\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0432 \u044D\u0442\u043E\u043C \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435";
+      return { destroy() {
+      } };
+    }
+    function onClick() {
+      controller.toggle();
+    }
+    button.addEventListener("click", onClick);
+    return {
+      onStatus({ status, transcript, message }) {
+        button.classList.toggle("listening", status === "listening");
+        button.setAttribute("aria-pressed", String(status === "listening"));
+        if (transcriptEl && typeof transcript === "string") transcriptEl.textContent = transcript;
+        if (!statusEl) return;
+        statusEl.dataset.state = status;
+        if (message) statusEl.textContent = message;
+        else if (status === "idle") statusEl.textContent = "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D \u0438 \u0441\u043A\u0430\u0436\u0438\u0442\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u0443";
+      },
+      destroy() {
+        button.removeEventListener("click", onClick);
+      }
+    };
+  }
+
   // src/list-preview-entry.js
   var PREVIEW_BUILD_HASH = "mrfy24y0-y3psju";
   async function bootstrapListManagerPreview() {
@@ -2340,6 +2830,30 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       }
     });
     await app.init();
+    bootstrapVoiceControl(app);
+  }
+  function bootstrapVoiceControl(app) {
+    const button = document.getElementById("voice-btn");
+    const statusEl = document.getElementById("voice-status");
+    const transcriptEl = document.getElementById("voice-transcript");
+    const helpButton = document.getElementById("voice-help-btn");
+    const helpList = document.getElementById("voice-help");
+    if (helpButton && helpList) {
+      helpButton.addEventListener("click", () => {
+        helpList.hidden = !helpList.hidden;
+        helpButton.setAttribute("aria-expanded", String(!helpList.hidden));
+      });
+    }
+    const supported = isSpeechRecognitionSupported(window);
+    let voiceUI = null;
+    const controller = createVoiceController({
+      recognitionFactory: createRecognitionFactory(window),
+      dispatch: (input) => app.dispatch(input),
+      getState: () => app.getState(),
+      onStatus: (event) => voiceUI?.onStatus(event)
+    });
+    voiceUI = createVoiceUI({ button, statusEl, transcriptEl, controller, supported });
+    window.__voiceControl__ = controller;
   }
   bootstrapListManagerPreview().catch((error) => {
     console.error("Failed to bootstrap list manager", error);

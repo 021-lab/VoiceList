@@ -18,6 +18,28 @@ __INLINE_CSS__
     <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
 
+  <section id="voice-panel" class="voice-panel">
+    <div class="voice-panel-row">
+      <span class="voice-indicator" aria-hidden="true"></span>
+      <p id="voice-status" class="voice-status" data-state="idle" role="status" aria-live="polite">Нажмите микрофон и скажите команду</p>
+      <button id="voice-help-btn" class="voice-help-btn" type="button" aria-expanded="false" title="Список голосовых команд">?</button>
+    </div>
+    <p id="voice-transcript" class="voice-transcript"></p>
+    <ul id="voice-help" class="voice-help" hidden>
+      <li>«добавь задачу купить молоко»</li>
+      <li>«добавь подзадачу голден к яблоки»</li>
+      <li>«отметь хлеб выполнено»</li>
+      <li>«фокус на кофе»</li>
+      <li>«в архив шампунь»</li>
+      <li>«переименуй кофе в чай»</li>
+      <li>«удали зубная паста»</li>
+      <li>«пометь молоко как срочно»</li>
+      <li>«сверни яблоки»</li>
+      <li>«покажи фронтир» / «покажи журнал» / «покажи список»</li>
+      <li>«отмена»</li>
+    </ul>
+  </section>
+
   <div id="list-container"></div>
 
   <section id="action-log-panel" hidden>
@@ -28,6 +50,7 @@ __INLINE_CSS__
   </section>
 
   <div class="toast" id="toast"></div>
+  <button class="voice-btn" id="voice-btn" type="button" aria-pressed="false" aria-label="Голосовая команда">🎤</button>
   <button class="add-btn" id="add-btn" aria-label="Добавить задачу">+</button>
 
   <div id="tag-panel" class="swipe-panel"></div>

@@ -33,6 +33,7 @@ export function createApp({ adapter, interpreter, renderer, store, sync, ui }) {
   }
 
   return {
+    dispatch: dispatchUserInput,
     async init() {
       state = store.load();
       const backendState = await adapter.load();

@@ -247,6 +247,80 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .empty-state p { font-size: 15px; }
 
 /* ── FAB ── */
+/* ── Voice control ── */
+.voice-panel {
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.voice-panel-row { display: flex; align-items: center; gap: 10px; }
+.voice-indicator {
+  flex-shrink: 0;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #c8c8c8;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.voice-status { flex: 1; font-size: 13px; color: #555; line-height: 1.35; }
+.voice-status[data-state="listening"] { color: #007aff; font-weight: 600; }
+.voice-status[data-state="accepted"] { color: #1e8b4d; font-weight: 600; }
+.voice-status[data-state="rejected"],
+.voice-status[data-state="error"],
+.voice-status[data-state="unsupported"] { color: #c0392b; font-weight: 600; }
+.voice-panel:has(.voice-status[data-state="listening"]) .voice-indicator {
+  background: #007aff;
+  box-shadow: 0 0 0 4px rgba(0,122,255,0.18);
+}
+.voice-panel:has(.voice-status[data-state="accepted"]) .voice-indicator { background: #1e8b4d; }
+.voice-panel:has(.voice-status[data-state="rejected"]) .voice-indicator,
+.voice-panel:has(.voice-status[data-state="error"]) .voice-indicator { background: #c0392b; }
+.voice-help-btn {
+  flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: #f0f0f0; color: #555;
+  font-size: 13px; font-weight: 700; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.voice-help-btn:active { background: #e0e0e0; }
+.voice-transcript {
+  font-size: 13px; color: #1a1a2e; font-style: italic;
+  margin-top: 6px; min-height: 0;
+}
+.voice-transcript:empty { display: none; }
+.voice-help {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  list-style: none;
+}
+.voice-help li { font-size: 12px; color: #777; padding: 2px 0; }
+
+.voice-btn {
+  position: fixed; bottom: 96px; right: 20px;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #fff; color: #1a1a2e; border: 1px solid #e0e0e0;
+  font-size: 24px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
+}
+.voice-btn:active { transform: scale(0.92); }
+.voice-btn:disabled { opacity: 0.4; pointer-events: none; }
+.voice-btn.listening {
+  background: #ff3b30; border-color: #ff3b30;
+  box-shadow: 0 4px 16px rgba(255,59,48,0.45);
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(255,59,48,0.45); }
+  50% { box-shadow: 0 4px 22px rgba(255,59,48,0.75); }
+}
+
+#app-root[data-view-mode="log"] .voice-panel,
+#app-root[data-view-mode="log"] .voice-btn { display: none; }
+
 .add-btn {
   position: fixed; bottom: 28px; right: 20px;
   width: 56px; height: 56px; border-radius: 50%;
