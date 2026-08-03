@@ -6,7 +6,7 @@ on:
       - '**'
 
 env:
-  CLOUDFLARED_URL: https://viewterminus.smileme.ai
+  CLOUDFLARED_URL: https://vlist-cloudflare-backend.smileme.ai
 
 jobs:
   test-cloudflared-deployment:
