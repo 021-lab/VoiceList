@@ -1,10 +1,12 @@
 {
-  "name": "voicelist-universal-interface",
+  "name": "searchmydata-list-interface",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "npm run test:unit",
     "test:unit": "vitest run",
+    "test:voice": "node tests/voice/test_resolver.js && node tests/voice/test_e2e.js",
+    "test:gestures": "playwright test tests/e2e/gestures.spec.js",
     "test:e2e": "playwright test",
     "prepare-preview": "node scripts/prepare-preview.mjs",
     "serve:test": "node scripts/static-server.mjs"

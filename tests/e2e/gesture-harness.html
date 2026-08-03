@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Gesture harness</title>
+<style>
+  html, body { margin: 0; height: 100%; touch-action: none; font: 14px system-ui; }
+  #list { height: 100%; display: flex; flex-direction: column; }
+  .row { height: 48px; line-height: 48px; padding: 0 12px; border-bottom: 1px solid #ddd; }
+  #out { position: fixed; bottom: 0; left: 0; right: 0; background: #111; color: #0f0;
+         padding: 8px; font-family: monospace; white-space: pre; }
+</style>
+</head>
+<body>
+<!-- Стенд для автотеста жестов: настоящие pointer-события, тот же
+     GestureRecognizer, что и в приложении. UI приложения тут не нужен. -->
+<div id="list">
+  <div class="row" agent-action-id="1">Ремонт</div>
+  <div class="row" agent-action-id="2">Ванная</div>
+  <div class="row" agent-action-id="3">Установить смеситель</div>
+  <div class="row" agent-action-id="4">Спальня</div>
+  <div class="row" style="flex:1"></div>
+</div>
+<div id="out">idle</div>
+
+<script type="module">
+import { C, selectAt, GestureRecognizer } from '../../src/gesture.js';
+
+const rec = new GestureRecognizer();
+const out = document.getElementById('out');
+let timer = null;
+let stackLen = 3;                      // фиктивный стек кандидатов для геометрии
+
+function publish(extra = {}) {
+  const sel = rec.state === 'armed' ? selectAt(rec.dy, stackLen) : { zone: null, index: null };
+  window.__g = { state: rec.state, mode: rec.mode, contextId: rec.contextId,
+                 dy: rec.dy, frozen: rec.frozen, zone: sel.zone, index: sel.index, ...extra };
+  out.textContent = JSON.stringify(window.__g);
+}
+
+addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('[agent-action-id]');
+  rec.down({ t: performance.now(), x: e.clientX, y: e.clientY,
+             elementId: el ? el.getAttribute('agent-action-id') : null });
+  clearTimeout(timer);
+  timer = setTimeout(() => { rec.tick({ t: performance.now() }); publish(); }, C.LONGPRESS_MS + 20);
+  publish();
+});
+
+addEventListener('pointermove', (e) => {
+  rec.move({ t: performance.now(), x: e.clientX, y: e.clientY });
+  publish();
+});
+
+addEventListener('pointerup', () => {
+  clearTimeout(timer);
+  const r = rec.up({ t: performance.now() });
+  publish({ released: r });
+});
+
+window.__setStack = (n) => { stackLen = n; };
+publish();
+</script>
+</body>
+</html>

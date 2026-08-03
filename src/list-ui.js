@@ -1,6 +1,12 @@
+import { BrowserASR } from './asr-browser.js';
+import { MockASR } from './asr-mock.js';
+import { C as VOICE_C, selectAt as selectVoiceAt } from './gesture.js';
+import { VoiceSession, validate as validateVoiceCommand } from './voice-session.js';
+
 const AVAILABLE_TAGS = ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'];
 const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause']);
 const PANEL_ITEM_HEIGHT = 72;
+const VOICE_LONGPRESS_MS = 400;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -37,7 +43,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -54,6 +60,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   let tagAction = null;
   let taskPageOpen = false;
   let taskPageTargetId = null;
+  let voiceState = null;
+  let voicePressTimer = null;
+  let voicePress = null;
 
   function showToast(message) {
     if (!toastEl) return;
@@ -61,6 +70,291 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     toastEl.classList.add('show');
     clearTimeout(showToast.timer);
     showToast.timer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  function itemLabel(id) {
+    return findItem(getState(), id)?.line1 || '';
+  }
+
+  function logEntryLabel(id) {
+    return getState().actionLog?.find((entry) => entry.id === id)?.label || 'Запись журнала';
+  }
+
+  function createVoiceAsr() {
+    const testConfig = window.__voiceTest;
+    if (testConfig) return new MockASR(testConfig);
+    return new BrowserASR({ finalTimeoutMs: VOICE_C.FINAL_TIMEOUT_MS });
+  }
+
+  function renderVoiceOverlay(session = voiceState?.session) {
+    if (!voiceOverlay || !voiceState) return;
+    if (voiceState.kind === 'log-comment') {
+      renderLogCommentOverlay();
+      return;
+    }
+    const activeSession = voiceState?.session;
+    if (!voiceOverlay || !activeSession) return;
+    if (session && session !== activeSession) return;
+    session = activeSession;
+    const selection = selectVoiceAt(voiceState?.dy || 0, session.overlay.stack.length, VOICE_C);
+    const fingerLabel = labelVoiceFinger(session);
+    const candidateRows = session.overlay.stack
+      .map((candidate, index) => ({
+        label: candidate.label,
+        selected: selection.zone === 'candidate' && selection.index === index,
+        overlayIndex: index
+      }))
+      .reverse();
+    const fingerSelected = selection.zone !== 'cancel' && selection.zone !== 'candidate';
+    const cancelSelected = selection.zone === 'cancel';
+
+    voiceOverlay.innerHTML = `
+      <div class="voice-transcript">${escHtml(session.text || 'Слушаю...')}</div>
+      ${session.context ? `<div class="voice-context">${escHtml(itemLabel(session.context))}</div>` : ''}
+      <div class="voice-stack">
+        ${candidateRows.map((row) => `<div class="voice-candidate${row.selected ? ' selected' : ''}" data-voice-index="${row.overlayIndex}">${escHtml(row.label)}</div>`).join('')}
+        <div class="voice-candidate voice-finger${fingerSelected ? ' selected' : ''}" data-voice-index="-1">${escHtml(fingerLabel)}</div>
+        <div class="voice-cancel${cancelSelected ? ' selected' : ''}">Отмена</div>
+      </div>
+    `;
+    voiceOverlay.classList.add('open');
+    positionVoiceOverlay();
+  }
+
+  function renderLogCommentOverlay() {
+    const selection = selectVoiceAt(voiceState?.dy || 0, 0, VOICE_C);
+    const fingerSelected = selection.zone !== 'cancel';
+    const cancelSelected = selection.zone === 'cancel';
+    const transcript = voiceState.finalText || voiceState.transcript || 'Слушаю комментарий...';
+
+    voiceOverlay.innerHTML = `
+      <div class="voice-transcript">${escHtml('Комментарий')}</div>
+      <div class="voice-context">${escHtml(logEntryLabel(voiceState.logEntryId))}</div>
+      <div class="voice-stack">
+        <div class="voice-candidate voice-finger${fingerSelected ? ' selected' : ''}" data-voice-index="-1">${escHtml(transcript)}</div>
+        <div class="voice-cancel${cancelSelected ? ' selected' : ''}">Отмена</div>
+      </div>
+    `;
+    voiceOverlay.classList.add('open');
+    positionVoiceOverlay();
+  }
+
+  function labelVoiceCommand(command) {
+    if (!command) return '';
+    if (command.command === 'addChild') return `Добавить: задачу ${command.payload.line1}`;
+    if (command.command === 'setStatus') return `Статус: ${command.payload.status}`;
+    if (command.command === 'setParent') return 'Перенести';
+    if (command.command === 'editItem') return `Переименовать: ${command.payload.line1}`;
+    if (command.command === 'showSearch') return `Поиск: ${command.payload.query}`;
+    if (command.command === 'undo') return 'Отменить';
+    return command.command;
+  }
+
+  function labelVoiceFinger(session) {
+    const selected = session.overlay.finger;
+    if (selected?.kind === 'command') return labelVoiceCommand(selected.command);
+    if (selected?.kind === 'blocked') return 'Не найдено';
+    return session.text || 'Слушаю...';
+  }
+
+  function positionVoiceOverlay() {
+    if (!voiceOverlay || !voiceState) return;
+    const fingerRow = voiceOverlay.querySelector('.voice-finger');
+    if (!fingerRow) return;
+    const overlayRect = voiceOverlay.getBoundingClientRect();
+    const fingerRect = fingerRow.getBoundingClientRect();
+    const fingerCenter = fingerRect.top + (fingerRect.height / 2);
+    const unclampedTop = overlayRect.top + (voiceState.anchorY - fingerCenter);
+    const maxTop = Math.max(12, window.innerHeight - overlayRect.height - 12);
+    const nextTop = Math.min(Math.max(12, unclampedTop), maxTop);
+    voiceOverlay.style.top = `${Math.round(nextTop)}px`;
+  }
+
+  function startVoice(contextId, anchorY) {
+    if (voiceState || modalOpen || taskPageOpen) return false;
+    hideDrop();
+    hideTagPanel();
+    const asr = createVoiceAsr();
+    const session = new VoiceSession({
+      tasks: getState().snapshot.items,
+      asr,
+      onUpdate: renderVoiceOverlay
+    });
+    voiceState = { session, anchorY, dy: 0 };
+    const armed = session.arm(contextId);
+    if (!armed) {
+      const message = session.messages.at(-1) || 'Нет доступа к микрофону';
+      showToast(message);
+      voiceState = null;
+      return false;
+    }
+    renderVoiceOverlay(session);
+    asr.speak?.();
+    renderVoiceOverlay(session);
+    return true;
+  }
+
+  function startLogCommentVoice(logEntryId, anchorY) {
+    if (voiceState || modalOpen || taskPageOpen) return false;
+    const asr = createVoiceAsr();
+    const nextVoiceState = {
+      kind: 'log-comment',
+      asr,
+      logEntryId,
+      anchorY,
+      dy: 0,
+      transcript: '',
+      finalText: '',
+      error: null
+    };
+    voiceState = nextVoiceState;
+    const armed = asr.start({
+      onInterim(text) {
+        if (voiceState !== nextVoiceState) return;
+        nextVoiceState.transcript = text;
+        renderVoiceOverlay();
+      },
+      onFinal(text) {
+        if (voiceState !== nextVoiceState) return;
+        nextVoiceState.finalText = text;
+        nextVoiceState.transcript = text;
+        renderVoiceOverlay();
+      },
+      onError(code) {
+        if (voiceState !== nextVoiceState) return;
+        nextVoiceState.error = code;
+      }
+    });
+    if (!armed) {
+      voiceState = null;
+      showToast('Нет доступа к микрофону');
+      return false;
+    }
+    renderVoiceOverlay();
+    asr.speak?.();
+    renderVoiceOverlay();
+    return true;
+  }
+
+  function resetRowGesture(row, actionBg) {
+    row.classList.remove('pressing');
+    row.style.transition = 'transform 0.3s cubic-bezier(.4,0,.2,1)';
+    row.style.transform = '';
+    actionBg.style.opacity = '0';
+    hideDrop();
+    hideTagPanel();
+  }
+
+  function updateVoice(clientY) {
+    if (!voiceState) return;
+    voiceState.dy = voiceState.anchorY - clientY;
+    if (voiceState.session) voiceState.session.move(voiceState.dy);
+    renderVoiceOverlay();
+  }
+
+  async function finishLogCommentVoice(current) {
+    const stopped = current.asr.stop();
+    if (stopped && typeof stopped.then === 'function') await stopped;
+    if (current.error === 'aborted') {
+      showToast('Распознавание прервано');
+      return;
+    }
+    if (current.error === 'timeout') {
+      showToast('Не расслышал');
+      return;
+    }
+    if (selectVoiceAt(current.dy || 0, 0, VOICE_C).zone === 'cancel') return;
+    const text = String(current.finalText || current.transcript || '').trim();
+    if (!text) {
+      showToast('Не расслышал');
+      return;
+    }
+    dispatchUserInput({
+      actId: current.logEntryId,
+      actType: 'log-entry',
+      command: 'commentLogEntry',
+      payload: { text },
+      source: 'voice-log-comment'
+    });
+  }
+
+  async function finishVoice() {
+    if (!voiceState) return;
+    const current = voiceState;
+    voiceState = null;
+    voiceOverlay?.classList.remove('open');
+    if (current.kind === 'log-comment') {
+      await finishLogCommentVoice(current);
+      return;
+    }
+    const transcript = String(current.session.finalText || current.session.text || '').trim() || null;
+    const result = await current.session.release(current.dy || 0);
+    handleVoiceResult(result, { transcript });
+  }
+
+  async function finishVoiceAtDy(dy) {
+    if (!voiceState) return;
+    const current = voiceState;
+    voiceState = null;
+    voiceOverlay?.classList.remove('open');
+    current.dy = dy;
+    if (current.kind === 'log-comment') {
+      await finishLogCommentVoice(current);
+      return;
+    }
+    const transcript = String(current.session.finalText || current.session.text || '').trim() || null;
+    const result = await current.session.release(dy);
+    handleVoiceResult(result, { transcript });
+  }
+
+  function cancelVoice() {
+    if (!voiceState) return;
+    if (voiceState.kind === 'log-comment') voiceState.asr.stop();
+    else voiceState.session.asr.stop();
+    voiceState = null;
+    voiceOverlay?.classList.remove('open');
+  }
+
+  function handleVoiceResult(result, meta = {}) {
+    if (!result || result.action === 'cancel') {
+      if (result?.why) showToast(result.why);
+      return;
+    }
+    if (result.action === 'fallback') {
+      showToast(result.text ? `Не понял: ${result.text}` : 'Не расслышал');
+      return;
+    }
+    const command = result.command;
+    if (!command) return;
+    const state = getState();
+    if (!validateVoiceCommand(command, state.snapshot.items)) {
+      showToast('Задача изменилась, повторите');
+      return;
+    }
+    if (command.command === 'undo') {
+      if (!undoSnapshot) {
+        showToast('Нечего отменять');
+        return;
+      }
+      dispatchUserInput({ ...command, payload: { snapshot: clone(undoSnapshot) }, source: 'voice', transcript: meta.transcript });
+      undoSnapshot = null;
+      undoButton.disabled = true;
+      return;
+    }
+    if (!String(command.command).startsWith('show') && command.command !== 'viewItem') saveUndoSnapshot();
+    dispatchUserInput({ ...command, actType: command.actId ? 'task' : 'list', source: 'voice', transcript: meta.transcript });
+  }
+
+  function queueVoicePress(nextPress) {
+    voicePress = nextPress;
+    if (voicePressTimer) clearTimeout(voicePressTimer);
+    voicePressTimer = setTimeout(() => {
+      const currentPress = voicePress;
+      voicePressTimer = null;
+      if (!currentPress) return;
+      if (currentPress.kind === 'log-comment') startLogCommentVoice(currentPress.logEntryId, currentPress.y);
+      else startVoice(currentPress.contextId ?? null, currentPress.y);
+    }, VOICE_LONGPRESS_MS);
   }
 
   function setDispatch(nextDispatch) {
@@ -333,6 +627,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       return;
     }
 
+    saveUndoSnapshot();
+
     dispatchUserInput({
       actId: taskPageTargetId,
       actType: 'task',
@@ -383,6 +679,30 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     overlay.addEventListener('click', (event) => {
       if (event.target === overlay) closeModal();
     });
+    voiceOverlay?.addEventListener('click', (event) => {
+      if (!voiceState) return;
+      const cancelEl = event.target.closest('.voice-cancel');
+      if (cancelEl) {
+        finishVoiceAtDy(-VOICE_C.CANCEL_ZONE_PX);
+        return;
+      }
+
+      const candidateEl = event.target.closest('.voice-candidate');
+      if (!candidateEl) return;
+
+      if (voiceState.kind === 'log-comment') {
+        finishVoiceAtDy(0);
+        return;
+      }
+
+      const overlayIndex = Number(candidateEl.dataset.voiceIndex || '-1');
+      if (overlayIndex < 0) {
+        finishVoiceAtDy(0);
+        return;
+      }
+
+      finishVoiceAtDy(VOICE_C.DEADZONE_PX + (overlayIndex * VOICE_C.ROW_H_PX) + 1);
+    });
     btnConfirm.addEventListener('click', confirmModal);
     [input1, input2].forEach((input) => input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') confirmModal();
@@ -409,7 +729,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
 
     viewToggleButton.addEventListener('click', () => {
-      const wantsLog = rootPanel.dataset.viewMode !== 'log';
+      const wantsLog = rootPanel.dataset.viewMode !== 'log' && rootPanel.dataset.viewMode !== 'search';
       dispatchUserInput({
         actId: wantsLog ? 'actionLog' : 'list',
         actType: wantsLog ? 'panel' : 'list',
@@ -420,7 +740,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
 
     frontierButton?.addEventListener('click', () => {
-      const wantsFrontier = rootPanel.dataset.viewMode !== 'frontier';
+      const wantsFrontier = rootPanel.dataset.viewMode !== 'frontier' && rootPanel.dataset.viewMode !== 'search';
       dispatchUserInput({
         actId: wantsFrontier ? 'frontier' : 'list',
         actType: wantsFrontier ? 'tab' : 'list',
@@ -430,21 +750,82 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       });
     });
 
+    container.addEventListener('mousedown', (event) => {
+      if (event.button !== 0 || event.target.closest('.list-item,button,input,select,textarea')) return;
+      queueVoicePress({ kind: 'command', contextId: null, x: event.clientX, y: event.clientY });
+    });
+
+    container.addEventListener('touchstart', (event) => {
+      if (event.target.closest('.list-item,button,input,select,textarea')) return;
+      const touch = event.touches[0];
+      queueVoicePress({ kind: 'command', contextId: null, x: touch.clientX, y: touch.clientY });
+    }, { passive: true });
+
+    actionLogPanel?.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
+      const row = event.target.closest('.action-log-row');
+      if (!row?.dataset.logId) return;
+      queueVoicePress({ kind: 'log-comment', logEntryId: row.dataset.logId, x: event.clientX, y: event.clientY });
+    });
+
+    actionLogPanel?.addEventListener('touchstart', (event) => {
+      const row = event.target.closest('.action-log-row');
+      if (!row?.dataset.logId) return;
+      const touch = event.touches[0];
+      queueVoicePress({ kind: 'log-comment', logEntryId: row.dataset.logId, x: touch.clientX, y: touch.clientY });
+    }, { passive: true });
+
     document.addEventListener('touchmove', (event) => {
+      if (voicePressTimer) {
+        const touch = event.touches[0];
+        if (Math.abs(touch.clientX - voicePress.x) > 10 || Math.abs(touch.clientY - voicePress.y) > 10) {
+          clearTimeout(voicePressTimer);
+          voicePressTimer = null;
+        }
+      }
+      if (voiceState) {
+        event.preventDefault();
+        updateVoice(event.touches[0].clientY);
+        return;
+      }
       if (!dragState) return;
       event.preventDefault();
       updateDrag(event.touches[0].clientY, event.touches[0].clientX);
     }, { passive: false });
 
     document.addEventListener('touchend', () => {
+      if (voicePressTimer) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        finishVoice();
+        return;
+      }
       if (dragState) finalizeDrag();
     }, { passive: true });
 
     document.addEventListener('touchcancel', () => {
+      if (voicePressTimer) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        cancelVoice();
+        return;
+      }
       if (dragState) finalizeDrag();
     }, { passive: true });
 
     document.addEventListener('mousemove', (event) => {
+      if (voicePressTimer && (Math.abs(event.clientX - voicePress.x) > 10 || Math.abs(event.clientY - voicePress.y) > 10)) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        updateVoice(event.clientY);
+        return;
+      }
       if (dragState) {
         updateDrag(event.clientY, event.clientX);
         return;
@@ -453,6 +834,14 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
 
     document.addEventListener('mouseup', () => {
+      if (voicePressTimer) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        finishVoice();
+        return;
+      }
       if (dragState) {
         finalizeDrag();
         wasDragging = true;
@@ -691,6 +1080,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       return;
     }
     if (action.kind === 'status' && STATUS_ACTIONS.has(action.status)) {
+      saveUndoSnapshot();
       dispatchUserInput({ actId: itemId, actType: 'task', command: 'setStatus', payload: { status: action.status }, source });
       showToast(`Статус: ${action.status}`);
       return;
@@ -762,19 +1152,12 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       }
 
       if (ldAnchor !== null || dx < -threshold) {
-        if (ldAnchor !== null && dx > -threshold) {
-          hideTagPanel();
-          ldAnchor = null;
-          row.style.transform = `translate(0px, ${offsetY}px)`;
-          return;
+        ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
+        active = false;
+        if (startVoice(itemId, curY)) {
+          if (isFinite(curY)) updateVoice(curY);
         }
-        if (!ldAnchor) {
-          ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
-          showTagPanel(ldAnchor, itemId);
-        }
-        row.style.transform = `translate(${Math.max(dx, -110)}px, ${offsetY}px)`;
-        actionBg.style.opacity = '0';
-        tagAction = setActiveItem(tagPanel, offsetY);
+        resetRowGesture(row, actionBg);
         return;
       }
 
@@ -791,7 +1174,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       const action = dropAction;
       const wasRight = !!rdAnchor;
       const wasLeft = !!ldAnchor;
-      const savedTagAction = tagAction;
       rdAnchor = null;
       ldAnchor = null;
       hideDrop();
@@ -810,9 +1192,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       if (wasRight && dx > 30 && action) {
         if (isMouse) mouseSwipeDone = true;
         execPanelAction(action, itemId, 'right-swipe-panel');
-      } else if (wasLeft && dx < -30 && savedTagAction) {
+      } else if (wasLeft && dx < -30) {
         if (isMouse) mouseSwipeDone = true;
-        execPanelAction(savedTagAction, itemId, 'left-swipe-panel');
       } else if (!isMouse && Math.abs(dx) < 10 && Math.abs(dy) < 10 && rootPanel.dataset.viewMode !== 'frontier') {
         dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
       }
@@ -833,13 +1214,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         active = false;
         rdAnchor = null;
-        hideDrop();
-        hideTagPanel();
-        row.style.transform = '';
-        actionBg.style.opacity = '0';
-        if (rootPanel.dataset.viewMode === 'frontier') return;
-        startDrag(wrapper, curY, curX);
-      }, 370);
+        if (rootPanel.dataset.viewMode !== 'frontier') startVoice(null, curY);
+        resetRowGesture(row, actionBg);
+      }, VOICE_LONGPRESS_MS);
     }, { passive: true });
 
     row.addEventListener('touchmove', (event) => {
@@ -869,13 +1246,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         active = false;
         rdAnchor = null;
-        hideDrop();
-        hideTagPanel();
-        row.style.transform = '';
-        actionBg.style.opacity = '0';
-        if (rootPanel.dataset.viewMode === 'frontier') return;
-        startDrag(wrapper, curY, curX);
-      }, 370);
+        if (rootPanel.dataset.viewMode !== 'frontier') startVoice(null, curY);
+        resetRowGesture(row, actionBg);
+      }, VOICE_LONGPRESS_MS);
     });
 
     row.addEventListener('click', () => {
@@ -898,9 +1271,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function onRendered(state, viewMode) {
     rootPanel.dataset.viewMode = viewMode;
-    viewToggleButton.textContent = viewMode === 'log' ? 'Список' : 'Журнал';
+    viewToggleButton.textContent = viewMode === 'log' || viewMode === 'search' ? 'Список' : 'Журнал';
     if (frontierButton) {
-      frontierButton.textContent = viewMode === 'frontier' ? 'Список' : 'Фронтир';
+      frontierButton.textContent = viewMode === 'frontier' || viewMode === 'search' ? 'Список' : 'Фронтир';
       frontierButton.classList.toggle('active', viewMode === 'frontier');
     }
   }

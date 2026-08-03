@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('https://firestore.googleapis.com/**', async (route) => {
+    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  });
+});
+
 async function confirmModal(page) {
   await expect(page.locator('#modal-overlay')).toHaveClass(/open/);
   await page.locator('#input-line1').press('Enter');
@@ -52,7 +58,7 @@ test('preview app can create task, create subtask, and change status', async ({ 
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
   await expect(page.locator('#list-container')).toBeVisible();
-  await expect(page.locator('.list-item-wrapper').first()).toContainText('Молоко 3.2%');
+  await expect(page.locator('#list-container')).toContainText('Молоко 3.2%');
 
   await page.getByRole('button', { name: 'Добавить задачу' }).click();
   await page.locator('#input-line1').fill(taskTitle);
@@ -100,4 +106,132 @@ test('preview app can create task, create subtask, and change status', async ({ 
   await expect(taskRow).toContainText('Done');
   await page.locator('#view-toggle-btn').click();
   await expect(page.locator('#action-log-list')).toContainText('Статус изменён: Done');
+});
+
+test('preview app executes voice commands through touch gestures', async ({ page }) => {
+  const voiceTitle = `Голосовая задача ${Date.now()}`;
+  const normalizedVoiceTitle = voiceTitle.toLowerCase();
+  await page.addInitScript((title) => {
+    window.__voiceTest = { phrase: `добавь ${title}` };
+  }, voiceTitle);
+
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+  await expect(page.locator('.list-item-wrapper', { hasText: 'Входящие' })).toBeVisible();
+
+  await page.mouse.move(220, 620);
+  await page.mouse.down();
+  await page.waitForTimeout(520);
+  await expect(page.locator('#voice-overlay')).toHaveClass(/open/);
+  await page.mouse.up();
+
+  const voiceRow = page.locator('.list-item-wrapper', { hasText: normalizedVoiceTitle });
+  await expect(voiceRow).toContainText(normalizedVoiceTitle);
+  expect(Number(await voiceRow.getAttribute('data-level'))).toBeGreaterThan(0);
+
+  await page.evaluate(() => { window.__voiceTest = { phrase: 'готово' }; });
+  const milkRow = page.locator('.list-item-wrapper', { hasText: 'Молоко 3.2%' }).locator('.list-item');
+  const box = await milkRow.boundingBox();
+  if (!box) throw new Error('No milk row box');
+  const viewport = page.viewportSize();
+  const leftSwipeDistance = Math.max(320, Math.floor((viewport?.width || 1280) * 0.28));
+
+  await page.mouse.move(box.x + box.width - 24, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - leftSwipeDistance, box.y + box.height / 2, { steps: 8 });
+  await expect(page.locator('#voice-overlay')).toHaveClass(/open/);
+  await page.mouse.up();
+
+  await expect(page.locator('.list-item-wrapper', { hasText: 'Молоко 3.2%' })).toContainText('Done');
+});
+
+test('preview app positions voice overlay near the pointer and selects a candidate by movement', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__voiceTest = { phrase: 'добавь молоко' };
+  });
+
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+
+  const anchor = { x: 220, y: 620 };
+
+  await page.mouse.move(anchor.x, anchor.y);
+  await page.mouse.down();
+  await page.waitForTimeout(520);
+  const overlay = page.locator('#voice-overlay');
+  await expect(overlay).toHaveClass(/open/);
+
+  const overlayBox = await overlay.boundingBox();
+  if (!overlayBox) throw new Error('No voice overlay box');
+  expect(overlayBox.y).toBeLessThan(anchor.y);
+  expect(overlayBox.y + overlayBox.height).toBeGreaterThan(anchor.y - 4);
+
+  await page.mouse.move(anchor.x, anchor.y - 28, { steps: 6 });
+  await expect(page.locator('#voice-overlay .voice-candidate.selected')).toHaveText('Молоко 3.2%');
+  await page.mouse.move(anchor.x, anchor.y - 4, { steps: 4 });
+  await expect(page.locator('#voice-overlay .voice-candidate.selected')).toHaveText('Добавить: задачу молоко');
+  await page.mouse.move(anchor.x, anchor.y - 28, { steps: 4 });
+  await expect(page.locator('#voice-overlay .voice-candidate.selected')).toHaveText('Молоко 3.2%');
+
+  await page.mouse.up();
+  await expect(overlay).not.toHaveClass(/open/);
+  await expect.poll(() => overlay.evaluate((element) => element.style.top)).toMatch(/px$/);
+  await expect(page.locator('#modal-overlay')).toHaveClass(/open/);
+  await expect(page.locator('#view-line1')).toHaveText('Молоко 3.2%');
+});
+
+test('preview app adds a voice comment to a log entry on press speak release', async ({ page }) => {
+  const taskTitle = `Log voice task ${Date.now()}`;
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+
+  await page.getByRole('button', { name: 'Добавить задачу' }).click();
+  await page.locator('#input-line1').fill(taskTitle);
+  await confirmModal(page);
+
+  await page.evaluate(() => {
+    window.__voiceTest = { phrase: 'купить сегодня' };
+  });
+
+  await page.locator('#view-toggle-btn').click();
+  const logRow = page.locator('.action-log-row', { hasText: taskTitle }).first();
+  await expect(logRow).toBeVisible();
+  const box = await logRow.boundingBox();
+  if (!box) throw new Error('No log row box');
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(520);
+  await expect(page.locator('#voice-overlay')).toHaveClass(/open/);
+  await page.mouse.up();
+
+  await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+  await expect(logRow).toContainText('купить сегодня');
+});
+
+test('preview app does not log collapse toggles and undo restores status changes', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+
+  const breadRow = page.locator('.list-item-wrapper', { hasText: 'Хлеб ржаной' }).locator('.list-item');
+  await breadRow.click();
+  await expect(page.locator('.list-item-wrapper', { hasText: 'Бородинский' })).toBeHidden();
+
+  await page.locator('#view-toggle-btn').click();
+  await expect(page.locator('#action-log-list')).not.toContainText('Переключено сворачивание');
+  await page.locator('#view-toggle-btn').click();
+
+  const taskRow = page.locator('.list-item-wrapper', { hasText: 'Молоко 3.2%' });
+  await triggerRightPanelActionUntil(page, taskRow.locator('.list-item'), 'Done', async () => (
+    (await taskRow.textContent()).includes('Done')
+  ));
+  await expect(taskRow).toContainText('Done');
+
+  await page.locator('#undo-btn').click();
+  await expect(taskRow).toContainText('Open');
 });

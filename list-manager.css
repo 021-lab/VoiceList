@@ -70,6 +70,16 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 
 #list-container { padding: 12px 0 88px; position: relative; }
 
+.search-summary {
+  margin: 0 12px 12px;
+  padding: 10px 12px;
+  border: 1px solid #d8e5ff;
+  background: #ffffff;
+  color: #1f3151;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .frontier-focus-strip {
   margin: 0 12px 12px;
   padding: 10px 12px;
@@ -328,6 +338,76 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 }
 .panel-icon  { width: 28px; font-size: 24px; line-height: 1; text-align: center; }
 .panel-label { font-size: 18px; font-weight: 800; letter-spacing: 0.01em; }
+
+/* ── Voice overlay ── */
+.voice-overlay {
+  position: fixed;
+  left: 50%;
+  top: 12px;
+  width: min(340px, calc(100vw - 32px));
+  transform: translateX(-50%) translateY(18px);
+  z-index: 720;
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(22, 24, 29, 0.94);
+  color: #fff;
+  padding: 14px;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.32);
+  transition: opacity 0.16s, transform 0.16s;
+}
+.voice-overlay.open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.voice-transcript {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.voice-context {
+  margin-top: 6px;
+  color: #b9c7d7;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-stack {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.voice-candidate,
+.voice-cancel {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.72);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.voice-candidate.selected {
+  background: #ffffff;
+  color: #111318;
+}
+.voice-cancel {
+  color: #ffb4a8;
+  background: rgba(255, 126, 102, 0.14);
+  font-size: 12px;
+  font-weight: 800;
+}
+.voice-cancel.selected {
+  background: #ffb4a8;
+  color: #1f2025;
+}
 
 /* ── Fullscreen task page ── */
 .task-page {

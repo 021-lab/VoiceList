@@ -2,6 +2,32 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const INBOX_ITEM = {
+  id: 'inbox',
+  parentId: null,
+  order: 0,
+  status: 'Open',
+  line1: 'Входящие',
+  line2: '',
+  collapsed: false,
+  tags: []
+};
+
+function ensureInbox(nextState) {
+  const state = clone(nextState);
+  const items = state.snapshot?.items || [];
+  if (!items.some((item) => item.id === INBOX_ITEM.id)) {
+    state.snapshot.items = [clone(INBOX_ITEM), ...items];
+  }
+  return state;
+}
+
+function normalizeState(nextState) {
+  if (nextState?.snapshot?.items) return { snapshot: { items: clone(nextState.snapshot.items) } };
+  if (Array.isArray(nextState?.items)) return { snapshot: { items: clone(nextState.items) } };
+  return { snapshot: { items: [] } };
+}
+
 function decodePathSegment(segment) {
   return segment.replace(/~1/g, '/').replace(/~0/g, '~');
 }
@@ -31,8 +57,9 @@ function applyJsonPatch(document, patch) {
   return nextDocument;
 }
 
-export function createStore({ storageKey = 'voicelist.universal-list.state', storage = window.localStorage, seedState }) {
+export function createStore({ storageKey = 'searchmydata.list.state', storage = window.localStorage, seedState }) {
   let state = null;
+  let legacyActionLog = null;
 
   function persist() {
     storage.setItem(storageKey, JSON.stringify(state));
@@ -40,8 +67,10 @@ export function createStore({ storageKey = 'voicelist.universal-list.state', sto
 
   function load() {
     const raw = storage.getItem(storageKey);
-    state = raw ? JSON.parse(raw) : clone(seedState);
-    if (!raw) persist();
+    const parsed = raw ? JSON.parse(raw) : seedState;
+    legacyActionLog = Array.isArray(parsed?.actionLog) ? clone(parsed.actionLog) : [];
+    state = ensureInbox(normalizeState(parsed));
+    persist();
     return clone(state);
   }
 
@@ -51,24 +80,14 @@ export function createStore({ storageKey = 'voicelist.universal-list.state', sto
   }
 
   function replaceState(nextState) {
-    state = clone(nextState);
+    state = ensureInbox(normalizeState(nextState));
     persist();
     return getState();
   }
 
-  function applyMutation({ patch = [], actionLogEntry = null }) {
+  function applyMutation({ patch = [] }) {
     if (!state) load();
     state = applyJsonPatch(state, patch);
-    if (actionLogEntry) state.actionLog.push(actionLogEntry);
-    persist();
-    return getState();
-  }
-
-  function updateActionLogStatus(logId, syncStatus) {
-    if (!state) load();
-    state.actionLog = state.actionLog.map((entry) => (
-      entry.id === logId ? { ...entry, syncStatus } : entry
-    ));
     persist();
     return getState();
   }
@@ -78,6 +97,10 @@ export function createStore({ storageKey = 'voicelist.universal-list.state', sto
     getState,
     load,
     replaceState,
-    updateActionLogStatus
+    takeLegacyActionLog() {
+      const entries = legacyActionLog || [];
+      legacyActionLog = [];
+      return clone(entries);
+    }
   };
 }

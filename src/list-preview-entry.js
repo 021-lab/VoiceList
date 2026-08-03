@@ -1,7 +1,7 @@
 import { seedState } from '../list-data.js';
 import { createApp } from './list-app.js';
-import { createBackendAdapter } from './list-backend-adapter.js';
 import { createInterpreter } from './list-interpreter.js';
+import { createLogStore } from './list-log-store.js';
 import { createRenderer } from './list-renderer.js';
 import { createStore } from './list-store.js';
 import { createSync } from './list-sync.js';
@@ -13,9 +13,13 @@ async function bootstrapListManagerPreview() {
   document.documentElement.dataset.previewBuildHash = PREVIEW_BUILD_HASH;
 
   const store = createStore({
-    storageKey: 'voicelist.universal-interface.state',
+    storageKey: 'searchmydata.list-interface.state',
     storage: window.localStorage,
     seedState
+  });
+  const logStore = createLogStore({
+    storageKeyPrefix: 'searchmydata.list-interface.log',
+    storage: window.localStorage
   });
 
   let app = null;
@@ -30,6 +34,7 @@ async function bootstrapListManagerPreview() {
     toastEl: document.getElementById('toast'),
     dropPanel: document.getElementById('drop-zone-panel'),
     tagPanel: document.getElementById('tag-panel'),
+    voiceOverlay: document.getElementById('voice-overlay'),
     overlay: document.getElementById('modal-overlay'),
     input1: document.getElementById('input-line1'),
     input2: document.getElementById('input-line2'),
@@ -62,7 +67,22 @@ async function bootstrapListManagerPreview() {
     onRendered: ui.onRendered
   });
 
-  const adapter = createBackendAdapter();
+  const adapter = {
+    async load() {
+      return null;
+    },
+    async save(state) {
+      return state;
+    }
+  };
+  const transport = {
+    async create(entry) {
+      return entry;
+    },
+    async update(entry) {
+      return entry;
+    }
+  };
   let sync = null;
 
   app = createApp({
@@ -70,19 +90,23 @@ async function bootstrapListManagerPreview() {
     interpreter: createInterpreter(),
     renderer,
     store,
+    logStore,
     sync: {
-      enqueue(state, actionLogEntry) {
-        return sync.enqueue(state, actionLogEntry);
+      enqueueCreate(entry) {
+        return sync.enqueueCreate(entry);
+      },
+      enqueueUpdate(entry) {
+        return sync.enqueueUpdate(entry);
       }
     },
     ui
   });
 
   sync = createSync({
-    adapter,
-    store,
-    onStateChange(nextState) {
-      app.onSyncedState(nextState);
+    transport,
+    logStore,
+    onLogEntriesChange(nextEntries) {
+      app.onLogEntriesChange(nextEntries);
     }
   });
 

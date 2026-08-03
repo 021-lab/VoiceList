@@ -1,4 +1,8 @@
+import { findCandidates } from './resolver.js';
+import { adaptSnapshot } from './snapshot-adapter.js';
+
 const STATUS_VALUES = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause']);
+const INBOX_ID = 'inbox';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -19,6 +23,10 @@ function nextOrder(items, parentId) {
   return Math.max(...siblings.map((item) => item.order || 0)) + 10;
 }
 
+function noChange() {
+  return { patch: [], logEntryDraft: null };
+}
+
 function buildLabel(command, payload = {}) {
   if (command === 'addItem') return `Создана задача: ${payload.line1}`;
   if (command === 'addChild') return `Создана подзадача: ${payload.line1}`;
@@ -32,14 +40,16 @@ function buildLabel(command, payload = {}) {
   return command;
 }
 
-function createLogEntry(input, patch) {
+function createLogEntryDraft(input, patch) {
   return {
     id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
     createdAt: new Date().toISOString(),
+    transcript: input.transcript ?? null,
     command: clone(input),
     patch,
     label: buildLabel(input.command, input.payload),
-    syncStatus: 'pending'
+    syncStatus: 'pending',
+    comments: []
   };
 }
 
@@ -67,22 +77,37 @@ export function createInterpreter() {
       const nextItems = clone(currentItems);
       const existingIds = new Set(nextItems.map((item) => item.id));
       let patch = [];
-      let actionLogEntry = null;
+      let logEntryDraft = null;
       const payload = input.payload || {};
 
       if (input.command === 'showActionLog' || input.command === 'showList' || input.command === 'showFrontier') {
         return {
           patch: [],
-          actionLogEntry: null,
+          logEntryDraft: null,
           viewMode: input.command === 'showActionLog' ? 'log' :
             input.command === 'showFrontier' ? 'frontier' : 'list'
+        };
+      }
+
+      if (input.command === 'showSearch') {
+        const query = String(payload.query || '').trim();
+        const rows = findCandidates(query, adaptSnapshot(currentItems));
+        return {
+          patch: [],
+          logEntryDraft: null,
+          viewMode: 'search',
+          effect: {
+            type: 'search',
+            query,
+            itemIds: rows.map((row) => row.id)
+          }
         };
       }
 
       if (input.command === 'showAddModal' || input.command === 'showEditModal' || input.command === 'showNestModal' || input.command === 'viewItem') {
         return {
           patch: [],
-          actionLogEntry: null,
+          logEntryDraft: null,
           effect: {
             type: 'modal',
             mode: input.command === 'showAddModal' ? 'add' :
@@ -91,6 +116,11 @@ export function createInterpreter() {
             itemId: input.actId === 'list' ? null : input.actId
           }
         };
+      }
+
+      if ((input.command === 'editItem' || input.command === 'deleteItem' || input.command === 'setParent') &&
+          input.actId === INBOX_ID) {
+        return noChange();
       }
 
       if (input.command === 'addItem') {
@@ -124,6 +154,14 @@ export function createInterpreter() {
       } else if (input.command === 'setStatus') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         if (item && STATUS_VALUES.has(payload.status)) item.status = payload.status;
+      } else if (input.command === 'setParent') {
+        const item = nextItems.find((candidate) => candidate.id === input.actId);
+        const parentId = payload.parentId ?? null;
+        if (!item || parentId === input.actId) return noChange();
+        if (parentId !== null && !nextItems.some((candidate) => candidate.id === parentId)) return noChange();
+        if (parentId !== null && descendants(nextItems, input.actId).has(parentId)) return noChange();
+        item.parentId = parentId;
+        item.order = nextOrder(nextItems.filter((candidate) => candidate.id !== input.actId), parentId);
       } else if (input.command === 'setTags') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         if (item) {
@@ -163,11 +201,13 @@ export function createInterpreter() {
         patch = [{ op: 'replace', path: '/snapshot/items', value: nextItems }];
       }
 
-      if (!String(input.command).startsWith('show') && input.command !== 'viewItem') {
-        actionLogEntry = createLogEntry(input, patch);
+      if (!String(input.command).startsWith('show') &&
+          input.command !== 'viewItem' &&
+          input.command !== 'toggleCollapse') {
+        logEntryDraft = createLogEntryDraft(input, patch);
       }
 
-      return { patch, actionLogEntry };
+      return { patch, logEntryDraft };
     }
   };
 }
