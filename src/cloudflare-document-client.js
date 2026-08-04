@@ -29,7 +29,10 @@ export function createCloudflareDocumentClient({
   WebSocketCtor = WebSocket,
   locationLike = window.location,
   sessionStorage = window.sessionStorage,
-  queueStorage = window.localStorage
+  queueStorage = window.localStorage,
+  setTimeoutFn = globalThis.setTimeout,
+  clearTimeoutFn = globalThis.clearTimeout,
+  reconnectDelayMs = 500
 } = {}) {
   const clientKey = createClientKey(sessionStorage);
   const pendingKey = `voicelist.pending.${clientKey}`;
@@ -38,7 +41,9 @@ export function createCloudflareDocumentClient({
   const ackHandlers = new Set();
   let socket = null;
   let knownRev = 0;
+  let connectPromise = null;
   let firstStateResolve = null;
+  let reconnectTimer = null;
 
   function readPending() {
     return readJson(queueStorage, pendingKey, []);
@@ -59,6 +64,7 @@ export function createCloudflareDocumentClient({
       socket.send(JSON.stringify(message));
       return true;
     }
+    scheduleReconnect(0);
     return false;
   }
 
@@ -83,23 +89,63 @@ export function createCloudflareDocumentClient({
     }
   }
 
-  function connect() {
-    return new Promise((resolve, reject) => {
-      firstStateResolve = resolve;
-      socket = new WebSocketCtor(wsUrl(locationLike));
-      socket.addEventListener('open', () => {
-        const pending = readPending();
-        sendRaw({
-          type: 'hello',
-          clientKey,
-          knownRev,
-          pendingSeq: pending.map((message) => message.seq)
-        });
-        flushPending();
+  function clearReconnect() {
+    if (!reconnectTimer) return;
+    clearTimeoutFn(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  function isSocketConnectingOrOpen() {
+    return socket?.readyState === WebSocketCtor.CONNECTING || socket?.readyState === WebSocketCtor.OPEN;
+  }
+
+  function openSocket() {
+    if (isSocketConnectingOrOpen()) return;
+    clearReconnect();
+
+    const nextSocket = new WebSocketCtor(wsUrl(locationLike));
+    socket = nextSocket;
+
+    nextSocket.addEventListener('open', () => {
+      if (socket !== nextSocket) return;
+      const pending = readPending();
+      sendRaw({
+        type: 'hello',
+        clientKey,
+        knownRev,
+        pendingSeq: pending.map((message) => message.seq)
       });
-      socket.addEventListener('message', handleMessage);
-      socket.addEventListener('error', reject);
+      flushPending();
     });
+    nextSocket.addEventListener('message', handleMessage);
+    nextSocket.addEventListener('close', () => {
+      if (socket === nextSocket) socket = null;
+      scheduleReconnect(reconnectDelayMs);
+    });
+    nextSocket.addEventListener('error', () => {
+      if (socket === nextSocket && nextSocket.readyState !== WebSocketCtor.OPEN) socket = null;
+      scheduleReconnect(reconnectDelayMs);
+    });
+  }
+
+  function scheduleReconnect(delayMs) {
+    if (reconnectTimer || isSocketConnectingOrOpen()) return;
+    reconnectTimer = setTimeoutFn(() => {
+      reconnectTimer = null;
+      openSocket();
+    }, delayMs);
+  }
+
+  function connect() {
+    if (!connectPromise) {
+      connectPromise = new Promise((resolve) => {
+        firstStateResolve = resolve;
+        openSocket();
+      });
+    } else {
+      openSocket();
+    }
+    return connectPromise;
   }
 
   async function sendCommand(input) {

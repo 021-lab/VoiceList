@@ -34,10 +34,16 @@ class FakeWebSocket {
   message(payload) {
     this.emit('message', { data: JSON.stringify(payload) });
   }
+
+  close() {
+    this.readyState = FakeWebSocket.CLOSED;
+    this.emit('close', {});
+  }
 }
 
 FakeWebSocket.CONNECTING = 0;
 FakeWebSocket.OPEN = 1;
+FakeWebSocket.CLOSED = 3;
 
 function createMemoryStorage() {
   const entries = new Map();
@@ -109,5 +115,79 @@ describe('Cloudflare document client', () => {
       }
     });
     expect(socket.sent[1].clientKey).toMatch(/^tab-/);
+  });
+
+  test('reconnects and flushes pending commands after an idle WebSocket close', async () => {
+    FakeWebSocket.instances = [];
+    const timers = [];
+    const onState = vi.fn();
+    const client = createCloudflareDocumentClient({
+      WebSocketCtor: FakeWebSocket,
+      locationLike: { protocol: 'https:', host: 'vlist-cloudflare-backend.smileme.ai' },
+      sessionStorage: createMemoryStorage(),
+      queueStorage: createMemoryStorage(),
+      setTimeoutFn(handler) {
+        timers.push(handler);
+        return timers.length;
+      },
+      clearTimeoutFn() {}
+    });
+    client.onState(onState);
+
+    const connected = client.connect();
+    const firstSocket = FakeWebSocket.instances[0];
+    firstSocket.open();
+    firstSocket.message({
+      type: 'state',
+      state: {
+        rev: 0,
+        content: { snapshot: { items: [] }, actionLog: [] }
+      }
+    });
+    await connected;
+
+    firstSocket.close();
+    await client.sendCommand({
+      actId: 'milk1',
+      actType: 'task',
+      command: 'setStatus',
+      payload: { status: 'Done' },
+      source: 'unit-test'
+    });
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(timers).toHaveLength(1);
+    timers.shift()();
+
+    const secondSocket = FakeWebSocket.instances[1];
+    secondSocket.open();
+    expect(secondSocket.sent[0]).toMatchObject({
+      type: 'hello',
+      knownRev: 0,
+      pendingSeq: [1]
+    });
+    expect(secondSocket.sent[1]).toMatchObject({
+      type: 'command',
+      seq: 1,
+      input: {
+        actId: 'milk1',
+        actType: 'task',
+        command: 'setStatus',
+        payload: { status: 'Done' },
+        source: 'unit-test'
+      }
+    });
+
+    secondSocket.message({
+      type: 'state',
+      state: {
+        rev: 1,
+        content: { snapshot: { items: [{ id: 'milk1', status: 'Done' }] }, actionLog: [] }
+      }
+    });
+    expect(onState).toHaveBeenLastCalledWith({
+      rev: 1,
+      content: { snapshot: { items: [{ id: 'milk1', status: 'Done' }] }, actionLog: [] }
+    });
   });
 });

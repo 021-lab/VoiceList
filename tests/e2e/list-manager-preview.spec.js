@@ -113,6 +113,42 @@ test('preview app can create task, create subtask, and change status', async ({ 
   await expect(page.locator('#action-log-list')).toContainText('Статус изменён: Done');
 });
 
+test('cloudflare mode reconnects after an idle WebSocket close and renders status changes without reload', async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWebSocket = window.WebSocket;
+    window.__voiceListSockets = [];
+    window.WebSocket = class TestWebSocket extends NativeWebSocket {
+      constructor(url, protocols) {
+        super(url, protocols);
+        window.__voiceListSockets.push(this);
+      }
+    };
+    window.WebSocket.CONNECTING = NativeWebSocket.CONNECTING;
+    window.WebSocket.OPEN = NativeWebSocket.OPEN;
+    window.WebSocket.CLOSING = NativeWebSocket.CLOSING;
+    window.WebSocket.CLOSED = NativeWebSocket.CLOSED;
+  });
+
+  await page.goto('');
+  const cloudflareMode = await page.evaluate(() => !window.location.hash.includes('v=local-dev') && window.location.port !== '4511');
+  test.skip(!cloudflareMode, 'Cloudflare document client is disabled in static local-dev mode.');
+
+  const taskRow = page.locator('.list-item-wrapper', { hasText: 'Молоко 3.2%' });
+  await expect(taskRow).toContainText('Open');
+  await expect.poll(() => page.evaluate(() => window.__voiceListSockets.some((socket) => socket.readyState === WebSocket.OPEN))).toBe(true);
+
+  await page.evaluate(() => {
+    for (const socket of window.__voiceListSockets) {
+      if (socket.readyState === WebSocket.OPEN) socket.close(1000, 'test idle close');
+    }
+  });
+
+  await triggerRightPanelActionUntil(page, taskRow.locator('.list-item'), 'Done', async () => (
+    (await taskRow.textContent()).includes('Done')
+  ));
+  await expect(taskRow).toContainText('Done');
+});
+
 test('preview app executes voice commands through touch gestures', async ({ page }) => {
   const voiceTitle = `Голосовая задача ${Date.now()}`;
   const normalizedVoiceTitle = voiceTitle.toLowerCase();
