@@ -2636,6 +2636,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       voiceOverlay.style.top = `${Math.round(nextTop)}px`;
     }
     function startVoice(contextId, anchorY) {
+      if (rootPanel.dataset.viewMode !== "frontier") return false;
       if (voiceState || modalOpen || taskPageOpen) return false;
       hideDrop();
       hideTagPanel();
@@ -3571,7 +3572,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           longTimer = null;
           active = false;
           rdAnchor = null;
-          if (rootPanel.dataset.viewMode !== "frontier") startVoice(null, curY);
+          if (rootPanel.dataset.viewMode === "frontier") startVoice(null, curY);
           resetRowGesture(row, actionBg);
         }, VOICE_LONGPRESS_MS);
       }, { passive: true });
@@ -3600,7 +3601,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           longTimer = null;
           active = false;
           rdAnchor = null;
-          if (rootPanel.dataset.viewMode !== "frontier") startVoice(null, curY);
+          if (rootPanel.dataset.viewMode === "frontier") startVoice(null, curY);
           resetRowGesture(row, actionBg);
         }, VOICE_LONGPRESS_MS);
       });

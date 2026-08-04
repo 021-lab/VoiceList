@@ -171,6 +171,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function startVoice(contextId, anchorY) {
+    if (rootPanel.dataset.viewMode !== 'frontier') return false;
     if (voiceState || modalOpen || taskPageOpen) return false;
     hideDrop();
     hideTagPanel();
@@ -1214,7 +1215,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         active = false;
         rdAnchor = null;
-        if (rootPanel.dataset.viewMode !== 'frontier') startVoice(null, curY);
+        if (rootPanel.dataset.viewMode === 'frontier') startVoice(null, curY);
         resetRowGesture(row, actionBg);
       }, VOICE_LONGPRESS_MS);
     }, { passive: true });
@@ -1246,7 +1247,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         active = false;
         rdAnchor = null;
-        if (rootPanel.dataset.viewMode !== 'frontier') startVoice(null, curY);
+        if (rootPanel.dataset.viewMode === 'frontier') startVoice(null, curY);
         resetRowGesture(row, actionBg);
       }, VOICE_LONGPRESS_MS);
     });
