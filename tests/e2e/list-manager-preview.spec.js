@@ -38,6 +38,27 @@ async function triggerRightPanelAction(page, rowLocator, actionLabel) {
   await page.mouse.up();
 }
 
+async function triggerLeftPanelAction(page, rowLocator, actionLabel) {
+  await rowLocator.scrollIntoViewIfNeeded();
+  await expect(rowLocator).toBeVisible();
+  const rowBox = await rowLocator.boundingBox();
+  if (!rowBox) throw new Error(`No bounding box for row ${actionLabel}`);
+  const viewport = page.viewportSize();
+  const swipeDistance = Math.max(320, Math.floor((viewport?.width || 1280) * 0.28));
+
+  await page.mouse.move(rowBox.x + rowBox.width - 24, rowBox.y + rowBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(rowBox.x + rowBox.width - swipeDistance, rowBox.y + rowBox.height / 2, { steps: 10 });
+
+  const panelItem = page.locator('#tag-panel .panel-item', { hasText: actionLabel });
+  await expect(panelItem).toBeVisible();
+  const panelBox = await panelItem.boundingBox();
+  if (!panelBox) throw new Error(`No tag panel box for action ${actionLabel}`);
+
+  await page.mouse.move(panelBox.x + panelBox.width / 2, panelBox.y + panelBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+}
+
 async function triggerRightPanelActionUntil(page, rowLocator, actionLabel, verify) {
   let lastError = null;
 
@@ -53,6 +74,29 @@ async function triggerRightPanelActionUntil(page, rowLocator, actionLabel, verif
   }
 
   throw lastError;
+}
+
+async function dragRowVertically(page, rowLocator, deltaY) {
+  await rowLocator.scrollIntoViewIfNeeded();
+  await expect(rowLocator).toBeVisible();
+  const rowBox = await rowLocator.boundingBox();
+  if (!rowBox) throw new Error('No row box for drag');
+
+  const x = rowBox.x + rowBox.width / 2;
+  const y = rowBox.y + rowBox.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.waitForTimeout(520);
+  await page.mouse.move(x, y + deltaY, { steps: 14 });
+  await page.mouse.up();
+}
+
+async function visibleListOrder(page) {
+  return page.locator('#list-container .list-item-wrapper').evaluateAll((nodes) => (
+    nodes
+      .filter((node) => node.offsetParent !== null)
+      .map((node) => node.dataset.id)
+  ));
 }
 
 test('preview app can create task, create subtask, and change status', async ({ page }) => {
@@ -149,11 +193,35 @@ test('cloudflare mode reconnects after an idle WebSocket close and renders statu
   await expect(taskRow).toContainText('Done');
 });
 
+test('preview app keeps list drag and left tag gestures when task-list voice is disabled', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const milkWrapper = page.locator('.list-item-wrapper[data-id="milk1"]');
+  const milkRow = milkWrapper.locator('.list-item');
+  await expect(milkWrapper).toContainText('Молоко 3.2%');
+
+  await triggerLeftPanelAction(page, milkRow, 'Купить');
+  await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+  await expect(milkWrapper).toContainText('Купить');
+
+  const initialOrder = await visibleListOrder(page);
+  expect(initialOrder.indexOf('milk1')).toBeLessThan(initialOrder.indexOf('bread'));
+
+  await dragRowVertically(page, milkRow, 140);
+  await expect.poll(async () => {
+    const nextOrder = await visibleListOrder(page);
+    return nextOrder.indexOf('milk1') > nextOrder.indexOf('bread');
+  }).toBe(true);
+  await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+});
+
 test('preview app disables task-list voice and keeps voice commands on the frontier', async ({ page }) => {
-  const voiceTitle = `Голосовая задача ${Date.now()}`;
-  await page.addInitScript((title) => {
-    window.__voiceTest = { phrase: `добавь ${title}` };
-  }, voiceTitle);
+  await page.addInitScript(() => {
+    window.__voiceTest = { phrase: 'шум' };
+  });
 
   await page.goto('');
   await page.evaluate(() => window.localStorage.clear());
@@ -161,15 +229,17 @@ test('preview app disables task-list voice and keeps voice commands on the front
   await expect(page.locator('#list-container')).toBeVisible();
   await expect(page.locator('.list-item-wrapper', { hasText: 'Входящие' })).toBeVisible();
 
-  await page.mouse.move(220, 620);
+  const milkRowInList = page.locator('.list-item-wrapper[data-id="milk1"]').locator('.list-item');
+  const milkBox = await milkRowInList.boundingBox();
+  if (!milkBox) throw new Error('No milk row box');
+
+  await page.mouse.move(milkBox.x + milkBox.width / 2, milkBox.y + milkBox.height / 2);
   await page.mouse.down();
   await page.waitForTimeout(520);
   await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
   await page.mouse.up();
+  await page.waitForTimeout(300);
 
-  const milkRowInList = page.locator('.list-item-wrapper', { hasText: 'Молоко 3.2%' }).locator('.list-item');
-  const milkBox = await milkRowInList.boundingBox();
-  if (!milkBox) throw new Error('No milk row box');
   const viewport = page.viewportSize();
   const leftSwipeDistance = Math.max(320, Math.floor((viewport?.width || 1280) * 0.28));
 
@@ -181,7 +251,7 @@ test('preview app disables task-list voice and keeps voice commands on the front
 
   await page.locator('#frontier-tab-btn').click();
   await expect(page.locator('#frontier-tab-btn')).toHaveClass(/active/);
-  const goldenRow = page.locator('.list-item-wrapper', { hasText: 'Голден' }).locator('.list-item').first();
+  const goldenRow = page.locator('.list-item-wrapper[data-id="goldn"]').locator('.list-item');
   const goldenBox = await goldenRow.boundingBox();
   if (!goldenBox) throw new Error('No Golden frontier row box');
 
@@ -193,7 +263,7 @@ test('preview app disables task-list voice and keeps voice commands on the front
   await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
 
   await page.evaluate(() => { window.__voiceTest = { phrase: 'готово' }; });
-  const frontierRow = page.locator('.list-item-wrapper', { hasText: 'Голден' }).locator('.list-item').first();
+  const frontierRow = page.locator('.list-item-wrapper[data-id="goldn"]').locator('.list-item');
   const box = await frontierRow.boundingBox();
   if (!box) throw new Error('No frontier row box');
 

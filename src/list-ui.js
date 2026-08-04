@@ -170,8 +170,12 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     voiceOverlay.style.top = `${Math.round(nextTop)}px`;
   }
 
+  function isFrontierView() {
+    return rootPanel.dataset.viewMode === 'frontier';
+  }
+
   function startVoice(contextId, anchorY) {
-    if (rootPanel.dataset.viewMode !== 'frontier') return false;
+    if (!isFrontierView()) return false;
     if (voiceState || modalOpen || taskPageOpen) return false;
     hideDrop();
     hideTagPanel();
@@ -845,6 +849,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       }
       if (dragState) {
         finalizeDrag();
+        currentMouseGesture = null;
         wasDragging = true;
         setTimeout(() => { wasDragging = false; }, 300);
       } else {
@@ -1153,12 +1158,28 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       }
 
       if (ldAnchor !== null || dx < -threshold) {
-        ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
-        active = false;
-        if (startVoice(itemId, curY)) {
-          if (isFinite(curY)) updateVoice(curY);
+        if (isFrontierView()) {
+          ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
+          active = false;
+          if (startVoice(itemId, curY)) {
+            if (isFinite(curY)) updateVoice(curY);
+          }
+          resetRowGesture(row, actionBg);
+          return;
         }
-        resetRowGesture(row, actionBg);
+        if (ldAnchor !== null && dx > -threshold) {
+          hideTagPanel();
+          ldAnchor = null;
+          row.style.transform = `translate(0px, ${offsetY}px)`;
+          return;
+        }
+        if (!ldAnchor) {
+          ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
+          showTagPanel(ldAnchor, itemId);
+        }
+        row.style.transform = `translate(${Math.max(dx, -110)}px, ${offsetY}px)`;
+        actionBg.style.opacity = '0';
+        tagAction = setActiveItem(tagPanel, offsetY);
         return;
       }
 
@@ -1172,7 +1193,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       row.classList.remove('pressing');
       if (isMouse) currentMouseGesture = null;
 
-      const action = dropAction;
+      const rightAction = dropAction;
+      const leftAction = tagAction;
       const wasRight = !!rdAnchor;
       const wasLeft = !!ldAnchor;
       rdAnchor = null;
@@ -1190,11 +1212,12 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       row.style.transform = '';
       actionBg.style.opacity = '0';
 
-      if (wasRight && dx > 30 && action) {
+      if (wasRight && dx > 30 && rightAction) {
         if (isMouse) mouseSwipeDone = true;
-        execPanelAction(action, itemId, 'right-swipe-panel');
-      } else if (wasLeft && dx < -30) {
+        execPanelAction(rightAction, itemId, 'right-swipe-panel');
+      } else if (wasLeft && dx < -30 && leftAction) {
         if (isMouse) mouseSwipeDone = true;
+        execPanelAction(leftAction, itemId, 'left-swipe-panel');
       } else if (!isMouse && Math.abs(dx) < 10 && Math.abs(dy) < 10 && rootPanel.dataset.viewMode !== 'frontier') {
         dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
       }
@@ -1215,8 +1238,16 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         active = false;
         rdAnchor = null;
-        if (rootPanel.dataset.viewMode === 'frontier') startVoice(null, curY);
-        resetRowGesture(row, actionBg);
+        ldAnchor = null;
+        if (isFrontierView()) {
+          startVoice(null, curY);
+          resetRowGesture(row, actionBg);
+          return;
+        }
+        actionBg.style.opacity = '0';
+        hideDrop();
+        hideTagPanel();
+        startDrag(wrapper, curY, curX);
       }, VOICE_LONGPRESS_MS);
     }, { passive: true });
 
@@ -1247,8 +1278,17 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         active = false;
         rdAnchor = null;
-        if (rootPanel.dataset.viewMode === 'frontier') startVoice(null, curY);
-        resetRowGesture(row, actionBg);
+        ldAnchor = null;
+        if (isFrontierView()) {
+          startVoice(null, curY);
+          resetRowGesture(row, actionBg);
+          return;
+        }
+        currentMouseGesture = null;
+        actionBg.style.opacity = '0';
+        hideDrop();
+        hideTagPanel();
+        startDrag(wrapper, curY, curX);
       }, VOICE_LONGPRESS_MS);
     });
 
@@ -1259,7 +1299,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         mouseSwipeDone = false;
         return;
       }
-      if (rootPanel.dataset.viewMode === 'frontier') return;
+      if (isFrontierView()) return;
       dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'click' });
     });
   }
