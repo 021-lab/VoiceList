@@ -6,7 +6,7 @@ function task(id, parentId, status, order = 10) {
 }
 
 describe('task frontier', () => {
-  test('returns the most specific active tasks from focused and paused branches', () => {
+  test('returns all open leaves except paused descendants and focus sibling branches', () => {
     const result = calculateFrontier([
       task('A', null, 'Open', 10),
       task('A1', 'A', 'Open', 10),
@@ -32,8 +32,8 @@ describe('task frontier', () => {
       task('G', null, 'Archive', 50)
     ]);
 
-    expect(result.frontier.map((item) => item.id)).toEqual(['A1.1.2', 'A2', 'D1.1', 'D1.1.1', 'D2']);
-    expect(result.focusHighlights.map((item) => item.id)).toEqual(['A1.1', 'D1.1']);
+    expect(result.frontier.map((item) => item.id)).toEqual(['A1.1.2', 'A2', 'D2']);
+    expect(result.focusHighlights.map((item) => item.id)).toEqual(['A1.1']);
   });
 
   test('uses all focused siblings and blocks unfocused sibling branches', () => {
@@ -51,11 +51,10 @@ describe('task frontier', () => {
     expect(result.focusHighlights.map((item) => item.id)).toEqual(['A', 'B']);
   });
 
-  test('allows focus below closed ancestors while keeping closed ancestors out of frontier', () => {
+  test('allows focus below done ancestors while keeping closed ancestors out of frontier', () => {
     const result = calculateFrontier([
       task('apple', null, 'Open', 10),
-      task('fudji', 'apple', 'Pause', 10),
-      task('done-parent', 'fudji', 'Done', 10),
+      task('done-parent', 'apple', 'Done', 10),
       task('open-bridge', 'done-parent', 'Open', 10),
       task('first-backlog', 'open-bridge', 'Focus', 10)
     ]);
@@ -72,6 +71,19 @@ describe('task frontier', () => {
     ]);
 
     expect(result.frontier.map((item) => item.id)).toEqual(['visible-root']);
+    expect(result.focusHighlights).toEqual([]);
+  });
+
+  test('blocks paused descendants even when a descendant is focused', () => {
+    const result = calculateFrontier([
+      task('visible-root', null, 'Open', 10),
+      task('visible-leaf', 'visible-root', 'Open', 10),
+      task('paused-root', null, 'Pause', 20),
+      task('paused-focus', 'paused-root', 'Focus', 10),
+      task('paused-open-leaf', 'paused-focus', 'Open', 10)
+    ]);
+
+    expect(result.frontier.map((item) => item.id)).toEqual(['visible-leaf']);
     expect(result.focusHighlights).toEqual([]);
   });
 

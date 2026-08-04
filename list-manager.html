@@ -1330,31 +1330,26 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     markFocus(root);
     const frontier = [];
     const focusHighlights = [];
-    function visit(node, paused) {
+    function visit(node) {
       const status = normalizedStatus(node.task || {});
       if (BLOCKED_BRANCH_STATUSES.has(status)) return false;
+      if (status === "pause") return false;
       if (CLOSED_STATUSES.has(status) && !node.hasFocusInSubtree) return false;
       if (status === "focus") focusHighlights.push(node.task);
-      const focusInsidePause = paused && status === "focus";
-      const insidePause = paused && status !== "focus" || status === "pause";
-      if (insidePause && !node.hasFocusInSubtree) return false;
-      if (!node.synthetic && focusInsidePause) {
-        frontier.push(node.task);
-      }
       const activeChildren = node.children.filter((child) => !CLOSED_STATUSES.has(normalizedStatus(child.task)) || child.hasFocusInSubtree);
       const focusedChildren = activeChildren.filter((child) => normalizedStatus(child.task) === "focus");
       const childrenToVisit = focusedChildren.length ? focusedChildren : activeChildren;
       let descendantInFrontier = false;
       for (const child of childrenToVisit) {
-        if (visit(child, insidePause)) descendantInFrontier = true;
+        if (visit(child)) descendantInFrontier = true;
       }
-      if (!node.synthetic && FRONTIER_STATUSES.has(status) && !descendantInFrontier && !focusInsidePause) {
+      if (!node.synthetic && FRONTIER_STATUSES.has(status) && !descendantInFrontier) {
         frontier.push(node.task);
         return true;
       }
-      return focusInsidePause || descendantInFrontier;
+      return descendantInFrontier;
     }
-    visit(root, false);
+    visit(root);
     return { frontier, focusHighlights };
   }
 
