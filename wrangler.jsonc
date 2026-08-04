@@ -3,6 +3,7 @@
   "name": "vlist-cloudflare-backend",
   "main": "worker/index.js",
   "compatibility_date": "2026-08-04",
+  "workers_dev": false,
   "compatibility_flags": [
     "nodejs_compat"
   ],
@@ -25,7 +26,11 @@
   "routes": [
     {
       "pattern": "vlist-cloudflare-backend.smileme.ai",
-      "custom_domain": true
+      "zone_name": "smileme.ai"
+    },
+    {
+      "pattern": "vlist-cloudflare-backend.smileme.ai/*",
+      "zone_name": "smileme.ai"
     }
   ],
   "vars": {
