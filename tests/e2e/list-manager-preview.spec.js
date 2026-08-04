@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, request }) => {
   await page.route('https://firestore.googleapis.com/**', async (route) => {
     await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
+  await request.post('/reset', {
+    headers: {
+      'X-VoiceList-Test-Reset': 'local-reset'
+    }
+  }).catch(() => {});
 });
 
 async function confirmModal(page) {

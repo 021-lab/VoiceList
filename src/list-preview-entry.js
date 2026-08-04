@@ -1,5 +1,6 @@
 import { seedState } from '../list-data.js';
 import { createApp } from './list-app.js';
+import { createCloudflareDocumentClient } from './cloudflare-document-client.js';
 import { createInterpreter } from './list-interpreter.js';
 import { createLogStore } from './list-log-store.js';
 import { createRenderer } from './list-renderer.js';
@@ -84,9 +85,13 @@ async function bootstrapListManagerPreview() {
     }
   };
   let sync = null;
+  const useCloudflareBackend = !window.location.hash.includes('v=local-dev') &&
+    window.location.port !== '4511';
+  const documentClient = useCloudflareBackend ? createCloudflareDocumentClient() : null;
 
   app = createApp({
     adapter,
+    documentClient,
     interpreter: createInterpreter(),
     renderer,
     store,

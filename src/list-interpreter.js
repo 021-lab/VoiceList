@@ -40,10 +40,14 @@ function buildLabel(command, payload = {}) {
   return command;
 }
 
-function createLogEntryDraft(input, patch) {
+function createDefaultLogId() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8);
+}
+
+function createLogEntryDraft(input, patch, { createLogId = createDefaultLogId, now = () => new Date() } = {}) {
   return {
-    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
-    createdAt: new Date().toISOString(),
+    id: createLogId(input, patch),
+    createdAt: now().toISOString(),
     transcript: input.transcript ?? null,
     command: clone(input),
     patch,
@@ -70,7 +74,7 @@ function descendants(items, rootId) {
   return blocked;
 }
 
-export function createInterpreter() {
+export function createInterpreter({ createItemId = randomId, createLogId = createDefaultLogId, now = () => new Date() } = {}) {
   return {
     execute(state, input) {
       const currentItems = clone(state.snapshot.items);
@@ -125,7 +129,7 @@ export function createInterpreter() {
 
       if (input.command === 'addItem') {
         nextItems.push({
-          id: randomId(existingIds),
+          id: createItemId(existingIds, input),
           parentId: null,
           order: nextOrder(nextItems, null),
           status: 'Open',
@@ -136,7 +140,7 @@ export function createInterpreter() {
         });
       } else if (input.command === 'addChild') {
         nextItems.push({
-          id: randomId(existingIds),
+          id: createItemId(existingIds, input),
           parentId: input.actId,
           order: nextOrder(nextItems, input.actId),
           status: 'Open',
@@ -204,7 +208,7 @@ export function createInterpreter() {
       if (!String(input.command).startsWith('show') &&
           input.command !== 'viewItem' &&
           input.command !== 'toggleCollapse') {
-        logEntryDraft = createLogEntryDraft(input, patch);
+        logEntryDraft = createLogEntryDraft(input, patch, { createLogId, now });
       }
 
       return { patch, logEntryDraft };

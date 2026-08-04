@@ -1,0 +1,160 @@
+import { DurableObject } from 'cloudflare:workers';
+
+import { seedState } from '../list-data.js';
+import { LIST_MANAGER_HTML } from './generated-html.js';
+import { createDocumentCore } from './list-document-core.js';
+
+const STORAGE_KEY = 'voicelist.document.v1';
+
+function json(data, init = {}) {
+  return Response.json(data, {
+    ...init,
+    headers: {
+      'Cache-Control': 'no-store',
+      ...(init.headers || {})
+    }
+  });
+}
+
+async function readRequestJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+export class ListDocumentDO extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.core = null;
+    this.queue = Promise.resolve();
+  }
+
+  async ensureCore() {
+    if (this.core) return this.core;
+    const initialState = await this.ctx.storage.get(STORAGE_KEY);
+    this.core = createDocumentCore({
+      seedState,
+      initialState,
+      openRouterApiKey: this.env.OPENROUTER_API_KEY || '',
+      openRouterModel: this.env.OPENROUTER_MODEL || 'openai/gpt-4.1-mini'
+    });
+    await this.core.init();
+    return this.core;
+  }
+
+  async persist() {
+    await this.ctx.storage.put(STORAGE_KEY, this.core.exportState());
+  }
+
+  async reset() {
+    this.core = createDocumentCore({
+      seedState,
+      openRouterApiKey: this.env.OPENROUTER_API_KEY || '',
+      openRouterModel: this.env.OPENROUTER_MODEL || 'openai/gpt-4.1-mini'
+    });
+    await this.core.init();
+    await this.persist();
+    const state = this.core.getSnapshot();
+    this.broadcastState(state);
+    return state;
+  }
+
+  broadcastState(state) {
+    const payload = JSON.stringify({ type: 'state', state });
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(payload);
+      } catch {
+        // Stale sockets disappear from getWebSockets after close completion.
+      }
+    }
+  }
+
+  async fetch(request) {
+    const upgrade = request.headers.get('Upgrade') || '';
+    if (upgrade.toLowerCase() !== 'websocket') return json({ error: 'Expected WebSocket upgrade' }, { status: 426 });
+
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    this.ctx.acceptWebSocket(server);
+    const core = await this.ensureCore();
+    server.send(JSON.stringify({ type: 'state', state: core.getSnapshot() }));
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async processWebSocketMessage(ws, rawMessage) {
+    const core = await this.ensureCore();
+    let message;
+    try {
+      message = JSON.parse(String(rawMessage));
+    } catch {
+      ws.send(JSON.stringify({
+        type: 'ack',
+        ack: { seq: null, id: null, status: 'rejected', reason: 'Invalid JSON message', newTarget: null }
+      }));
+      return;
+    }
+
+    if (message.type === 'hello') {
+      ws.send(JSON.stringify({ type: 'state', state: core.getSnapshot() }));
+      return;
+    }
+
+    const result = await core.handleClientMessage(message);
+    await this.persist();
+    ws.send(JSON.stringify({ type: 'ack', ack: result.ack }));
+    this.broadcastState(result.state);
+  }
+
+  webSocketMessage(ws, message) {
+    this.queue = this.queue.then(() => this.processWebSocketMessage(ws, message));
+    this.ctx.waitUntil(this.queue);
+  }
+
+  webSocketClose() {}
+
+  webSocketError() {}
+}
+
+function documentStub(env) {
+  return env.LIST_DOCUMENT.getByName('main');
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/health') {
+      return new Response('ok\n', {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
+    if (url.pathname === '/ws') {
+      return documentStub(env).fetch(request);
+    }
+
+    if (url.pathname === '/reset' && request.method === 'POST') {
+      const token = request.headers.get('X-VoiceList-Test-Reset') || '';
+      if (!env.TEST_RESET_TOKEN || token !== env.TEST_RESET_TOKEN) return new Response('Not found', { status: 404 });
+      const state = await documentStub(env).reset();
+      return json({ state });
+    }
+
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      return new Response(LIST_MANAGER_HTML, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
+    return new Response('Not found', { status: 404 });
+  }
+};

@@ -10,7 +10,26 @@ function createCommentRecord(text) {
   };
 }
 
-export function createApp({ adapter, interpreter, renderer, store, logStore, sync, ui }) {
+function isLocalUiCommand(input) {
+  return input.command === 'showActionLog' ||
+    input.command === 'showList' ||
+    input.command === 'showFrontier' ||
+    input.command === 'showSearch' ||
+    input.command === 'showAddModal' ||
+    input.command === 'showEditModal' ||
+    input.command === 'showNestModal' ||
+    input.command === 'viewItem';
+}
+
+function unpackServerState(serverState) {
+  if (!serverState?.content) return null;
+  return {
+    snapshot: clone(serverState.content.snapshot || { items: [] }),
+    actionLog: clone(serverState.content.actionLog || [])
+  };
+}
+
+export function createApp({ adapter, documentClient = null, interpreter, renderer, store, logStore, sync, ui }) {
   let state = null;
   let snapshotState = null;
   let actionLog = [];
@@ -35,6 +54,13 @@ export function createApp({ adapter, interpreter, renderer, store, logStore, syn
     renderer.render(state, viewMode, viewContext);
   }
 
+  function applyServerState(serverState) {
+    const unpacked = unpackServerState(serverState);
+    if (!unpacked) return;
+    refreshState({ snapshot: unpacked.snapshot }, unpacked.actionLog);
+    render();
+  }
+
   function handleEffect(effect) {
     if (!effect) return;
     if (effect.type === 'modal') ui.openModal(effect.mode, effect.itemId, state);
@@ -55,6 +81,11 @@ export function createApp({ adapter, interpreter, renderer, store, logStore, syn
   }
 
   async function dispatchUserInput(input) {
+    if (documentClient && !isLocalUiCommand(input)) {
+      await documentClient.sendCommand(input);
+      return;
+    }
+
     if (input.command === 'commentLogEntry') {
       await appendLogComment(input);
       return;
@@ -91,6 +122,22 @@ export function createApp({ adapter, interpreter, renderer, store, logStore, syn
 
   return {
     async init() {
+      if (documentClient) {
+        snapshotState = { snapshot: { items: [] } };
+        actionLog = [];
+        refreshState(snapshotState, actionLog);
+
+        documentClient.onState?.(applyServerState);
+        const serverState = await documentClient.connect();
+        if (serverState) applyServerState(serverState);
+
+        ui.setDispatch(dispatchUserInput);
+        ui.setGetState(() => state);
+        ui.bindGlobal();
+        if (!serverState) render();
+        return;
+      }
+
       snapshotState = store.load();
       logStore.importLegacyEntries?.(store.takeLegacyActionLog?.() || []);
       actionLog = logStore.listEntries();

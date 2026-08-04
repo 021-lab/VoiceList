@@ -86,4 +86,91 @@ describe('list app', () => {
       comments: []
     });
   });
+
+  test('sends document commands to the Cloudflare backend without local interpretation', async () => {
+    let dispatch = null;
+    let stateHandler = null;
+    const renderer = { render: vi.fn() };
+    const taskStore = {
+      load: vi.fn(() => ({ snapshot: { items: [] } })),
+      replaceState: vi.fn((state) => state),
+      applyMutation: vi.fn(),
+      takeLegacyActionLog: vi.fn(() => [])
+    };
+    const logStore = {
+      importLegacyEntries: vi.fn(),
+      listEntries: vi.fn(() => []),
+      createEntry: vi.fn(),
+      updateEntry: vi.fn()
+    };
+    const documentClient = {
+      connect: vi.fn(async () => ({
+        rev: 0,
+        content: { snapshot: { items: [] }, actionLog: [] }
+      })),
+      onState: vi.fn((handler) => { stateHandler = handler; }),
+      sendCommand: vi.fn(async () => {})
+    };
+    const ui = {
+      setDispatch: vi.fn((fn) => { dispatch = fn; }),
+      setGetState: vi.fn(),
+      bindGlobal: vi.fn(),
+      openModal: vi.fn()
+    };
+    const interpreter = {
+      execute: vi.fn()
+    };
+
+    const app = createApp({
+      adapter: { load: vi.fn(async () => null) },
+      documentClient,
+      interpreter,
+      renderer,
+      store: taskStore,
+      logStore,
+      sync: {},
+      ui
+    });
+
+    await app.init();
+    expect(stateHandler).toBeTypeOf('function');
+
+    await dispatch({
+      actId: 'list',
+      actType: 'list',
+      command: 'addItem',
+      payload: { line1: 'Backend task', line2: '' },
+      source: 'unit-test'
+    });
+
+    expect(documentClient.sendCommand).toHaveBeenCalledWith({
+      actId: 'list',
+      actType: 'list',
+      command: 'addItem',
+      payload: { line1: 'Backend task', line2: '' },
+      source: 'unit-test'
+    });
+    expect(interpreter.execute).not.toHaveBeenCalled();
+    expect(taskStore.applyMutation).not.toHaveBeenCalled();
+
+    stateHandler({
+      rev: 1,
+      content: {
+        snapshot: {
+          items: [
+            { id: 'rs', parentId: null, order: 10, status: 'Open', line1: 'Backend task', line2: '', collapsed: false, tags: [] }
+          ]
+        },
+        actionLog: []
+      }
+    });
+    expect(renderer.render).toHaveBeenLastCalledWith({
+      snapshot: {
+        items: [
+          { id: 'rs', parentId: null, order: 10, status: 'Open', line1: 'Backend task', line2: '', collapsed: false, tags: [] }
+        ]
+      },
+      actionLog: []
+    }, 'list', {});
+  });
 });

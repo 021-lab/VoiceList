@@ -1276,6 +1276,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       frontierButton.textContent = viewMode === 'frontier' || viewMode === 'search' ? 'Список' : 'Фронтир';
       frontierButton.classList.toggle('active', viewMode === 'frontier');
     }
+    if (taskPageOpen && taskPageTargetId) renderTaskPageSubtasks(taskPageTargetId, state);
   }
 
   return {
