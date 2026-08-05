@@ -76,7 +76,7 @@ async function triggerRightPanelActionUntil(page, rowLocator, actionLabel, verif
   throw lastError;
 }
 
-async function dragRowVertically(page, rowLocator, deltaY) {
+async function dragRowVertically(page, rowLocator, deltaY, deltaX = 0) {
   await rowLocator.scrollIntoViewIfNeeded();
   await expect(rowLocator).toBeVisible();
   const rowBox = await rowLocator.boundingBox();
@@ -87,7 +87,7 @@ async function dragRowVertically(page, rowLocator, deltaY) {
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.waitForTimeout(520);
-  await page.mouse.move(x, y + deltaY, { steps: 14 });
+  await page.mouse.move(x + deltaX, y + deltaY, { steps: 14 });
   await page.mouse.up();
 }
 
@@ -268,6 +268,34 @@ test('preview app keeps list drag and left tag gestures when task-list voice is 
     return nextOrder.indexOf('milk1') > nextOrder.indexOf('bread');
   }).toBe(true);
   await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+});
+
+test('preview app keeps a purely vertical upward drag at the original nesting level', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const coffeeWrapper = page.locator('.list-item-wrapper[data-id="cofee"]');
+  const coffeeRow = coffeeWrapper.locator('.list-item');
+
+  await dragRowVertically(page, coffeeRow, -180);
+
+  await expect(coffeeWrapper).toHaveAttribute('data-level', '0');
+});
+
+test('preview app allows an upward drag to nest only after a deliberate right shift', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const coffeeWrapper = page.locator('.list-item-wrapper[data-id="cofee"]');
+  const coffeeRow = coffeeWrapper.locator('.list-item');
+
+  await dragRowVertically(page, coffeeRow, -180, 60);
+
+  await expect(coffeeWrapper).toHaveAttribute('data-level', '2');
 });
 
 test('preview app imports a Workflowy shared tree from settings', async ({ page }) => {

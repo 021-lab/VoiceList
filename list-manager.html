@@ -3661,14 +3661,34 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     function updateDraggedLevel() {
       const all = [...container.querySelectorAll(".list-item-wrapper")];
       const index = all.indexOf(dragState.wrapper);
-      let nextLevel = 0;
-      if (index > 0) {
+      let nextLevel = dragState.originalLevel;
+      if (dragState.rightShifted && index > 0) {
         const aboveLevel = Number(all[index - 1].dataset.level || 0);
-        nextLevel = dragState.rightShifted ? aboveLevel + 1 : aboveLevel;
+        nextLevel = aboveLevel + 1;
       }
       dragState.pendingLevel = nextLevel;
       dragState.wrapper.dataset.level = String(nextLevel);
       dragState.wrapper.style.marginLeft = `${nextLevel * 24}px`;
+    }
+    function snapUnshiftedDragOutOfDeeperRows() {
+      const { wrapper, children, originalLevel, offsetY } = dragState;
+      if (offsetY >= 0) return;
+      const all = [...container.querySelectorAll(".list-item-wrapper")];
+      const index = all.indexOf(wrapper);
+      const groupEnd = index + children.length;
+      const aboveLevel = index > 0 ? Number(all[index - 1].dataset.level || 0) : originalLevel;
+      const belowLevel = groupEnd < all.length - 1 ? Number(all[groupEnd + 1].dataset.level || 0) : originalLevel;
+      if (aboveLevel <= originalLevel && belowLevel <= originalLevel) return;
+      let ancestor = null;
+      for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+        if (Number(all[cursor].dataset.level || 0) <= originalLevel) {
+          ancestor = all[cursor];
+          break;
+        }
+      }
+      if (!ancestor) return;
+      container.insertBefore(wrapper, ancestor);
+      for (const child of children) container.insertBefore(child, ancestor);
     }
     function checkSwap() {
       const { wrapper, children } = dragState;
@@ -3764,21 +3784,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     function finalizeDrag() {
       stopAutoScroll();
       const { wrapper, pendingLevel, rightShifted, children, originalLevel } = dragState;
-      dragState = null;
       if (!rightShifted) {
-        const all = [...container.querySelectorAll(".list-item-wrapper")];
-        const index = all.indexOf(wrapper);
-        const groupEnd = index + children.length;
-        if (index > 0 && groupEnd < all.length - 1) {
-          const aboveLevel = Number(all[index - 1].dataset.level || 0);
-          const belowLevel = Number(all[groupEnd + 1].dataset.level || 0);
-          if (belowLevel > aboveLevel) {
-            const aboveWrapper = all[index - 1];
-            container.insertBefore(wrapper, aboveWrapper);
-            for (const child of children) container.insertBefore(child, aboveWrapper);
-          }
-        }
+        snapUnshiftedDragOutOfDeeperRows();
       }
+      dragState = null;
       if (pendingLevel !== void 0) {
         const delta = pendingLevel - originalLevel;
         wrapper.dataset.level = String(pendingLevel);
