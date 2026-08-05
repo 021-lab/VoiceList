@@ -173,4 +173,54 @@ describe('list app', () => {
       actionLog: []
     }, 'list', {});
   });
+
+  test('binds global UI controls before waiting for the Cloudflare document connection', async () => {
+    let resolveConnect;
+    const connectPromise = new Promise((resolve) => {
+      resolveConnect = resolve;
+    });
+    const documentClient = {
+      connect: vi.fn(() => connectPromise),
+      onState: vi.fn(),
+      sendCommand: vi.fn()
+    };
+    const ui = {
+      setDispatch: vi.fn(),
+      setGetState: vi.fn(),
+      bindGlobal: vi.fn(),
+      openModal: vi.fn()
+    };
+    const app = createApp({
+      adapter: { load: vi.fn(async () => null) },
+      documentClient,
+      interpreter: { execute: vi.fn() },
+      renderer: { render: vi.fn() },
+      store: {
+        load: vi.fn(),
+        replaceState: vi.fn((state) => state),
+        applyMutation: vi.fn(),
+        takeLegacyActionLog: vi.fn(() => [])
+      },
+      logStore: {
+        importLegacyEntries: vi.fn(),
+        listEntries: vi.fn(() => []),
+        createEntry: vi.fn(),
+        updateEntry: vi.fn()
+      },
+      sync: {},
+      ui
+    });
+
+    const initPromise = app.init();
+    await Promise.resolve();
+
+    expect(documentClient.connect).toHaveBeenCalled();
+    expect(ui.bindGlobal).toHaveBeenCalled();
+
+    resolveConnect({
+      rev: 0,
+      content: { snapshot: { items: [] }, actionLog: [] }
+    });
+    await initPromise;
+  });
 });

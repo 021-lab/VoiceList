@@ -43,7 +43,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -60,6 +60,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   let tagAction = null;
   let taskPageOpen = false;
   let taskPageTargetId = null;
+  let settingsOpen = false;
   let voiceState = null;
   let voicePressTimer = null;
   let voicePress = null;
@@ -176,7 +177,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function startVoice(contextId, anchorY) {
     if (!isFrontierView()) return false;
-    if (voiceState || modalOpen || taskPageOpen) return false;
+    if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
     hideDrop();
     hideTagPanel();
     const asr = createVoiceAsr();
@@ -200,7 +201,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function startLogCommentVoice(logEntryId, anchorY) {
-    if (voiceState || modalOpen || taskPageOpen) return false;
+    if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
     const asr = createVoiceAsr();
     const nextVoiceState = {
       kind: 'log-comment',
@@ -536,6 +537,49 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     modalOpen = false;
   }
 
+  function openSettings() {
+    if (!settingsOverlay) return;
+    settingsOpen = true;
+    settingsOverlay.classList.add('open');
+    settingsOverlay.setAttribute('aria-hidden', 'false');
+    if (workflowyImportStatus) workflowyImportStatus.textContent = '';
+    workflowyUrlInput?.focus();
+  }
+
+  function closeSettings() {
+    if (!settingsOverlay) return;
+    settingsOpen = false;
+    settingsOverlay.classList.remove('open');
+    settingsOverlay.setAttribute('aria-hidden', 'true');
+  }
+
+  async function importWorkflowyFromSettings() {
+    const url = workflowyUrlInput?.value.trim() || '';
+    if (!url) {
+      if (workflowyImportStatus) workflowyImportStatus.textContent = 'Введите ссылку Workflowy';
+      return;
+    }
+
+    if (workflowyImportButton) workflowyImportButton.disabled = true;
+    if (workflowyImportStatus) workflowyImportStatus.textContent = 'Импорт...';
+    try {
+      await dispatchUserInput({
+        actId: 'workflowy-import',
+        actType: 'settings',
+        command: 'importWorkflowy',
+        payload: { url },
+        source: 'settings-import'
+      });
+      if (workflowyImportStatus) workflowyImportStatus.textContent = 'Импорт запущен';
+      showToast('Импорт Workflowy запущен');
+    } catch (error) {
+      if (workflowyImportStatus) workflowyImportStatus.textContent = error.message || 'Импорт не выполнен';
+      showToast('Импорт не выполнен');
+    } finally {
+      if (workflowyImportButton) workflowyImportButton.disabled = false;
+    }
+  }
+
   function confirmModal() {
     const line1 = input1.value.trim();
     const line2 = input2.value.trim();
@@ -678,6 +722,17 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     addButton.addEventListener('click', () => {
       dispatchUserInput({ actId: 'list', actType: 'list', command: 'showAddModal', payload: {}, source: 'add-button' });
+    });
+    settingsButton?.addEventListener('click', openSettings);
+    settingsClose?.addEventListener('click', closeSettings);
+    settingsOverlay?.addEventListener('click', (event) => {
+      if (event.target === settingsOverlay) closeSettings();
+    });
+    workflowyImportButton?.addEventListener('click', () => {
+      importWorkflowyFromSettings();
+    });
+    workflowyUrlInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') importWorkflowyFromSettings();
     });
 
     btnCancel.addEventListener('click', closeModal);
@@ -1224,7 +1279,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     };
 
     row.addEventListener('touchstart', (event) => {
-      if (dragState || modalOpen || taskPageOpen) return;
+      if (dragState || modalOpen || settingsOpen || taskPageOpen) return;
       const touch = event.touches[0];
       startX = curX = touch.clientX;
       startY = curY = touch.clientY;
@@ -1264,7 +1319,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     row.addEventListener('mousedown', (event) => {
       if (Date.now() - lastTouchEndTime < 500) return;
-      if (dragState || modalOpen || taskPageOpen || event.button !== 0) return;
+      if (dragState || modalOpen || settingsOpen || taskPageOpen || event.button !== 0) return;
       startX = curX = event.clientX;
       startY = curY = event.clientY;
       active = true;

@@ -29,6 +29,7 @@ async function bootstrapListManagerPreview() {
     header: document.querySelector('header'),
     viewToggleButton: document.getElementById('view-toggle-btn'),
     frontierButton: document.getElementById('frontier-tab-btn'),
+    settingsButton: document.getElementById('settings-btn'),
     undoButton: document.getElementById('undo-btn'),
     addButton: document.getElementById('add-btn'),
     container: document.getElementById('list-container'),
@@ -56,7 +57,12 @@ async function bootstrapListManagerPreview() {
     taskPageStatus: document.getElementById('task-page-status'),
     taskPageSubtasks: document.getElementById('task-page-subtasks'),
     taskPageChildInput: document.getElementById('task-page-child-input'),
-    taskPageAddChild: document.getElementById('task-page-add-child')
+    taskPageAddChild: document.getElementById('task-page-add-child'),
+    settingsOverlay: document.getElementById('settings-overlay'),
+    settingsClose: document.getElementById('settings-close'),
+    workflowyUrlInput: document.getElementById('workflowy-url-input'),
+    workflowyImportButton: document.getElementById('workflowy-import-btn'),
+    workflowyImportStatus: document.getElementById('workflowy-import-status')
   });
 
   const renderer = createRenderer({

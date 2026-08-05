@@ -1,3 +1,5 @@
+import { importWorkflowyTreeFromUrl } from './workflowy-import.js';
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -86,6 +88,16 @@ export function createApp({ adapter, documentClient = null, interpreter, rendere
       return;
     }
 
+    if (input.command === 'importWorkflowy') {
+      const url = String(input.payload?.url || '').trim();
+      const tree = await importWorkflowyTreeFromUrl(url, { fetchImpl: fetch });
+      input = {
+        ...input,
+        command: 'importWorkflowyTree',
+        payload: { sourceUrl: url, tree }
+      };
+    }
+
     if (input.command === 'commentLogEntry') {
       await appendLogComment(input);
       return;
@@ -126,14 +138,14 @@ export function createApp({ adapter, documentClient = null, interpreter, rendere
         snapshotState = { snapshot: { items: [] } };
         actionLog = [];
         refreshState(snapshotState, actionLog);
+        ui.setDispatch(dispatchUserInput);
+        ui.setGetState(() => state);
+        ui.bindGlobal();
 
         documentClient.onState?.(applyServerState);
         const serverState = await documentClient.connect();
         if (serverState) applyServerState(serverState);
 
-        ui.setDispatch(dispatchUserInput);
-        ui.setGetState(() => state);
-        ui.bindGlobal();
         if (!serverState) render();
         return;
       }

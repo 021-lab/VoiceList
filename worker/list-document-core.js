@@ -1,5 +1,6 @@
 import { parseCommand, toCommand } from '../src/command-resolver.js';
 import { createInterpreter } from '../src/list-interpreter.js';
+import { importWorkflowyTreeFromUrl } from '../src/workflowy-import.js';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -214,13 +215,27 @@ export function createDocumentCore({
   async function applyCommand(message, input, metadata = {}) {
     const beforeItems = clone(state.content.snapshot.items);
     let allocatedId = null;
+    if (input.command === 'importWorkflowy') {
+      const url = String(input.payload?.url || '').trim();
+      const tree = await importWorkflowyTreeFromUrl(url, { fetchImpl });
+      input = {
+        ...input,
+        command: 'importWorkflowyTree',
+        payload: {
+          sourceUrl: url,
+          tree
+        }
+      };
+    }
     const interpreter = createInterpreter({
       createItemId(existingIds) {
+        let nextId;
         do {
-          allocatedId = encodeId(state.nextId);
+          nextId = encodeId(state.nextId);
           state.nextId += 1;
-        } while (existingIds.has(allocatedId));
-        return allocatedId;
+        } while (existingIds.has(nextId));
+        if (!allocatedId) allocatedId = nextId;
+        return nextId;
       },
       createLogId() {
         return encodeId(state.rev + 1);

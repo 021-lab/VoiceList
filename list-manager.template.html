@@ -12,10 +12,11 @@ __INLINE_CSS__
 <body>
 <div id="app-root" data-view-mode="list">
   <header>
-    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
-    <h1>Мой список</h1>
-    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
-    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
+	    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
+	    <h1>Мой список</h1>
+	    <button id="settings-btn" class="icon-header-btn" type="button" aria-label="Настройки" title="Настройки">⚙</button>
+	    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
+	    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
 
   <div id="list-container"></div>
@@ -34,9 +35,24 @@ __INLINE_CSS__
 
   <div id="drop-zone-panel" class="swipe-panel"></div>
 
-  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
+	  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
 
-  <section class="task-page" id="task-page" aria-hidden="true">
+	  <div class="settings-overlay" id="settings-overlay" aria-hidden="true">
+	    <section class="settings-panel" aria-label="Настройки">
+	      <div class="settings-header">
+	        <h2>Настройки</h2>
+	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
+	      </div>
+	      <label class="settings-field">
+	        <span>Workflowy</span>
+	        <input type="url" id="workflowy-url-input" placeholder="https://workflowy.com/s/task-tree/..." inputmode="url">
+	      </label>
+	      <button id="workflowy-import-btn" class="settings-primary" type="button">Импорт</button>
+	      <div id="workflowy-import-status" class="settings-status" aria-live="polite"></div>
+	    </section>
+	  </div>
+
+	  <section class="task-page" id="task-page" aria-hidden="true">
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
       <h2 id="task-page-title">Задача</h2>

@@ -125,4 +125,58 @@ describe('list interpreter', () => {
     expect(result.patch).toHaveLength(1);
     expect(result.logEntryDraft).toBeNull();
   });
+
+  test('imports a Workflowy tree as Open tasks appended to the list', () => {
+    let nextId = 0;
+    const interpreter = createInterpreter({
+      createItemId(existingIds) {
+        let id;
+        do {
+          id = `wf${nextId}`;
+          nextId += 1;
+        } while (existingIds.has(id));
+        existingIds.add(id);
+        return id;
+      },
+      createLogId: () => 'log-import',
+      now: () => new Date('2026-08-05T00:00:00.000Z')
+    });
+    const state = {
+      snapshot: {
+        items: [
+          { id: 'milk1', parentId: null, order: 10, status: 'Open', line1: 'Молоко', line2: '', collapsed: false, tags: [] }
+        ]
+      },
+      actionLog: []
+    };
+
+    const result = interpreter.execute(state, {
+      actId: 'list',
+      actType: 'list',
+      command: 'importWorkflowyTree',
+      payload: {
+        sourceUrl: 'https://workflowy.com/s/task-tree/iq43ak7FYqEEO1uO',
+        tree: {
+          title: 'task tree',
+          children: [
+            { title: 'First', children: [{ title: 'Nested', children: [] }] },
+            { title: 'Second', children: [] }
+          ]
+        }
+      },
+      source: 'settings-import'
+    });
+
+    expect(result.patch).toHaveLength(1);
+    expect(result.patch[0].value.slice(1)).toEqual([
+      { id: 'wf0', parentId: null, order: 20, status: 'Open', line1: 'task tree', line2: '', collapsed: false, tags: [] },
+      { id: 'wf1', parentId: 'wf0', order: 10, status: 'Open', line1: 'First', line2: '', collapsed: false, tags: [] },
+      { id: 'wf2', parentId: 'wf1', order: 10, status: 'Open', line1: 'Nested', line2: '', collapsed: false, tags: [] },
+      { id: 'wf3', parentId: 'wf0', order: 20, status: 'Open', line1: 'Second', line2: '', collapsed: false, tags: [] }
+    ]);
+    expect(result.logEntryDraft).toMatchObject({
+      id: 'log-import',
+      label: 'Импортировано дерево Workflowy: task tree'
+    });
+  });
 });

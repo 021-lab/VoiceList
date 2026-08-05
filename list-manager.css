@@ -43,6 +43,24 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 #undo-btn:active { background: #e0e0e0; }
 #undo-btn:disabled { opacity: 0.3; pointer-events: none; }
 
+.icon-header-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-header-btn:active { transform: scale(0.96); background: #e0e0e0; }
+
 #view-toggle-btn,
 .header-tab-btn {
   flex-shrink: 0;
@@ -407,6 +425,93 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .voice-cancel.selected {
   background: #ffb4a8;
   color: #1f2025;
+}
+
+/* ── Settings ── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.36);
+  display: flex;
+  align-items: flex-end;
+  z-index: 680;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+.settings-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+.settings-panel {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 16px 18px 28px;
+  transform: translateY(100%);
+  transition: transform 0.24s cubic-bezier(.4,0,.2,1);
+}
+.settings-overlay.open .settings-panel { transform: translateY(0); }
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.settings-header h2 {
+  color: #1a1a2e;
+  font-size: 18px;
+  font-weight: 800;
+}
+.settings-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 24px;
+  line-height: 1;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #555;
+  font-size: 12px;
+  font-weight: 800;
+}
+.settings-field input {
+  width: 100%;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #1a1a2e;
+  font-size: 15px;
+  outline: none;
+}
+.settings-field input:focus { border-color: #007aff; }
+.settings-primary {
+  width: 100%;
+  margin-top: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #007aff;
+  color: #fff;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.settings-primary:disabled {
+  opacity: 0.55;
+}
+.settings-status {
+  min-height: 18px;
+  margin-top: 10px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* ── Fullscreen task page ── */

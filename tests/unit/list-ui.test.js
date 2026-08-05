@@ -14,6 +14,7 @@ function createUiFixture(rootPanel = el('app-root')) {
     header: document.createElement('header'),
     viewToggleButton: el('view-toggle-btn', 'button'),
     frontierButton: el('frontier-tab-btn', 'button'),
+    settingsButton: el('settings-btn', 'button'),
     undoButton: el('undo-btn', 'button'),
     addButton: el('add-btn', 'button'),
     container: el('list-container'),
@@ -40,7 +41,12 @@ function createUiFixture(rootPanel = el('app-root')) {
     taskPageStatus: el('task-page-status', 'select'),
     taskPageSubtasks: el('task-page-subtasks'),
     taskPageChildInput: el('task-page-child-input', 'input'),
-    taskPageAddChild: el('task-page-add-child', 'button')
+    taskPageAddChild: el('task-page-add-child', 'button'),
+    settingsOverlay: el('settings-overlay'),
+    settingsClose: el('settings-close', 'button'),
+    workflowyUrlInput: el('workflowy-url-input', 'input'),
+    workflowyImportButton: el('workflowy-import-btn', 'button'),
+    workflowyImportStatus: el('workflowy-import-status')
   });
 }
 
@@ -86,5 +92,28 @@ describe('list UI', () => {
     row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(inputs).toEqual([]);
+  });
+
+  test('dispatches Workflowy import from the settings panel', () => {
+    document.body.innerHTML = '';
+    const inputs = [];
+    const ui = createUiFixture();
+
+    ui.setDispatch((input) => inputs.push(input));
+    ui.bindGlobal();
+
+    document.getElementById('settings-btn').click();
+    expect(document.getElementById('settings-overlay').classList.contains('open')).toBe(true);
+    document.getElementById('workflowy-url-input').value = 'https://workflowy.com/s/task-tree/iq43ak7FYqEEO1uO';
+    document.getElementById('workflowy-import-btn').click();
+
+    expect(inputs).toEqual([{
+      actId: 'workflowy-import',
+      actType: 'settings',
+      command: 'importWorkflowy',
+      payload: { url: 'https://workflowy.com/s/task-tree/iq43ak7FYqEEO1uO' },
+      source: 'settings-import'
+    }]);
+    expect(document.getElementById('workflowy-import-status').textContent).toContain('Импорт');
   });
 });

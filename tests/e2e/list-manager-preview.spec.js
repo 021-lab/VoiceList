@@ -99,6 +99,58 @@ async function visibleListOrder(page) {
   ));
 }
 
+async function mockWorkflowyExport(page) {
+  await page.route('https://workflowy.com/**', async (route) => {
+    const url = route.request().url();
+    const origin = route.request().headers().origin || '*';
+    const headers = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true'
+    };
+    if (url.includes('/s/task-tree/')) {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'text/html',
+          'Set-Cookie': 'sessionid=abc; Path=/; HttpOnly'
+        },
+        body: '<script>var PROJECT_TREE_DATA_URL_PARAMS = {"share_id":"Share.123"};</script>'
+      });
+      return;
+    }
+    if (url.includes('/get_initialization_data')) {
+      await route.fulfill({
+        status: 200,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectTreeData: {
+            auxiliaryProjectTreeInfos: [{
+              rootProject: { id: 'root', nm: 'task tree' }
+            }],
+            initialMostRecentOperationTransactionId: '42'
+          }
+        })
+      });
+      return;
+    }
+    if (url.includes('/get_tree_data/')) {
+      await route.fulfill({
+        status: 200,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { id: 'child', prnt: 'root', pr: 10, nm: 'Child task' },
+            { id: 'nested', prnt: 'child', pr: 10, nm: 'Nested task' }
+          ]
+        })
+      });
+      return;
+    }
+    await route.abort();
+  });
+}
+
 test('preview app can create task, create subtask, and change status', async ({ page }) => {
   const taskTitle = `E2E Task ${Date.now()}`;
   const subtaskTitle = `E2E Subtask ${Date.now()}`;
@@ -216,6 +268,25 @@ test('preview app keeps list drag and left tag gestures when task-list voice is 
     return nextOrder.indexOf('milk1') > nextOrder.indexOf('bread');
   }).toBe(true);
   await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+});
+
+test('preview app imports a Workflowy shared tree from settings', async ({ page }) => {
+  await mockWorkflowyExport(page);
+  await page.goto('');
+  const cloudflareMode = await page.evaluate(() => !window.location.hash.includes('v=local-dev') && window.location.port !== '4511');
+  test.skip(cloudflareMode, 'Workflowy Worker outbound fetch is covered by document-core tests.');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+
+  await page.locator('#settings-btn').click();
+  await expect(page.locator('#settings-overlay')).toHaveClass(/open/);
+  await page.locator('#workflowy-url-input').fill('https://workflowy.com/s/task-tree/iq43ak7FYqEEO1uO');
+  await page.locator('#workflowy-import-btn').click();
+
+  await expect(page.locator('#workflowy-import-status')).toContainText('Импорт');
+  await expect(page.locator('#list-container')).toContainText('task tree');
+  await expect(page.locator('#list-container')).toContainText('Child task');
+  await expect(page.locator('#list-container')).toContainText('Nested task');
 });
 
 test('preview app disables task-list voice and keeps voice commands on the frontier', async ({ page }) => {

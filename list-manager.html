@@ -51,6 +51,24 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 #undo-btn:active { background: #e0e0e0; }
 #undo-btn:disabled { opacity: 0.3; pointer-events: none; }
 
+.icon-header-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-header-btn:active { transform: scale(0.96); background: #e0e0e0; }
+
 #view-toggle-btn,
 .header-tab-btn {
   flex-shrink: 0;
@@ -417,6 +435,93 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   color: #1f2025;
 }
 
+/* ── Settings ── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.36);
+  display: flex;
+  align-items: flex-end;
+  z-index: 680;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+.settings-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+.settings-panel {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 16px 18px 28px;
+  transform: translateY(100%);
+  transition: transform 0.24s cubic-bezier(.4,0,.2,1);
+}
+.settings-overlay.open .settings-panel { transform: translateY(0); }
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.settings-header h2 {
+  color: #1a1a2e;
+  font-size: 18px;
+  font-weight: 800;
+}
+.settings-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 24px;
+  line-height: 1;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #555;
+  font-size: 12px;
+  font-weight: 800;
+}
+.settings-field input {
+  width: 100%;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #1a1a2e;
+  font-size: 15px;
+  outline: none;
+}
+.settings-field input:focus { border-color: #007aff; }
+.settings-primary {
+  width: 100%;
+  margin-top: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #007aff;
+  color: #fff;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.settings-primary:disabled {
+  opacity: 0.55;
+}
+.settings-status {
+  min-height: 18px;
+  margin-top: 10px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* ── Fullscreen task page ── */
 .task-page {
   position: fixed;
@@ -597,10 +702,11 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 <body>
 <div id="app-root" data-view-mode="list">
   <header>
-    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
-    <h1>Мой список</h1>
-    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
-    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
+	    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
+	    <h1>Мой список</h1>
+	    <button id="settings-btn" class="icon-header-btn" type="button" aria-label="Настройки" title="Настройки">⚙</button>
+	    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
+	    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
 
   <div id="list-container"></div>
@@ -619,9 +725,24 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 
   <div id="drop-zone-panel" class="swipe-panel"></div>
 
-  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
+	  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
 
-  <section class="task-page" id="task-page" aria-hidden="true">
+	  <div class="settings-overlay" id="settings-overlay" aria-hidden="true">
+	    <section class="settings-panel" aria-label="Настройки">
+	      <div class="settings-header">
+	        <h2>Настройки</h2>
+	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
+	      </div>
+	      <label class="settings-field">
+	        <span>Workflowy</span>
+	        <input type="url" id="workflowy-url-input" placeholder="https://workflowy.com/s/task-tree/..." inputmode="url">
+	      </label>
+	      <button id="workflowy-import-btn" class="settings-primary" type="button">Импорт</button>
+	      <div id="workflowy-import-status" class="settings-status" aria-live="polite"></div>
+	    </section>
+	  </div>
+
+	  <section class="task-page" id="task-page" aria-hidden="true">
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
       <h2 id="task-page-title">Задача</h2>
@@ -703,6 +824,144 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     actionLog: []
   };
 
+  // src/workflowy-import.js
+  var WORKFLOWY_HOSTS = /* @__PURE__ */ new Set(["workflowy.com", "www.workflowy.com", "beta.workflowy.com"]);
+  var IGNORED_COOKIE_FIELDS = /* @__PURE__ */ new Set(["path", "domain", "expires", "max-age", "samesite", "secure", "httponly"]);
+  function stripHtml(value) {
+    return String(value || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+  }
+  function parseWorkflowyUrl(rawUrl) {
+    const url = new URL(String(rawUrl || "").trim());
+    if (!WORKFLOWY_HOSTS.has(url.hostname)) throw new Error("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0443\u0431\u043B\u0438\u0447\u043D\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 Workflowy");
+    if (!url.pathname.startsWith("/s/")) throw new Error("\u0421\u0441\u044B\u043B\u043A\u0430 Workflowy \u0434\u043E\u043B\u0436\u043D\u0430 \u0432\u0435\u0441\u0442\u0438 \u043D\u0430 shared tree");
+    return url;
+  }
+  function extractShareId(html) {
+    const match = String(html || "").match(/PROJECT_TREE_DATA_URL_PARAMS\s*=\s*({[^;]+})/);
+    if (!match) throw new Error("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0439\u0442\u0438 share_id \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 Workflowy");
+    const data = JSON.parse(match[1]);
+    if (!data.share_id) throw new Error("Workflowy \u043D\u0435 \u0432\u0435\u0440\u043D\u0443\u043B share_id");
+    return data.share_id;
+  }
+  function mergeCookies(currentCookieHeader, setCookieHeader) {
+    if (!setCookieHeader) return currentCookieHeader;
+    const cookies = /* @__PURE__ */ new Map();
+    for (const part of String(currentCookieHeader || "").split(";")) {
+      const trimmed = part.trim();
+      const index = trimmed.indexOf("=");
+      if (index > 0) cookies.set(trimmed.slice(0, index), trimmed.slice(index + 1));
+    }
+    for (const match of String(setCookieHeader).matchAll(/(?:^|,\s*|;\s*)([^=;,\s]+)=([^;,]+)/g)) {
+      const name = match[1].trim();
+      const lower = name.toLowerCase();
+      if (IGNORED_COOKIE_FIELDS.has(lower)) continue;
+      cookies.set(name, match[2].trim());
+    }
+    return [...cookies.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
+  async function readJsonResponse(response, label) {
+    if (!response.ok) throw new Error(`${label}: Workflowy returned ${response.status}`);
+    return response.json();
+  }
+  async function readTextResponse(response, label) {
+    if (!response.ok) throw new Error(`${label}: Workflowy returned ${response.status}`);
+    return response.text();
+  }
+  function workflowyJsonHeaders(cookieHeader, fetchImpl) {
+    const canSetCookie = typeof window === "undefined" || fetchImpl !== globalThis.fetch;
+    return {
+      Accept: "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      ...cookieHeader && canSetCookie ? { Cookie: cookieHeader } : {}
+    };
+  }
+  function renderPlainTextExport(rootProject, treeData) {
+    const rootId = rootProject?.id;
+    const title = stripHtml(rootProject?.nm);
+    if (!rootId || !title) throw new Error("Workflowy tree root is empty");
+    const childrenByParent = /* @__PURE__ */ new Map();
+    for (const item of treeData?.items || []) {
+      if (!item?.id || !item.prnt) continue;
+      if (!childrenByParent.has(item.prnt)) childrenByParent.set(item.prnt, []);
+      childrenByParent.get(item.prnt).push(item);
+    }
+    for (const children of childrenByParent.values()) {
+      children.sort((left, right) => (left.pr || 0) - (right.pr || 0));
+    }
+    const lines = [title, ""];
+    function appendChildren(parentId, depth) {
+      for (const item of childrenByParent.get(parentId) || []) {
+        const itemTitle = stripHtml(item.nm);
+        if (!itemTitle) continue;
+        lines.push(`${"  ".repeat(depth)}- ${itemTitle}`);
+        appendChildren(item.id, depth + 1);
+      }
+    }
+    appendChildren(rootId, 0);
+    return lines.join("\n");
+  }
+  function parseWorkflowyPlainTextExport(text) {
+    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    const firstLineIndex = lines.findIndex((line) => line.trim());
+    if (firstLineIndex < 0) throw new Error("Workflowy export is empty");
+    const root = {
+      title: lines[firstLineIndex].trim(),
+      children: []
+    };
+    const stack = [root];
+    let lastNode = root;
+    for (const line of lines.slice(firstLineIndex + 1)) {
+      if (!line.trim()) continue;
+      const bullet = line.match(/^(\s*)-\s?(.*)$/);
+      if (!bullet) {
+        if (lastNode) lastNode.title = `${lastNode.title} ${line.trim()}`.trim();
+        continue;
+      }
+      const title = bullet[2].trim();
+      if (!title) continue;
+      const level = Math.floor(bullet[1].length / 2) + 1;
+      const parent = stack[level - 1] || root;
+      const node = { title, children: [] };
+      parent.children.push(node);
+      stack[level] = node;
+      stack.length = level + 1;
+      lastNode = node;
+    }
+    return root;
+  }
+  async function loadWorkflowyPlainTextExportFromUrl(rawUrl, { fetchImpl = fetch } = {}) {
+    const shareUrl = parseWorkflowyUrl(rawUrl);
+    let cookieHeader = "";
+    const shareResponse = await fetchImpl(shareUrl.href, { redirect: "follow" });
+    cookieHeader = mergeCookies(cookieHeader, shareResponse.headers?.get?.("set-cookie"));
+    const shareHtml = await readTextResponse(shareResponse, "Workflowy share page");
+    const shareId = extractShareId(shareHtml);
+    const initUrl = new URL("/get_initialization_data", shareUrl.origin);
+    initUrl.searchParams.set("share_id", shareId);
+    initUrl.searchParams.set("client_version", "21");
+    initUrl.searchParams.set("client_version_v2", "28");
+    initUrl.searchParams.set("no_root_children", "1");
+    initUrl.searchParams.set("include_main_tree", "1");
+    const initData = await readJsonResponse(await fetchImpl(initUrl.href, {
+      headers: workflowyJsonHeaders(cookieHeader, fetchImpl),
+      credentials: "include"
+    }), "Workflowy initialization");
+    const rootProject = initData?.projectTreeData?.auxiliaryProjectTreeInfos?.[0]?.rootProject || initData?.projectTreeData?.mainProjectTreeInfo?.rootProject;
+    const operationId = initData?.projectTreeData?.initialMostRecentOperationTransactionId || "0";
+    const treeUrl = new URL("/get_tree_data/", shareUrl.origin);
+    treeUrl.searchParams.set("share_id", shareId);
+    treeUrl.searchParams.set("ot", operationId);
+    const treeData = await readJsonResponse(await fetchImpl(treeUrl.href, {
+      headers: workflowyJsonHeaders(cookieHeader, fetchImpl),
+      credentials: "include"
+    }), "Workflowy tree data");
+    return renderPlainTextExport(rootProject, treeData);
+  }
+  async function importWorkflowyTreeFromUrl(rawUrl, { fetchImpl = fetch } = {}) {
+    const text = await loadWorkflowyPlainTextExportFromUrl(rawUrl, { fetchImpl });
+    return parseWorkflowyPlainTextExport(text);
+  }
+
   // src/list-app.js
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -773,6 +1032,15 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         await documentClient.sendCommand(input);
         return;
       }
+      if (input.command === "importWorkflowy") {
+        const url = String(input.payload?.url || "").trim();
+        const tree = await importWorkflowyTreeFromUrl(url, { fetchImpl: fetch });
+        input = {
+          ...input,
+          command: "importWorkflowyTree",
+          payload: { sourceUrl: url, tree }
+        };
+      }
       if (input.command === "commentLogEntry") {
         await appendLogComment(input);
         return;
@@ -808,12 +1076,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           snapshotState = { snapshot: { items: [] } };
           actionLog = [];
           refreshState(snapshotState, actionLog);
-          documentClient.onState?.(applyServerState);
-          const serverState = await documentClient.connect();
-          if (serverState) applyServerState(serverState);
           ui.setDispatch(dispatchUserInput);
           ui.setGetState(() => state);
           ui.bindGlobal();
+          documentClient.onState?.(applyServerState);
+          const serverState = await documentClient.connect();
+          if (serverState) applyServerState(serverState);
           if (!serverState) render();
           return;
         }
@@ -1235,6 +1503,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     if (command === "setTags") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u044B \u0442\u0435\u0433\u0438: ${payload.tag}`;
     if (command === "toggleCollapse") return "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435";
     if (command === "reorderItems") return "\u0418\u0437\u043C\u0435\u043D\u0451\u043D \u043F\u043E\u0440\u044F\u0434\u043E\u043A \u0441\u043F\u0438\u0441\u043A\u0430";
+    if (command === "importWorkflowyTree") return `\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0434\u0435\u0440\u0435\u0432\u043E Workflowy: ${payload.tree?.title || "\u0431\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F"}`;
     if (command === "undo") return "\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D undo";
     return command;
   }
@@ -1266,6 +1535,36 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       }
     }
     return blocked;
+  }
+  function appendImportedTree({ createItemId, existingIds, input, nextItems, parentId, tree, order }) {
+    const title = String(tree?.title || "").trim();
+    if (!title) return null;
+    const id = createItemId(existingIds, input);
+    existingIds.add(id);
+    nextItems.push({
+      id,
+      parentId,
+      order,
+      status: "Open",
+      line1: title,
+      line2: "",
+      collapsed: false,
+      tags: []
+    });
+    let childOrder = 10;
+    for (const child of tree.children || []) {
+      appendImportedTree({
+        createItemId,
+        existingIds,
+        input,
+        nextItems,
+        parentId: id,
+        tree: child,
+        order: childOrder
+      });
+      childOrder += 10;
+    }
+    return id;
   }
   function createInterpreter({ createItemId = randomId, createLogId = createDefaultLogId, now = () => /* @__PURE__ */ new Date() } = {}) {
     return {
@@ -1379,6 +1678,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
               value: nextItems.map((item) => arranged.has(item.id) ? { ...item, ...arranged.get(item.id) } : item).sort((left, right) => left.order - right.order)
             }
           ];
+        } else if (input.command === "importWorkflowyTree") {
+          const rootId = appendImportedTree({
+            createItemId,
+            existingIds,
+            input,
+            nextItems,
+            parentId: null,
+            tree: payload.tree,
+            order: nextOrder(nextItems, null)
+          });
+          if (!rootId) return noChange();
         } else if (input.command === "undo") {
           patch = [{ op: "replace", path: "/snapshot", value: clone2(payload.snapshot) }];
         }
@@ -2521,7 +2831,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       return { id, parentId, order: currentOrder };
     });
   }
-  function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+  function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
     let dispatchUserInput = () => {
     };
     let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
@@ -2539,6 +2849,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     let tagAction = null;
     let taskPageOpen = false;
     let taskPageTargetId = null;
+    let settingsOpen = false;
     let voiceState = null;
     let voicePressTimer = null;
     let voicePress = null;
@@ -2640,7 +2951,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     }
     function startVoice(contextId, anchorY) {
       if (!isFrontierView()) return false;
-      if (voiceState || modalOpen || taskPageOpen) return false;
+      if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
       hideDrop();
       hideTagPanel();
       const asr = createVoiceAsr();
@@ -2663,7 +2974,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       return true;
     }
     function startLogCommentVoice(logEntryId, anchorY) {
-      if (voiceState || modalOpen || taskPageOpen) return false;
+      if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
       const asr = createVoiceAsr();
       const nextVoiceState = {
         kind: "log-comment",
@@ -2968,6 +3279,45 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       overlay.classList.remove("open");
       modalOpen = false;
     }
+    function openSettings() {
+      if (!settingsOverlay) return;
+      settingsOpen = true;
+      settingsOverlay.classList.add("open");
+      settingsOverlay.setAttribute("aria-hidden", "false");
+      if (workflowyImportStatus) workflowyImportStatus.textContent = "";
+      workflowyUrlInput?.focus();
+    }
+    function closeSettings() {
+      if (!settingsOverlay) return;
+      settingsOpen = false;
+      settingsOverlay.classList.remove("open");
+      settingsOverlay.setAttribute("aria-hidden", "true");
+    }
+    async function importWorkflowyFromSettings() {
+      const url = workflowyUrlInput?.value.trim() || "";
+      if (!url) {
+        if (workflowyImportStatus) workflowyImportStatus.textContent = "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 Workflowy";
+        return;
+      }
+      if (workflowyImportButton) workflowyImportButton.disabled = true;
+      if (workflowyImportStatus) workflowyImportStatus.textContent = "\u0418\u043C\u043F\u043E\u0440\u0442...";
+      try {
+        await dispatchUserInput({
+          actId: "workflowy-import",
+          actType: "settings",
+          command: "importWorkflowy",
+          payload: { url },
+          source: "settings-import"
+        });
+        if (workflowyImportStatus) workflowyImportStatus.textContent = "\u0418\u043C\u043F\u043E\u0440\u0442 \u0437\u0430\u043F\u0443\u0449\u0435\u043D";
+        showToast("\u0418\u043C\u043F\u043E\u0440\u0442 Workflowy \u0437\u0430\u043F\u0443\u0449\u0435\u043D");
+      } catch (error) {
+        if (workflowyImportStatus) workflowyImportStatus.textContent = error.message || "\u0418\u043C\u043F\u043E\u0440\u0442 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D";
+        showToast("\u0418\u043C\u043F\u043E\u0440\u0442 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D");
+      } finally {
+        if (workflowyImportButton) workflowyImportButton.disabled = false;
+      }
+    }
     function confirmModal() {
       const line1 = input1.value.trim();
       const line2 = input2.value.trim();
@@ -3091,6 +3441,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       boundGlobals = true;
       addButton.addEventListener("click", () => {
         dispatchUserInput({ actId: "list", actType: "list", command: "showAddModal", payload: {}, source: "add-button" });
+      });
+      settingsButton?.addEventListener("click", openSettings);
+      settingsClose?.addEventListener("click", closeSettings);
+      settingsOverlay?.addEventListener("click", (event) => {
+        if (event.target === settingsOverlay) closeSettings();
+      });
+      workflowyImportButton?.addEventListener("click", () => {
+        importWorkflowyFromSettings();
+      });
+      workflowyUrlInput?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") importWorkflowyFromSettings();
       });
       btnCancel.addEventListener("click", closeModal);
       overlay.addEventListener("click", (event) => {
@@ -3580,7 +3941,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         }
       };
       row.addEventListener("touchstart", (event) => {
-        if (dragState || modalOpen || taskPageOpen) return;
+        if (dragState || modalOpen || settingsOpen || taskPageOpen) return;
         const touch = event.touches[0];
         startX = curX = touch.clientX;
         startY = curY = touch.clientY;
@@ -3617,7 +3978,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       row.addEventListener("touchcancel", () => handleEnd(false));
       row.addEventListener("mousedown", (event) => {
         if (Date.now() - lastTouchEndTime < 500) return;
-        if (dragState || modalOpen || taskPageOpen || event.button !== 0) return;
+        if (dragState || modalOpen || settingsOpen || taskPageOpen || event.button !== 0) return;
         startX = curX = event.clientX;
         startY = curY = event.clientY;
         active = true;
@@ -3698,6 +4059,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       header: document.querySelector("header"),
       viewToggleButton: document.getElementById("view-toggle-btn"),
       frontierButton: document.getElementById("frontier-tab-btn"),
+      settingsButton: document.getElementById("settings-btn"),
       undoButton: document.getElementById("undo-btn"),
       addButton: document.getElementById("add-btn"),
       container: document.getElementById("list-container"),
@@ -3725,7 +4087,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       taskPageStatus: document.getElementById("task-page-status"),
       taskPageSubtasks: document.getElementById("task-page-subtasks"),
       taskPageChildInput: document.getElementById("task-page-child-input"),
-      taskPageAddChild: document.getElementById("task-page-add-child")
+      taskPageAddChild: document.getElementById("task-page-add-child"),
+      settingsOverlay: document.getElementById("settings-overlay"),
+      settingsClose: document.getElementById("settings-close"),
+      workflowyUrlInput: document.getElementById("workflowy-url-input"),
+      workflowyImportButton: document.getElementById("workflowy-import-btn"),
+      workflowyImportStatus: document.getElementById("workflowy-import-status")
     });
     const renderer = createRenderer({
       rootPanel: document.getElementById("app-root"),

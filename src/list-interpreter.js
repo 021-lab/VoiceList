@@ -36,6 +36,7 @@ function buildLabel(command, payload = {}) {
   if (command === 'setTags') return `Изменены теги: ${payload.tag}`;
   if (command === 'toggleCollapse') return 'Переключено сворачивание';
   if (command === 'reorderItems') return 'Изменён порядок списка';
+  if (command === 'importWorkflowyTree') return `Импортировано дерево Workflowy: ${payload.tree?.title || 'без названия'}`;
   if (command === 'undo') return 'Выполнен undo';
   return command;
 }
@@ -72,6 +73,39 @@ function descendants(items, rootId) {
   }
 
   return blocked;
+}
+
+function appendImportedTree({ createItemId, existingIds, input, nextItems, parentId, tree, order }) {
+  const title = String(tree?.title || '').trim();
+  if (!title) return null;
+  const id = createItemId(existingIds, input);
+  existingIds.add(id);
+  nextItems.push({
+    id,
+    parentId,
+    order,
+    status: 'Open',
+    line1: title,
+    line2: '',
+    collapsed: false,
+    tags: []
+  });
+
+  let childOrder = 10;
+  for (const child of tree.children || []) {
+    appendImportedTree({
+      createItemId,
+      existingIds,
+      input,
+      nextItems,
+      parentId: id,
+      tree: child,
+      order: childOrder
+    });
+    childOrder += 10;
+  }
+
+  return id;
 }
 
 export function createInterpreter({ createItemId = randomId, createLogId = createDefaultLogId, now = () => new Date() } = {}) {
@@ -197,6 +231,17 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
               .sort((left, right) => left.order - right.order)
           }
         ];
+      } else if (input.command === 'importWorkflowyTree') {
+        const rootId = appendImportedTree({
+          createItemId,
+          existingIds,
+          input,
+          nextItems,
+          parentId: null,
+          tree: payload.tree,
+          order: nextOrder(nextItems, null)
+        });
+        if (!rootId) return noChange();
       } else if (input.command === 'undo') {
         patch = [{ op: 'replace', path: '/snapshot', value: clone(payload.snapshot) }];
       }
