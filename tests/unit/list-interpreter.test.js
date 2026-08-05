@@ -126,6 +126,29 @@ describe('list interpreter', () => {
     expect(result.logEntryDraft).toBeNull();
   });
 
+  test('accepts Info as a task status', () => {
+    const interpreter = createInterpreter();
+    const state = {
+      snapshot: {
+        items: [
+          { id: 'note', parentId: null, order: 10, status: 'Open', line1: 'Reference', collapsed: false, tags: [] }
+        ]
+      },
+      actionLog: []
+    };
+
+    const result = interpreter.execute(state, {
+      actId: 'note',
+      actType: 'task',
+      command: 'setStatus',
+      payload: { status: 'Info' },
+      source: 'unit-test'
+    });
+
+    expect(result.patch[0].value.find((item) => item.id === 'note').status).toBe('Info');
+    expect(result.logEntryDraft.label).toBe('Статус изменён: Info');
+  });
+
   test('imports a Workflowy tree as Open tasks appended to the list', () => {
     let nextId = 0;
     const interpreter = createInterpreter({

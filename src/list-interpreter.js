@@ -1,7 +1,7 @@
 import { findCandidates } from './resolver.js';
 import { adaptSnapshot } from './snapshot-adapter.js';
 
-const STATUS_VALUES = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause']);
+const STATUS_VALUES = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'Info']);
 const INBOX_ID = 'inbox';
 
 function clone(value) {

@@ -32,6 +32,7 @@ function statusColor(status) {
   if (status === 'Focus') return '#ff9500';
   if (status === 'Archive') return '#8e8e93';
   if (status === 'Pause') return '#5856d6';
+  if (status === 'Info') return '#0a84ff';
   return '#007aff';
 }
 

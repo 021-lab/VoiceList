@@ -765,6 +765,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
           <option>Focus</option>
           <option>Archive</option>
           <option>Pause</option>
+          <option>Info</option>
         </select>
       </label>
       <section class="task-page-subtasks">
@@ -1473,7 +1474,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-interpreter.js
-  var STATUS_VALUES = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause"]);
+  var STATUS_VALUES = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause", "Info"]);
   var INBOX_ID = "inbox";
   function clone2(value) {
     return JSON.parse(JSON.stringify(value));
@@ -1896,6 +1897,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     if (status === "Focus") return "#ff9500";
     if (status === "Archive") return "#8e8e93";
     if (status === "Pause") return "#5856d6";
+    if (status === "Info") return "#0a84ff";
     return "#007aff";
   }
   function formatCommand(command) {
@@ -2804,7 +2806,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
 
   // src/list-ui.js
   var AVAILABLE_TAGS = ["\u0412\u0430\u0436\u043D\u043E\u0435", "\u0421\u0440\u043E\u0447\u043D\u043E", "\u041A\u0443\u043F\u0438\u0442\u044C", "\u0414\u043E\u043C", "\u0420\u0430\u0431\u043E\u0442\u0430", "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"];
-  var STATUS_ACTIONS = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause"]);
+  var STATUS_ACTIONS = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause", "Info"]);
   var PANEL_ITEM_HEIGHT = 72;
   var VOICE_LONGPRESS_MS = 400;
   function clone5(value) {
@@ -3139,6 +3141,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         { id: "done", label: "Done", icon: "\u2713", color: "#34c759", kind: "status", status: "Done" },
         { id: "pause-toggle", label: status === "Pause" ? "Open" : "Pause", icon: status === "Pause" ? "\u25EF" : "\u2161", color: "#5856d6", kind: "status", status: status === "Pause" ? "Open" : "Pause" },
         { id: "focus-toggle", label: status === "Focus" ? "Open" : "Focus", icon: status === "Focus" ? "\u25EF" : "\u25CE", color: "#ff9500", kind: "status", status: status === "Focus" ? "Open" : "Focus" },
+        { id: "info-toggle", label: status === "Info" ? "Open" : "Info", icon: status === "Info" ? "\u25EF" : "i", color: "#0a84ff", kind: "status", status: status === "Info" ? "Open" : "Info" },
         { id: "archive", label: "Archive", icon: "\u25A3", color: "#8e8e93", kind: "status", status: "Archive", default: true },
         { id: "edit-page", label: "Edit", icon: "\u270E", color: "#007aff", kind: "editPage" }
       ];

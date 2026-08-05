@@ -400,6 +400,28 @@ test('preview app disables task-list voice and keeps voice commands on the front
   await expect(page.locator('.list-item-wrapper[data-id="goldn"]')).toContainText('Done');
 });
 
+test('preview app can mark a task as Info from the right menu and hides it from frontier', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const coffeeWrapper = page.locator('.list-item-wrapper[data-id="cofee"]');
+  await expect(coffeeWrapper).toContainText('Кофе');
+
+  await triggerRightPanelActionUntil(page, coffeeWrapper.locator('.list-item'), 'Info', async () => (
+    (await coffeeWrapper.textContent()).includes('Info')
+  ));
+  await expect(coffeeWrapper).toContainText('Info');
+
+  await page.locator('#frontier-tab-btn').click();
+  await expect(page.locator('#frontier-tab-btn')).toHaveClass(/active/);
+  await expect(page.locator('.list-item-wrapper[data-id="cofee"]')).toHaveCount(0);
+
+  await page.locator('#frontier-tab-btn').click();
+  await expect(coffeeWrapper).toContainText('Info');
+});
+
 test('preview app positions voice overlay near the pointer and selects a candidate by movement', async ({ page }) => {
   await page.addInitScript(() => {
     window.__voiceTest = { phrase: 'добавь молоко' };

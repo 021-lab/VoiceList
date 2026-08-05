@@ -4,7 +4,7 @@ import { C as VOICE_C, selectAt as selectVoiceAt } from './gesture.js';
 import { VoiceSession, validate as validateVoiceCommand } from './voice-session.js';
 
 const AVAILABLE_TAGS = ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'];
-const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause']);
+const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'Info']);
 const PANEL_ITEM_HEIGHT = 72;
 const VOICE_LONGPRESS_MS = 400;
 
@@ -377,6 +377,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       { id: 'done', label: 'Done', icon: '✓', color: '#34c759', kind: 'status', status: 'Done' },
       { id: 'pause-toggle', label: status === 'Pause' ? 'Open' : 'Pause', icon: status === 'Pause' ? '◯' : 'Ⅱ', color: '#5856d6', kind: 'status', status: status === 'Pause' ? 'Open' : 'Pause' },
       { id: 'focus-toggle', label: status === 'Focus' ? 'Open' : 'Focus', icon: status === 'Focus' ? '◯' : '◎', color: '#ff9500', kind: 'status', status: status === 'Focus' ? 'Open' : 'Focus' },
+      { id: 'info-toggle', label: status === 'Info' ? 'Open' : 'Info', icon: status === 'Info' ? '◯' : 'i', color: '#0a84ff', kind: 'status', status: status === 'Info' ? 'Open' : 'Info' },
       { id: 'archive', label: 'Archive', icon: '▣', color: '#8e8e93', kind: 'status', status: 'Archive', default: true },
       { id: 'edit-page', label: 'Edit', icon: '✎', color: '#007aff', kind: 'editPage' }
     ];
