@@ -936,6 +936,26 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     for (const child of dragState.children) child.style.transform = transform;
   }
 
+  function visibleDragWrappers(wrappers) {
+    return wrappers.filter((wrapper) => wrapper === dragState.wrapper || wrapper.offsetParent !== null);
+  }
+
+  function groupEndIndex(wrappers, startIndex) {
+    const baseLevel = Number(wrappers[startIndex]?.dataset.level || 0);
+    let endIndex = startIndex;
+    for (let index = startIndex + 1; index < wrappers.length; index += 1) {
+      if (Number(wrappers[index].dataset.level || 0) <= baseLevel) break;
+      endIndex = index;
+    }
+    return endIndex;
+  }
+
+  function moveDraggedGroupBefore(reference) {
+    const { wrapper, children } = dragState;
+    container.insertBefore(wrapper, reference);
+    for (const child of children) container.insertBefore(child, reference);
+  }
+
   function clampToBoundary() {
     if (!dragState) return;
     const viewportHeight = window.innerHeight;
@@ -1003,28 +1023,28 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   function checkSwap() {
     const { wrapper, children } = dragState;
     const all = [...container.querySelectorAll('.list-item-wrapper')];
-    const index = all.indexOf(wrapper);
+    const visible = visibleDragWrappers(all);
+    const index = visible.indexOf(wrapper);
     const rect = wrapper.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
 
     if (index > 0) {
-      const previous = all[index - 1];
+      const previous = visible[index - 1];
       const previousRect = previous.getBoundingClientRect();
       if (midpoint < previousRect.top + previousRect.height / 2) {
-        container.insertBefore(wrapper, previous);
-        for (const child of children) container.insertBefore(child, previous);
+        moveDraggedGroupBefore(previous);
         dragState.offsetY += previousRect.height + 1;
         wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
         return;
       }
     }
 
-    const groupEnd = index + children.length;
-    if (groupEnd < all.length - 1) {
-      const next = all[groupEnd + 1];
+    if (index < visible.length - 1) {
+      const next = visible[index + 1];
       const nextRect = next.getBoundingClientRect();
       if (midpoint > nextRect.top + nextRect.height / 2) {
-        container.insertBefore(next, wrapper);
+        const nextEnd = groupEndIndex(all, all.indexOf(next));
+        moveDraggedGroupBefore(all[nextEnd + 1] || null);
         dragState.offsetY -= nextRect.height + 1;
         wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
       }

@@ -270,6 +270,30 @@ test('preview app keeps list drag and left tag gestures when task-list voice is 
   await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
 });
 
+test('preview app drags through a collapsed parent as one visible row', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const milkWrapper = page.locator('.list-item-wrapper[data-id="milk1"]');
+  const milkRow = milkWrapper.locator('.list-item');
+  const breadRow = page.locator('.list-item-wrapper[data-id="bread"]').locator('.list-item');
+
+  await breadRow.click();
+  await expect(page.locator('.list-item-wrapper[data-id="borod"]')).not.toBeVisible();
+  await expect(page.locator('.list-item-wrapper[data-id="stoli"]')).not.toBeVisible();
+
+  await dragRowVertically(page, milkRow, 70);
+
+  await expect.poll(async () => {
+    const order = await visibleListOrder(page);
+    return order.indexOf('bread') < order.indexOf('milk1') &&
+      order.indexOf('milk1') < order.indexOf('apple');
+  }).toBe(true);
+  await expect(milkWrapper).toHaveAttribute('data-level', '0');
+});
+
 test('preview app keeps a purely vertical upward drag at the original nesting level', async ({ page }) => {
   await page.goto('');
   await page.evaluate(() => window.localStorage.clear());
