@@ -7,6 +7,7 @@ const AVAILABLE_TAGS = ['Важное', 'Срочно', 'Купить', 'Дом'
 const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'Info']);
 const PANEL_ITEM_HEIGHT = 72;
 const VOICE_LONGPRESS_MS = 400;
+const TAP_TOLERANCE_PX = 10;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -1214,7 +1215,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       if (!lockedH) {
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
           lockedH = true;
-        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= TAP_TOLERANCE_PX) {
           row.style.transform = '';
           actionBg.style.opacity = '0';
           actionBg.className = 'action-bg del';
@@ -1307,7 +1308,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       } else if (wasLeft && dx < -30 && leftAction) {
         if (isMouse) mouseSwipeDone = true;
         execPanelAction(leftAction, itemId, 'left-swipe-panel');
-      } else if (!isMouse && Math.abs(dx) < 10 && Math.abs(dy) < 10 && rootPanel.dataset.viewMode !== 'frontier') {
+      } else if (!isMouse && Math.abs(dx) < TAP_TOLERANCE_PX && Math.abs(dy) < TAP_TOLERANCE_PX && rootPanel.dataset.viewMode !== 'frontier') {
         dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
       }
     };

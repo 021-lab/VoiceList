@@ -294,6 +294,60 @@ test('preview app drags through a collapsed parent as one visible row', async ({
   await expect(milkWrapper).toHaveAttribute('data-level', '0');
 });
 
+test('preview app toggles a sublist closed and open from a touch tap', async ({ browser }) => {
+  const context = await browser.newContext({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 }
+  });
+  const page = await context.newPage();
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const breadRow = page.locator('.list-item-wrapper[data-id="bread"]').locator('.list-item');
+  const breadBox = await breadRow.boundingBox();
+  if (!breadBox) throw new Error('No bread row box');
+
+  await page.touchscreen.tap(breadBox.x + 24, breadBox.y + breadBox.height / 2);
+  await expect(page.locator('.list-item-wrapper[data-id="borod"]')).toBeHidden();
+
+  const collapsedBreadBox = await breadRow.boundingBox();
+  if (!collapsedBreadBox) throw new Error('No collapsed bread row box');
+  await page.touchscreen.tap(collapsedBreadBox.x + 24, collapsedBreadBox.y + collapsedBreadBox.height / 2);
+  await expect(page.locator('.list-item-wrapper[data-id="borod"]')).toBeVisible();
+
+  await context.close();
+});
+
+test('preview app tolerates small finger drift when toggling a sublist', async ({ browser }) => {
+  const context = await browser.newContext({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 }
+  });
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const breadRow = page.locator('.list-item-wrapper[data-id="bread"]').locator('.list-item');
+  const breadBox = await breadRow.boundingBox();
+  if (!breadBox) throw new Error('No bread row box');
+  const x = Math.round(breadBox.x + 24);
+  const y = Math.round(breadBox.y + breadBox.height / 2);
+
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 8 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+  await expect(page.locator('.list-item-wrapper[data-id="borod"]')).toBeHidden();
+  await context.close();
+});
+
 test('preview app keeps a purely vertical upward drag at the original nesting level', async ({ page }) => {
   await page.goto('');
   await page.evaluate(() => window.localStorage.clear());
@@ -306,6 +360,35 @@ test('preview app keeps a purely vertical upward drag at the original nesting le
   await dragRowVertically(page, coffeeRow, -180);
 
   await expect(coffeeWrapper).toHaveAttribute('data-level', '0');
+});
+
+test('preview app wraps long task titles to no more than two lines', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+
+  const longTitle = 'Длинная задача должна переноситься ровно на две строки';
+  await page.getByRole('button', { name: 'Добавить задачу' }).click();
+  await page.locator('#input-line1').fill(longTitle);
+  await confirmModal(page);
+
+  const line = page.locator('.list-item-wrapper', { hasText: longTitle }).locator('.item-line1');
+  await expect(line).toBeVisible();
+  const metrics = await line.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      clientHeight: node.clientHeight,
+      lineHeight: Number.parseFloat(style.lineHeight),
+      overflow: style.overflow,
+      textOverflow: style.textOverflow,
+      whiteSpace: style.whiteSpace
+    };
+  });
+
+  expect(metrics.whiteSpace).not.toBe('nowrap');
+  expect(metrics.textOverflow).not.toBe('ellipsis');
+  expect(metrics.overflow).toBe('hidden');
+  expect(metrics.clientHeight).toBeLessThanOrEqual(Math.ceil(metrics.lineHeight * 2) + 2);
 });
 
 test('preview app allows an upward drag to nest only after a deliberate right shift', async ({ page }) => {

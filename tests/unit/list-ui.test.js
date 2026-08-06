@@ -50,6 +50,13 @@ function createUiFixture(rootPanel = el('app-root')) {
   });
 }
 
+function dispatchTouch(node, type, x, y) {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  const touches = type === 'touchend' || type === 'touchcancel' ? [] : [{ clientX: x, clientY: y }];
+  Object.defineProperty(event, 'touches', { value: touches });
+  node.dispatchEvent(event);
+}
+
 describe('list UI', () => {
   test('dispatches showFrontier from the header frontier button', () => {
     document.body.innerHTML = '';
@@ -92,6 +99,37 @@ describe('list UI', () => {
     row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(inputs).toEqual([]);
+  });
+
+  test('keeps a small touch drift as a collapse tap', () => {
+    document.body.innerHTML = '';
+    const inputs = [];
+    const rootPanel = el('app-root');
+    rootPanel.dataset.viewMode = 'list';
+    const ui = createUiFixture(rootPanel);
+    const wrapper = document.createElement('div');
+    const row = document.createElement('div');
+    const actionBg = document.createElement('div');
+
+    ui.setDispatch((input) => inputs.push(input));
+    ui.bindRow({
+      actionBg,
+      item: { id: 'task1' },
+      row,
+      wrapper
+    });
+
+    dispatchTouch(row, 'touchstart', 40, 40);
+    dispatchTouch(row, 'touchmove', 40, 48);
+    dispatchTouch(row, 'touchend', 40, 48);
+
+    expect(inputs).toEqual([{
+      actId: 'task1',
+      actType: 'task',
+      command: 'toggleCollapse',
+      payload: {},
+      source: 'tap'
+    }]);
   });
 
   test('dispatches Workflowy import from the settings panel', () => {
