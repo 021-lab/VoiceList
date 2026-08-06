@@ -8,6 +8,9 @@ const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'In
 const PANEL_ITEM_HEIGHT = 72;
 const VOICE_LONGPRESS_MS = 400;
 const TAP_TOLERANCE_PX = 10;
+const LONGPRESS_CANCEL_PX = 8;
+const HORIZONTAL_SWIPE_LOCK_PX = 6;
+const VERTICAL_SCROLL_CANCEL_PX = 15;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -905,10 +908,13 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         return;
       }
       if (dragState) {
-        finalizeDrag();
+        const handledAsTap = currentMouseGesture?.end(true) === true;
+        if (!handledAsTap && dragState) {
+          finalizeDrag();
+          wasDragging = true;
+          setTimeout(() => { wasDragging = false; }, 300);
+        }
         currentMouseGesture = null;
-        wasDragging = true;
-        setTimeout(() => { wasDragging = false; }, 300);
       } else {
         currentMouseGesture?.end();
       }
@@ -1066,6 +1072,34 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     }
   }
 
+  function restoreUndoSnapshot(snapshot, disabled) {
+    undoSnapshot = snapshot ? clone(snapshot) : null;
+    undoButton.disabled = disabled;
+  }
+
+  function cancelDragAsTap() {
+    if (!dragState) return;
+    stopAutoScroll();
+    const { wrapper, children, previousUndoSnapshot, previousUndoDisabled } = dragState;
+    dragState = null;
+
+    const row = wrapper.querySelector('.list-item');
+    row?.classList.remove('pressing');
+    if (row) {
+      row.style.transition = '';
+      row.style.transform = '';
+    }
+    wrapper.classList.remove('is-dragging');
+    wrapper.style.transition = '';
+    wrapper.style.transform = '';
+    for (const child of children) {
+      child.style.display = '';
+      child.style.transition = '';
+      child.style.transform = '';
+    }
+    restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+  }
+
   function autoScrollStep() {
     if (!dragState) {
       autoScrollRAF = null;
@@ -1104,6 +1138,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function startDrag(wrapper, clientY, clientX) {
+    const previousUndoSnapshot = undoSnapshot ? clone(undoSnapshot) : null;
+    const previousUndoDisabled = undoButton.disabled;
     saveUndoSnapshot();
     const row = wrapper.querySelector('.list-item');
     row.classList.remove('pressing');
@@ -1119,7 +1155,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       children.push(allWrappers[index]);
     }
 
-    dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, originalLevel: baseLevel };
+    dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
     for (const child of children) child.style.display = 'none';
     startAutoScroll();
   }
@@ -1200,22 +1236,22 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     let mouseSwipeDone = false;
 
     const handleMoveXY = (clientX, clientY) => {
-      if (dragState || !active) return;
       curX = clientX;
       curY = clientY;
+      if (dragState || !active) return;
       const dx = curX - startX;
       const dy = curY - startY;
 
-      if (longTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      if (longTimer && (Math.abs(dx) > LONGPRESS_CANCEL_PX || Math.abs(dy) > LONGPRESS_CANCEL_PX)) {
         clearTimeout(longTimer);
         longTimer = null;
         row.classList.remove('pressing');
       }
 
       if (!lockedH) {
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > HORIZONTAL_SWIPE_LOCK_PX) {
           lockedH = true;
-        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= TAP_TOLERANCE_PX) {
+        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= VERTICAL_SCROLL_CANCEL_PX) {
           row.style.transform = '';
           actionBg.style.opacity = '0';
           actionBg.className = 'action-bg del';
@@ -1292,11 +1328,23 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       hideDrop();
       hideTagPanel();
 
-      if (dragState || !active) return;
-      active = false;
-
       const dx = curX - startX;
       const dy = curY - startY;
+      const stayedWithinTap = Math.abs(dx) <= TAP_TOLERANCE_PX && Math.abs(dy) <= TAP_TOLERANCE_PX;
+
+      if (dragState) {
+        if (stayedWithinTap && rootPanel.dataset.viewMode !== 'frontier') {
+          cancelDragAsTap();
+          active = false;
+          if (!isMouse) {
+            dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
+          }
+          return true;
+        }
+        return false;
+      }
+      if (!active) return false;
+      active = false;
 
       row.style.transition = 'transform 0.3s cubic-bezier(.4,0,.2,1)';
       row.style.transform = '';
@@ -1308,9 +1356,10 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       } else if (wasLeft && dx < -30 && leftAction) {
         if (isMouse) mouseSwipeDone = true;
         execPanelAction(leftAction, itemId, 'left-swipe-panel');
-      } else if (!isMouse && Math.abs(dx) < TAP_TOLERANCE_PX && Math.abs(dy) < TAP_TOLERANCE_PX && rootPanel.dataset.viewMode !== 'frontier') {
+      } else if (!isMouse && stayedWithinTap && rootPanel.dataset.viewMode !== 'frontier') {
         dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
       }
+      return true;
     };
 
     row.addEventListener('touchstart', (event) => {
@@ -1326,7 +1375,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       row.classList.add('pressing');
       longTimer = setTimeout(() => {
         longTimer = null;
-        active = false;
         rdAnchor = null;
         ldAnchor = null;
         if (isFrontierView()) {
@@ -1366,7 +1414,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       currentMouseGesture = { move: handleMoveXY, end: () => handleEnd(true) };
       longTimer = setTimeout(() => {
         longTimer = null;
-        active = false;
         rdAnchor = null;
         ldAnchor = null;
         if (isFrontierView()) {
@@ -1374,7 +1421,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
           resetRowGesture(row, actionBg);
           return;
         }
-        currentMouseGesture = null;
         actionBg.style.opacity = '0';
         hideDrop();
         hideTagPanel();
