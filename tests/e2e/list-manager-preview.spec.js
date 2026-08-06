@@ -294,6 +294,31 @@ test('preview app drags through a collapsed parent as one visible row', async ({
   await expect(milkWrapper).toHaveAttribute('data-level', '0');
 });
 
+test('preview app clears an interrupted drag without leaving a blank slot', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const appleWrapper = page.locator('.list-item-wrapper[data-id="apple"]');
+  const appleRow = appleWrapper.locator('.list-item');
+  await appleRow.scrollIntoViewIfNeeded();
+  const rowBox = await appleRow.boundingBox();
+  if (!rowBox) throw new Error('No apple row box');
+
+  const x = rowBox.x + rowBox.width / 2;
+  const y = rowBox.y + rowBox.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.waitForTimeout(520);
+  await page.mouse.move(x, y + 260, { steps: 8 });
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+
+  await expect(appleWrapper).not.toHaveClass(/is-dragging/);
+  await expect.poll(async () => appleWrapper.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
+  await page.mouse.up();
+});
+
 test('preview app toggles a sublist closed and open from a touch tap', async ({ browser }) => {
   const context = await browser.newContext({
     hasTouch: true,

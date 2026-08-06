@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="mrfy24y0-y3psju">
+<meta name="preview-build-hash" content="gapfix-20260806154849">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -805,7 +805,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
+window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
 </script>
 <script>
 (() => {
@@ -3611,7 +3611,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           cancelVoice();
           return;
         }
-        if (dragState) finalizeDrag();
+        if (dragState) cancelActiveDrag();
       }, { passive: true });
       document.addEventListener("mousemove", (event) => {
         if (voicePressTimer && (Math.abs(event.clientX - voicePress.x) > 10 || Math.abs(event.clientY - voicePress.y) > 10)) {
@@ -3650,6 +3650,14 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         } else {
           currentMouseGesture?.end();
         }
+      });
+      const cancelInterruptedDrag = () => {
+        if (dragState) cancelActiveDrag();
+      };
+      window.addEventListener("blur", cancelInterruptedDrag);
+      window.addEventListener("pagehide", cancelInterruptedDrag);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") cancelInterruptedDrag();
       });
     }
     function saveUndoSnapshot() {
@@ -3787,10 +3795,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       undoSnapshot = snapshot ? clone5(snapshot) : null;
       undoButton.disabled = disabled;
     }
-    function cancelDragAsTap() {
+    function restoreDragChildren(children, childDisplayBeforeDrag) {
+      for (const child of children) {
+        child.style.display = childDisplayBeforeDrag?.get(child) ?? "";
+        child.style.transition = "";
+        child.style.transform = "";
+      }
+    }
+    function cancelActiveDrag({ restoreUndo = true } = {}) {
       if (!dragState) return;
       stopAutoScroll();
-      const { wrapper, children, previousUndoSnapshot, previousUndoDisabled } = dragState;
+      const { wrapper, children, childDisplayBeforeDrag, previousUndoSnapshot, previousUndoDisabled } = dragState;
       dragState = null;
       const row = wrapper.querySelector(".list-item");
       row?.classList.remove("pressing");
@@ -3801,12 +3816,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       wrapper.classList.remove("is-dragging");
       wrapper.style.transition = "";
       wrapper.style.transform = "";
-      for (const child of children) {
-        child.style.display = "";
-        child.style.transition = "";
-        child.style.transform = "";
-      }
-      restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+      restoreDragChildren(children, childDisplayBeforeDrag);
+      if (restoreUndo) restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+    }
+    function cancelDragAsTap() {
+      cancelActiveDrag();
     }
     function autoScrollStep() {
       if (!dragState) {
@@ -3857,13 +3871,14 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         if (Number(allWrappers[index].dataset.level || 0) <= baseLevel) break;
         children.push(allWrappers[index]);
       }
-      dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
+      const childDisplayBeforeDrag = new Map(children.map((child) => [child, child.style.display]));
+      dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, childDisplayBeforeDrag, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
       for (const child of children) child.style.display = "none";
       startAutoScroll();
     }
     function finalizeDrag() {
       stopAutoScroll();
-      const { wrapper, pendingLevel, rightShifted, children, originalLevel } = dragState;
+      const { wrapper, pendingLevel, rightShifted, children, childDisplayBeforeDrag, originalLevel } = dragState;
       if (!rightShifted) {
         snapUnshiftedDragOutOfDeeperRows();
       }
@@ -3885,10 +3900,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       for (const child of children) {
         child.style.transition = "transform 0.22s cubic-bezier(.4,0,.2,1)";
         child.style.transform = "";
+        child.style.display = childDisplayBeforeDrag?.get(child) ?? "";
       }
       setTimeout(() => {
         wrapper.style.transition = "";
         wrapper.classList.remove("is-dragging");
+        for (const child of children) child.style.transition = "";
         const wrappers = [...container.querySelectorAll(".list-item-wrapper")];
         const arranged = deriveArrangedFromWrappers(wrappers);
         dispatchUserInput({
@@ -4057,6 +4074,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           longTimer = null;
           rdAnchor = null;
           ldAnchor = null;
+          if (document.visibilityState === "hidden") {
+            active = false;
+            resetRowGesture(row, actionBg);
+            return;
+          }
           if (isFrontierView()) {
             startVoice(null, curY);
             resetRowGesture(row, actionBg);
@@ -4093,6 +4115,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           longTimer = null;
           rdAnchor = null;
           ldAnchor = null;
+          if (document.visibilityState === "hidden") {
+            active = false;
+            resetRowGesture(row, actionBg);
+            return;
+          }
           if (isFrontierView()) {
             startVoice(null, curY);
             resetRowGesture(row, actionBg);
@@ -4140,7 +4167,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-preview-entry.js
-  var PREVIEW_BUILD_HASH = "mrfy24y0-y3psju";
+  var PREVIEW_BUILD_HASH = "gapfix-20260806154849";
   async function bootstrapListManagerPreview() {
     document.documentElement.dataset.previewBuildHash = PREVIEW_BUILD_HASH;
     const store = createStore({

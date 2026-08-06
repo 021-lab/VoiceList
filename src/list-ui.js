@@ -890,7 +890,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         cancelVoice();
         return;
       }
-      if (dragState) finalizeDrag();
+      if (dragState) cancelActiveDrag();
     }, { passive: true });
 
     document.addEventListener('mousemove', (event) => {
@@ -929,6 +929,15 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       } else {
         currentMouseGesture?.end();
       }
+    });
+
+    const cancelInterruptedDrag = () => {
+      if (dragState) cancelActiveDrag();
+    };
+    window.addEventListener('blur', cancelInterruptedDrag);
+    window.addEventListener('pagehide', cancelInterruptedDrag);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') cancelInterruptedDrag();
     });
   }
 
@@ -1088,10 +1097,18 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     undoButton.disabled = disabled;
   }
 
-  function cancelDragAsTap() {
+  function restoreDragChildren(children, childDisplayBeforeDrag) {
+    for (const child of children) {
+      child.style.display = childDisplayBeforeDrag?.get(child) ?? '';
+      child.style.transition = '';
+      child.style.transform = '';
+    }
+  }
+
+  function cancelActiveDrag({ restoreUndo = true } = {}) {
     if (!dragState) return;
     stopAutoScroll();
-    const { wrapper, children, previousUndoSnapshot, previousUndoDisabled } = dragState;
+    const { wrapper, children, childDisplayBeforeDrag, previousUndoSnapshot, previousUndoDisabled } = dragState;
     dragState = null;
 
     const row = wrapper.querySelector('.list-item');
@@ -1103,12 +1120,12 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     wrapper.classList.remove('is-dragging');
     wrapper.style.transition = '';
     wrapper.style.transform = '';
-    for (const child of children) {
-      child.style.display = '';
-      child.style.transition = '';
-      child.style.transform = '';
-    }
-    restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+    restoreDragChildren(children, childDisplayBeforeDrag);
+    if (restoreUndo) restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+  }
+
+  function cancelDragAsTap() {
+    cancelActiveDrag();
   }
 
   function autoScrollStep() {
@@ -1166,14 +1183,15 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       children.push(allWrappers[index]);
     }
 
-    dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
+    const childDisplayBeforeDrag = new Map(children.map((child) => [child, child.style.display]));
+    dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, childDisplayBeforeDrag, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
     for (const child of children) child.style.display = 'none';
     startAutoScroll();
   }
 
   function finalizeDrag() {
     stopAutoScroll();
-    const { wrapper, pendingLevel, rightShifted, children, originalLevel } = dragState;
+    const { wrapper, pendingLevel, rightShifted, children, childDisplayBeforeDrag, originalLevel } = dragState;
 
     if (!rightShifted) {
       snapUnshiftedDragOutOfDeeperRows();
@@ -1199,11 +1217,13 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     for (const child of children) {
       child.style.transition = 'transform 0.22s cubic-bezier(.4,0,.2,1)';
       child.style.transform = '';
+      child.style.display = childDisplayBeforeDrag?.get(child) ?? '';
     }
 
     setTimeout(() => {
       wrapper.style.transition = '';
       wrapper.classList.remove('is-dragging');
+      for (const child of children) child.style.transition = '';
       const wrappers = [...container.querySelectorAll('.list-item-wrapper')];
       const arranged = deriveArrangedFromWrappers(wrappers);
       dispatchUserInput({
@@ -1388,6 +1408,11 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         rdAnchor = null;
         ldAnchor = null;
+        if (document.visibilityState === 'hidden') {
+          active = false;
+          resetRowGesture(row, actionBg);
+          return;
+        }
         if (isFrontierView()) {
           startVoice(null, curY);
           resetRowGesture(row, actionBg);
@@ -1427,6 +1452,11 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         longTimer = null;
         rdAnchor = null;
         ldAnchor = null;
+        if (document.visibilityState === 'hidden') {
+          active = false;
+          resetRowGesture(row, actionBg);
+          return;
+        }
         if (isFrontierView()) {
           startVoice(null, curY);
           resetRowGesture(row, actionBg);
