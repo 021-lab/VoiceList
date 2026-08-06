@@ -505,6 +505,33 @@ test('preview app can mark a task as Info from the right menu and hides it from 
   await expect(coffeeWrapper).toContainText('Info');
 });
 
+test('preview app logs unrecognized voice fallback utterances', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__voiceTest = { phrase: 'позвонить Ване' };
+  });
+
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await page.locator('#frontier-tab-btn').click();
+  await expect(page.locator('#frontier-tab-btn')).toHaveClass(/active/);
+
+  const frontierRow = page.locator('.list-item-wrapper[data-id="goldn"]').locator('.list-item');
+  const box = await frontierRow.boundingBox();
+  if (!box) throw new Error('No frontier row box');
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(520);
+  await expect(page.locator('#voice-overlay')).toHaveClass(/open/);
+  await page.mouse.up();
+  await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+
+  await page.locator('#view-toggle-btn').click();
+  await expect(page.locator('#action-log-list')).toContainText('Нераспознано: позвонить Ване');
+  await expect(page.locator('#action-log-list')).toContainText('позвонить Ване');
+});
+
 test('preview app positions voice overlay near the pointer and selects a candidate by movement', async ({ page }) => {
   await page.addInitScript(() => {
     window.__voiceTest = { phrase: 'добавь молоко' };

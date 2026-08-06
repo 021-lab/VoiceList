@@ -103,7 +103,21 @@ export class ListDocumentDO extends DurableObject {
     }
 
     const result = await core.handleClientMessage(message);
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      ws.send(JSON.stringify({
+        type: 'ack',
+        ack: {
+          seq: result.ack?.seq ?? message.seq ?? null,
+          id: null,
+          status: 'rejected',
+          reason: `Persist failed: ${error.message}`,
+          newTarget: null
+        }
+      }));
+      return;
+    }
     ws.send(JSON.stringify({ type: 'ack', ack: result.ack }));
     this.broadcastState(result.state);
   }

@@ -1512,6 +1512,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     if (command === "toggleCollapse") return "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435";
     if (command === "reorderItems") return "\u0418\u0437\u043C\u0435\u043D\u0451\u043D \u043F\u043E\u0440\u044F\u0434\u043E\u043A \u0441\u043F\u0438\u0441\u043A\u0430";
     if (command === "importWorkflowyTree") return `\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0434\u0435\u0440\u0435\u0432\u043E Workflowy: ${payload.tree?.title || "\u0431\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F"}`;
+    if (command === "logFallbackUtterance") return `\u041D\u0435\u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u043E: ${payload.text || "\u043F\u0443\u0441\u0442\u0430\u044F \u0444\u0440\u0430\u0437\u0430"}`;
     if (command === "undo") return "\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D undo";
     return command;
   }
@@ -1582,6 +1583,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         const existingIds = new Set(nextItems.map((item) => item.id));
         let patch = [];
         let logEntryDraft = null;
+        let logOnly = false;
+        let handledCommand = true;
         const payload = input.payload || {};
         if (input.command === "showActionLog" || input.command === "showList" || input.command === "showFrontier") {
           return {
@@ -1697,10 +1700,15 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
             order: nextOrder(nextItems, null)
           });
           if (!rootId) return noChange();
+        } else if (input.command === "logFallbackUtterance") {
+          logOnly = true;
         } else if (input.command === "undo") {
           patch = [{ op: "replace", path: "/snapshot", value: clone2(payload.snapshot) }];
+        } else {
+          handledCommand = false;
         }
-        if (!patch.length) {
+        if (!handledCommand) return noChange();
+        if (!patch.length && !logOnly) {
           patch = [{ op: "replace", path: "/snapshot/items", value: nextItems }];
         }
         if (!String(input.command).startsWith("show") && input.command !== "viewItem" && input.command !== "toggleCollapse") {
@@ -3077,7 +3085,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       }
       const transcript = String(current.session.finalText || current.session.text || "").trim() || null;
       const result = await current.session.release(current.dy || 0);
-      handleVoiceResult(result, { transcript });
+      handleVoiceResult(result, { transcript, contextId: current.session.context });
     }
     async function finishVoiceAtDy(dy) {
       if (!voiceState) return;
@@ -3091,7 +3099,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       }
       const transcript = String(current.session.finalText || current.session.text || "").trim() || null;
       const result = await current.session.release(dy);
-      handleVoiceResult(result, { transcript });
+      handleVoiceResult(result, { transcript, contextId: current.session.context });
     }
     function cancelVoice() {
       if (!voiceState) return;
@@ -3106,7 +3114,18 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         return;
       }
       if (result.action === "fallback") {
-        showToast(result.text ? `\u041D\u0435 \u043F\u043E\u043D\u044F\u043B: ${result.text}` : "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B");
+        const text = String(result.text || meta.transcript || "").trim();
+        showToast(text ? `\u041D\u0435 \u043F\u043E\u043D\u044F\u043B: ${text}` : "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B");
+        if (text) {
+          dispatchUserInput({
+            actId: meta.contextId || "list",
+            actType: meta.contextId ? "task" : "list",
+            command: "logFallbackUtterance",
+            payload: { text },
+            source: "voice-fallback",
+            transcript: text
+          });
+        }
         return;
       }
       const command = result.command;

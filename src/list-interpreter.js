@@ -37,6 +37,7 @@ function buildLabel(command, payload = {}) {
   if (command === 'toggleCollapse') return 'Переключено сворачивание';
   if (command === 'reorderItems') return 'Изменён порядок списка';
   if (command === 'importWorkflowyTree') return `Импортировано дерево Workflowy: ${payload.tree?.title || 'без названия'}`;
+  if (command === 'logFallbackUtterance') return `Нераспознано: ${payload.text || 'пустая фраза'}`;
   if (command === 'undo') return 'Выполнен undo';
   return command;
 }
@@ -116,6 +117,8 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
       const existingIds = new Set(nextItems.map((item) => item.id));
       let patch = [];
       let logEntryDraft = null;
+      let logOnly = false;
+      let handledCommand = true;
       const payload = input.payload || {};
 
       if (input.command === 'showActionLog' || input.command === 'showList' || input.command === 'showFrontier') {
@@ -242,11 +245,17 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
           order: nextOrder(nextItems, null)
         });
         if (!rootId) return noChange();
+      } else if (input.command === 'logFallbackUtterance') {
+        logOnly = true;
       } else if (input.command === 'undo') {
         patch = [{ op: 'replace', path: '/snapshot', value: clone(payload.snapshot) }];
+      } else {
+        handledCommand = false;
       }
 
-      if (!patch.length) {
+      if (!handledCommand) return noChange();
+
+      if (!patch.length && !logOnly) {
         patch = [{ op: 'replace', path: '/snapshot/items', value: nextItems }];
       }
 

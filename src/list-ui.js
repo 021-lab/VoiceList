@@ -299,7 +299,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     }
     const transcript = String(current.session.finalText || current.session.text || '').trim() || null;
     const result = await current.session.release(current.dy || 0);
-    handleVoiceResult(result, { transcript });
+    handleVoiceResult(result, { transcript, contextId: current.session.context });
   }
 
   async function finishVoiceAtDy(dy) {
@@ -314,7 +314,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     }
     const transcript = String(current.session.finalText || current.session.text || '').trim() || null;
     const result = await current.session.release(dy);
-    handleVoiceResult(result, { transcript });
+    handleVoiceResult(result, { transcript, contextId: current.session.context });
   }
 
   function cancelVoice() {
@@ -331,7 +331,18 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       return;
     }
     if (result.action === 'fallback') {
-      showToast(result.text ? `Не понял: ${result.text}` : 'Не расслышал');
+      const text = String(result.text || meta.transcript || '').trim();
+      showToast(text ? `Не понял: ${text}` : 'Не расслышал');
+      if (text) {
+        dispatchUserInput({
+          actId: meta.contextId || 'list',
+          actType: meta.contextId ? 'task' : 'list',
+          command: 'logFallbackUtterance',
+          payload: { text },
+          source: 'voice-fallback',
+          transcript: text
+        });
+      }
       return;
     }
     const command = result.command;

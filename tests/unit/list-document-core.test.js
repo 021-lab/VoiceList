@@ -127,7 +127,68 @@ describe('Cloudflare list document core', () => {
     ]);
   });
 
-  test('returns an explicit OpenRouter key error when LLM fallback is required', async () => {
+  test('applies collapse without adding an action-log entry', async () => {
+    const core = createDocumentCore({ seedState, openRouterApiKey: '' });
+    await core.init();
+
+    const result = await core.handleClientMessage({
+      type: 'command',
+      clientKey: 'tab-a',
+      seq: 1,
+      input: {
+        actId: 'bread',
+        actType: 'task',
+        command: 'toggleCollapse',
+        payload: {},
+        source: 'unit-test'
+      }
+    });
+
+    expect(result.ack).toMatchObject({
+      seq: 1,
+      status: 'applied',
+      newTarget: 'bread'
+    });
+    expect(result.state.content.snapshot.items.find((item) => item.id === 'bread').collapsed).toBe(true);
+    expect(core.listLog()).toHaveLength(0);
+  });
+
+  test('logs unrecognized fallback utterances without changing the snapshot', async () => {
+    const core = createDocumentCore({ seedState, openRouterApiKey: '' });
+    await core.init();
+
+    const result = await core.handleClientMessage({
+      type: 'command',
+      clientKey: 'tab-a',
+      seq: 1,
+      input: {
+        actId: 'milk1',
+        actType: 'task',
+        command: 'logFallbackUtterance',
+        payload: { text: 'позвонить Ване' },
+        source: 'voice-fallback',
+        transcript: 'позвонить Ване'
+      }
+    });
+
+    expect(result.ack).toMatchObject({
+      seq: 1,
+      status: 'applied',
+      newTarget: 'milk1'
+    });
+    expect(result.state.rev).toBe(1);
+    expect(result.state.content.snapshot.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'milk1', line1: 'Молоко 3.2%' })
+    ]));
+    expect(result.state.content.actionLog).toHaveLength(1);
+    expect(result.state.content.actionLog[0]).toMatchObject({
+      command: expect.objectContaining({ command: 'logFallbackUtterance' }),
+      label: 'Нераспознано: позвонить Ване',
+      transcript: 'позвонить Ване'
+    });
+  });
+
+  test('logs LLM fallback failures instead of dropping unrecognized utterances', async () => {
     const core = createDocumentCore({ seedState, openRouterApiKey: '' });
     await core.init();
 
@@ -141,11 +202,59 @@ describe('Cloudflare list document core', () => {
 
     expect(result.ack).toMatchObject({
       seq: 2,
-      status: 'rejected',
-      reason: 'OPENROUTER_API_KEY is not configured'
+      status: 'applied',
+      newTarget: 'milk1'
     });
-    expect(result.state.rev).toBe(0);
-    expect(core.listLog()).toHaveLength(0);
+    expect(result.state.rev).toBe(1);
+    expect(core.listLog()).toHaveLength(1);
+    expect(core.listLog()[0]).toMatchObject({
+      op: 'logFallbackUtterance',
+      transcript: 'сделай что-нибудь очень странное',
+      label: 'Нераспознано: сделай что-нибудь очень странное'
+    });
+  });
+
+  test('compacts stored action-log patches and undo payload snapshots on init', async () => {
+    const largePatch = [{ op: 'replace', path: '/snapshot/items', value: seedState.snapshot.items }];
+    const initialState = {
+      content: {
+        snapshot: { items: seedState.snapshot.items },
+        actionLog: []
+      },
+      log: [{
+        id: '1',
+        rev: 1,
+        clientKey: 'tab-a',
+        seq: 1,
+        op: 'undo',
+        target: 'list',
+        value: null,
+        undo: null,
+        undoes: null,
+        transcript: null,
+        llm_raw: null,
+        command: {
+          actId: 'list',
+          actType: 'list',
+          command: 'undo',
+          payload: { snapshot: seedState.snapshot },
+          source: 'unit-test'
+        },
+        patch: largePatch,
+        label: 'Выполнен undo',
+        comments: [],
+        at: '2026-08-06T00:00:00.000Z'
+      }],
+      rev: 1,
+      nextId: 1000,
+      clients: {}
+    };
+    const core = createDocumentCore({ seedState, initialState, openRouterApiKey: '' });
+    await core.init();
+
+    const [entry] = core.listLog();
+    expect(entry.patch).toEqual([]);
+    expect(entry.command.payload).toEqual({ snapshot: '[omitted]' });
   });
 
   test('imports a Workflowy shared tree through a server command', async () => {

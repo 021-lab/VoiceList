@@ -21,6 +21,35 @@ const INBOX_ITEM = {
   tags: []
 };
 
+function commandName(entry) {
+  return entry?.op || entry?.command?.command || '';
+}
+
+function compactLogCommand(command) {
+  const nextCommand = clone(command || {});
+  if (nextCommand.command === 'undo' && nextCommand.payload?.snapshot) {
+    nextCommand.payload = {
+      ...nextCommand.payload,
+      snapshot: '[omitted]'
+    };
+  }
+  return nextCommand;
+}
+
+function compactLogEntry(entry) {
+  return {
+    ...clone(entry),
+    command: compactLogCommand(entry.command),
+    patch: []
+  };
+}
+
+function compactStateLog(state) {
+  state.log = (state.log || [])
+    .filter((entry) => commandName(entry) !== 'toggleCollapse')
+    .map(compactLogEntry);
+}
+
 function normalizeSeed(seedState) {
   const items = clone(seedState?.snapshot?.items || []);
   const normalizedItems = items.some((item) => item.id === INBOX_ITEM.id) ? items : [clone(INBOX_ITEM), ...items];
@@ -180,6 +209,7 @@ export function createDocumentCore({
     state.rev ||= 0;
     state.nextId ||= 1000;
     state.clients ||= {};
+    compactStateLog(state);
     return createStateEnvelope(state);
   }
 
@@ -254,35 +284,38 @@ export function createDocumentCore({
     const nextContent = result.patch?.length ? applyJsonPatch(state.content, result.patch) : clone(state.content);
     const newTarget = allocatedId || findNewTarget(beforeItems, nextContent.snapshot.items);
     const rev = state.rev + 1;
-    const logEntry = {
-      id: encodeId(rev),
-      rev,
-      clientKey: message.clientKey,
-      seq: message.seq,
-      op: input.command,
-      target: newTarget || input.actId || null,
-      value: clone(input.payload || null),
-      undo: null,
-      undoes: input.command === 'undo' ? input.payload?.id || null : null,
-      transcript: metadata.transcript ?? input.transcript ?? null,
-      llm_raw: metadata.llmRaw ?? null,
-      command: clone(input),
-      patch: clone(result.patch || []),
-      label: result.logEntryDraft?.label || input.command,
-      comments: [],
-      at: now().toISOString()
-    };
+    let logEntry = null;
 
     state.rev = rev;
     state.content = nextContent;
-    state.log.push(logEntry);
+    if (result.logEntryDraft) {
+      logEntry = {
+        id: encodeId(rev),
+        rev,
+        clientKey: message.clientKey,
+        seq: message.seq,
+        op: input.command,
+        target: newTarget || input.actId || null,
+        value: clone(input.payload || null),
+        undo: null,
+        undoes: input.command === 'undo' ? input.payload?.id || null : null,
+        transcript: metadata.transcript ?? input.transcript ?? null,
+        llm_raw: metadata.llmRaw ?? null,
+        command: compactLogCommand(input),
+        patch: [],
+        label: result.logEntryDraft.label,
+        comments: [],
+        at: now().toISOString()
+      };
+      state.log.push(logEntry);
+    }
 
     return {
       seq: message.seq,
-      id: logEntry.id,
+      id: logEntry?.id || null,
       status: 'applied',
       reason: null,
-      newTarget: logEntry.target
+      newTarget: logEntry?.target || newTarget || input.actId || null
     };
   }
 
@@ -311,7 +344,7 @@ export function createDocumentCore({
       undoes: null,
       transcript: input.transcript ?? null,
       llm_raw: null,
-      command: clone(input),
+      command: compactLogCommand(input),
       patch: [],
       label: 'Добавлен комментарий к записи журнала',
       comments: [],
@@ -364,6 +397,22 @@ export function createDocumentCore({
     };
   }
 
+  async function logFallbackUtterance(message, reason = null) {
+    const transcript = String(message.transcript || '').trim();
+    if (!transcript) return createRejectedAck(message, reason || 'Empty fallback utterance');
+    return applyCommand(message, {
+      actId: message.target || 'list',
+      actType: message.target ? 'task' : 'list',
+      command: 'logFallbackUtterance',
+      payload: {
+        text: transcript,
+        ...(reason ? { reason } : {})
+      },
+      source: 'voice-fallback',
+      transcript
+    });
+  }
+
   async function handleClientMessage(message) {
     ensureReady();
     const clientKey = String(message.clientKey || 'anonymous');
@@ -384,7 +433,15 @@ export function createDocumentCore({
         ack = createRejectedAck({ ...message, seq }, `Unsupported message type: ${message.type}`);
       }
     } catch (error) {
-      ack = createRejectedAck({ ...message, seq }, error.message);
+      if (message.type === 'utterance') {
+        try {
+          ack = await logFallbackUtterance({ ...message, clientKey, seq }, error.message);
+        } catch (fallbackError) {
+          ack = createRejectedAck({ ...message, seq }, fallbackError.message);
+        }
+      } else {
+        ack = createRejectedAck({ ...message, seq }, error.message);
+      }
     }
 
     rememberAck(clientKey, seq, ack);
@@ -393,7 +450,9 @@ export function createDocumentCore({
 
   function exportState() {
     ensureReady();
-    return clone(state);
+    const exported = clone(state);
+    compactStateLog(exported);
+    return exported;
   }
 
   return {
