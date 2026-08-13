@@ -1016,7 +1016,14 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     let nextLevel = dragState.originalLevel;
 
     if (dragState.rightShifted && index > 0) {
-      const aboveLevel = Number(all[index - 1].dataset.level || 0);
+      let parentIndex = index - 1;
+      if (dragState.offsetY > 0) {
+        const childLevel = Number(all[parentIndex].dataset.level || 0);
+        while (parentIndex > 0 && childLevel > 0 && Number(all[parentIndex].dataset.level || 0) >= childLevel) {
+          parentIndex -= 1;
+        }
+      }
+      const aboveLevel = Number(all[parentIndex].dataset.level || 0);
       nextLevel = aboveLevel + 1;
     }
 
@@ -1071,7 +1078,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       const next = visible[index + 1];
       const nextRect = next.getBoundingClientRect();
       if (midpoint > nextRect.top + nextRect.height / 2) {
-        const nextEnd = groupEndIndex(all, all.indexOf(next));
+        const nextIndex = all.indexOf(next);
+        const nextEnd = dragState.rightShifted ? nextIndex : groupEndIndex(all, nextIndex);
         moveDraggedGroupBefore(all[nextEnd + 1] || null);
         dragState.offsetY -= nextRect.height + 1;
         wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
@@ -1083,13 +1091,11 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     dragState.offsetY += (clientY - dragState.lastClientY) * 2;
     dragState.lastClientY = clientY;
     dragState.wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
+    if (clientX !== undefined) detectRightShift(clientX);
     clampToBoundary();
     checkSwap();
     syncChildTransforms();
-    if (clientX !== undefined) {
-      detectRightShift(clientX);
-      updateDraggedLevel();
-    }
+    if (clientX !== undefined) updateDraggedLevel();
   }
 
   function restoreUndoSnapshot(snapshot, disabled) {
@@ -1191,12 +1197,15 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function finalizeDrag() {
     stopAutoScroll();
-    const { wrapper, pendingLevel, rightShifted, children, childDisplayBeforeDrag, originalLevel } = dragState;
+    const { rightShifted } = dragState;
 
     if (!rightShifted) {
       snapUnshiftedDragOutOfDeeperRows();
+    } else {
+      updateDraggedLevel();
     }
 
+    const { wrapper, pendingLevel, children, childDisplayBeforeDrag, originalLevel } = dragState;
     dragState = null;
 
     if (pendingLevel !== undefined) {

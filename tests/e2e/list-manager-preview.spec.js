@@ -387,6 +387,36 @@ test('preview app keeps a purely vertical upward drag at the original nesting le
   await expect(coffeeWrapper).toHaveAttribute('data-level', '0');
 });
 
+test('preview app drops a downward drag below a parent as a sibling without right shift', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const milkWrapper = page.locator('.list-item-wrapper[data-id="milk1"]');
+  const milkRow = milkWrapper.locator('.list-item');
+
+  await dragRowVertically(page, milkRow, 45);
+
+  await expect(milkWrapper).toHaveAttribute('data-level', '0');
+  await expect.poll(() => visibleListOrder(page)).toEqual(['inbox', 'bread', 'borod', 'stoli', 'milk1', 'apple', 'goldn', 'grnsm', 'fudji', 'pozzd', 'voovo', 'first', 'cofee', 'tooth']);
+});
+
+test('preview app drops a downward drag with right shift as the first child', async ({ page }) => {
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+
+  const milkWrapper = page.locator('.list-item-wrapper[data-id="milk1"]');
+  const milkRow = milkWrapper.locator('.list-item');
+
+  await dragRowVertically(page, milkRow, 45, 60);
+
+  await expect(milkWrapper).toHaveAttribute('data-level', '1');
+  await expect.poll(() => visibleListOrder(page)).toEqual(['inbox', 'bread', 'milk1', 'borod', 'stoli', 'apple', 'goldn', 'grnsm', 'fudji', 'pozzd', 'voovo', 'first', 'cofee', 'tooth']);
+});
+
 test('preview app wraps long task titles to no more than two lines', async ({ page }) => {
   await page.goto('');
   await page.evaluate(() => window.localStorage.clear());
