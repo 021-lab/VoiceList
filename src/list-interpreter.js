@@ -29,6 +29,7 @@ function noChange() {
 
 function buildLabel(command, payload = {}) {
   if (command === 'addItem') return `Создана задача: ${payload.line1}`;
+  if (command === 'addChild' && payload.status === 'Info') return `Добавлена информация: ${payload.line1}`;
   if (command === 'addChild') return `Создана подзадача: ${payload.line1}`;
   if (command === 'setStatus') return `Статус изменён: ${payload.status}`;
   if (command === 'editItem') return `Изменена задача: ${payload.line1}`;
@@ -180,7 +181,7 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
           id: createItemId(existingIds, input),
           parentId: input.actId,
           order: nextOrder(nextItems, input.actId),
-          status: 'Open',
+          status: STATUS_VALUES.has(payload.status) ? payload.status : 'Open',
           line1: payload.line1,
           line2: payload.line2 || '',
           collapsed: false,
@@ -190,7 +191,7 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         if (item) {
           item.line1 = payload.line1;
-          item.line2 = payload.line2 || '';
+          if ('line2' in payload) item.line2 = payload.line2 || '';
         }
       } else if (input.command === 'setStatus') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);

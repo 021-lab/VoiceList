@@ -94,6 +94,13 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   color: #fff;
 }
 
+@media (max-width: 720px) {
+  header { gap: 6px; padding-inline: 10px; }
+  header h1 { display: none; }
+  #view-toggle-btn,
+  .header-tab-btn { min-width: 0; padding-inline: 10px; font-size: 12px; }
+}
+
 #list-container { padding: 12px 0 88px; position: relative; }
 
 .search-summary {
@@ -301,6 +308,100 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 }
 .add-btn:active { transform: scale(0.92); background: #005fcb; }
 
+/* ── OpenAI Realtime voice button ── */
+.realtime-voice-btn {
+  position: fixed;
+  top: 50%;
+  right: max(14px, env(safe-area-inset-right));
+  width: 60px;
+  height: 60px;
+  border: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 27px;
+  box-shadow: 0 8px 28px rgba(26, 26, 46, 0.34);
+  z-index: 650;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.realtime-voice-btn:active { transform: translateY(-50%) scale(0.94); }
+.realtime-voice-btn[data-state="connecting"] { background: #ff9500; }
+.realtime-voice-btn[data-state="active"] {
+  background: #ff3b30;
+  box-shadow: 0 0 0 8px rgba(255, 59, 48, 0.15), 0 8px 28px rgba(255, 59, 48, 0.35);
+  animation: realtime-voice-pulse 1.8s ease-in-out infinite;
+}
+.realtime-voice-btn[data-state="error"] { background: #8e8e93; }
+.realtime-voice-status {
+  position: fixed;
+  top: 50%;
+  right: calc(max(14px, env(safe-area-inset-right)) + 70px);
+  transform: translateY(-50%);
+  z-index: 650;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(26, 26, 46, 0.92);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@keyframes realtime-voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(255, 59, 48, 0.12), 0 8px 28px rgba(255, 59, 48, 0.30); }
+  50% { box-shadow: 0 0 0 11px rgba(255, 59, 48, 0.04), 0 8px 32px rgba(255, 59, 48, 0.42); }
+}
+
+/* ── Realtime dialogue transcript ── */
+.dialogues-panel {
+  padding: 16px 14px 100px;
+}
+.dialogues-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.dialogues-header h2 { color: #1a1a2e; font-size: 22px; }
+.dialogues-header p { margin-top: 4px; color: #777; font-size: 12px; }
+.dialogues-close {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #555;
+  font-size: 25px;
+  cursor: pointer;
+}
+.dialogues-list { display: grid; gap: 12px; }
+.dialogue-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.dialogue-card h3 { margin-bottom: 10px; color: #777; font-size: 12px; }
+.dialogue-message {
+  margin-top: 7px;
+  color: #252634;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.dialogue-message.user strong { color: #007aff; }
+.dialogue-message.assistant strong { color: #7b3ff2; }
+.dialogue-message.tool strong { color: #1b8f4b; }
+.dialogue-message.system { color: #a14b00; }
+.dialogues-empty { padding: 48px 16px; color: #888; text-align: center; }
+#app-root[data-dialogues-open="true"] #list-container,
+#app-root[data-dialogues-open="true"] #action-log-panel,
+#app-root[data-dialogues-open="true"] #add-btn { display: none !important; }
+
 /* ── Modal ── */
 .modal-overlay {
   position: fixed; inset: 0;
@@ -460,6 +561,8 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 }
 .settings-panel {
   width: 100%;
+  max-height: min(86vh, 720px);
+  overflow-y: auto;
   background: #fff;
   border-radius: 20px 20px 0 0;
   padding: 16px 18px 28px;
@@ -479,6 +582,25 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 18px;
   font-weight: 800;
 }
+.settings-section h3 {
+  margin-bottom: 7px;
+  color: #1a1a2e;
+  font-size: 15px;
+  font-weight: 850;
+}
+.settings-section-secondary {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #ececf1;
+}
+.settings-help {
+  margin-bottom: 11px;
+  color: #777;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.settings-field[hidden],
+.settings-primary[hidden] { display: none; }
 .settings-close {
   width: 36px;
   height: 36px;
@@ -528,6 +650,8 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 13px;
   font-weight: 700;
 }
+.settings-status.success { color: #1b8f4b; }
+.settings-status.error { color: #b42318; }
 
 /* ── Fullscreen task page ── */
 .task-page {
@@ -712,6 +836,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
 	    <h1>Мой список</h1>
 	    <button id="settings-btn" class="icon-header-btn" type="button" aria-label="Настройки" title="Настройки">⚙</button>
+	    <button id="dialogues-tab-btn" class="header-tab-btn" type="button" aria-pressed="false">Диалоги</button>
 	    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
 	    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
@@ -725,8 +850,23 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
     <div id="action-log-list"></div>
   </section>
 
+  <section id="dialogues-panel" class="dialogues-panel" hidden aria-label="Диалоги">
+    <div class="dialogues-header">
+      <div>
+        <h2>Диалоги</h2>
+        <p>Текст голосовых сессий хранится только в этом браузере.</p>
+      </div>
+      <button id="dialogues-close" class="dialogues-close" type="button" aria-label="Закрыть диалоги">×</button>
+    </div>
+    <div id="dialogues-list" class="dialogues-list"></div>
+  </section>
+
   <div class="toast" id="toast"></div>
   <button class="add-btn" id="add-btn" aria-label="Добавить задачу">+</button>
+  <div id="realtime-voice-status" class="realtime-voice-status" hidden aria-live="polite"></div>
+  <button id="realtime-voice-btn" class="realtime-voice-btn" type="button" aria-label="Начать голосовой диалог" aria-pressed="false" data-state="idle">
+    <span aria-hidden="true">🎙</span>
+  </button>
 
   <div id="tag-panel" class="swipe-panel"></div>
 
@@ -740,12 +880,25 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	        <h2>Настройки</h2>
 	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
 	      </div>
+	      <section class="settings-section" aria-labelledby="openai-key-heading">
+	        <h3 id="openai-key-heading">OpenAI Realtime</h3>
+	        <p class="settings-help">Ключ сохраняется на сервере для голосового агента и никогда не показывается после сохранения.</p>
+	        <label class="settings-field" id="openai-key-field">
+	          <span>OpenAI API key</span>
+	          <input type="password" id="openai-key-input" placeholder="sk-…" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="openai-key-save" class="settings-primary" type="button">Сохранить ключ на сервере</button>
+	        <div id="openai-key-status" class="settings-status" aria-live="polite"></div>
+	      </section>
+	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
+	        <h3 id="workflowy-heading">Workflowy</h3>
 	      <label class="settings-field">
-	        <span>Workflowy</span>
+	        <span>Ссылка для импорта</span>
 	        <input type="url" id="workflowy-url-input" placeholder="https://workflowy.com/s/task-tree/..." inputmode="url">
 	      </label>
 	      <button id="workflowy-import-btn" class="settings-primary" type="button">Импорт</button>
 	      <div id="workflowy-import-status" class="settings-status" aria-live="polite"></div>
+	      </section>
 	    </section>
 	  </div>
 
@@ -1107,6 +1260,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       getState() {
         return state;
       },
+      dispatchUserInput,
       onLogEntriesChange(nextActionLog) {
         refreshState(snapshotState, nextActionLog);
         render();
@@ -1152,6 +1306,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     const nextSeqKey = `voicelist.nextSeq.${clientKey}`;
     const stateHandlers = /* @__PURE__ */ new Set();
     const ackHandlers = /* @__PURE__ */ new Set();
+    const ackWaiters = /* @__PURE__ */ new Map();
     let socket = null;
     let knownRev = 0;
     let connectPromise = null;
@@ -1191,6 +1346,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         firstStateResolve = null;
       } else if (message.type === "ack" && message.ack) {
         if (message.ack.status === "applied") removePending(message.ack.seq);
+        const waiter = ackWaiters.get(message.ack.seq);
+        if (waiter) {
+          clearTimeoutFn(waiter.timeoutId);
+          ackWaiters.delete(message.ack.seq);
+          waiter.resolve(message.ack);
+        }
         for (const handler of ackHandlers) handler(message.ack);
       }
     }
@@ -1246,15 +1407,33 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       }
       return connectPromise;
     }
-    async function sendCommand(input) {
+    function queueCommand(input) {
+      const seq = nextSeq();
       const message = {
         type: "command",
         clientKey,
-        seq: nextSeq(),
+        seq,
         input
       };
       writePending([...readPending(), message]);
+      return message;
+    }
+    function sendCommand(input) {
+      const message = queueCommand(input);
       sendRaw(message);
+      return message.seq;
+    }
+    function sendCommandAndWait(input, { timeoutMs = 1e4 } = {}) {
+      const message = queueCommand(input);
+      const result = new Promise((resolve2, reject) => {
+        const timeoutId = setTimeoutFn(() => {
+          ackWaiters.delete(message.seq);
+          reject(new Error("Timed out waiting for task update"));
+        }, timeoutMs);
+        ackWaiters.set(message.seq, { resolve: resolve2, reject, timeoutId });
+      });
+      sendRaw(message);
+      return result;
     }
     async function sendUtterance({ target, transcript }) {
       const message = {
@@ -1278,6 +1457,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         return () => stateHandlers.delete(handler);
       },
       sendCommand,
+      sendCommandAndWait,
       sendUtterance
     };
   }
@@ -1504,6 +1684,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
   }
   function buildLabel(command, payload = {}) {
     if (command === "addItem") return `\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
+    if (command === "addChild" && payload.status === "Info") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F: ${payload.line1}`;
     if (command === "addChild") return `\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
     if (command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441 \u0438\u0437\u043C\u0435\u043D\u0451\u043D: ${payload.status}`;
     if (command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
@@ -1637,7 +1818,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
             id: createItemId(existingIds, input),
             parentId: input.actId,
             order: nextOrder(nextItems, input.actId),
-            status: "Open",
+            status: STATUS_VALUES.has(payload.status) ? payload.status : "Open",
             line1: payload.line1,
             line2: payload.line2 || "",
             collapsed: false,
@@ -1647,7 +1828,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           if (item) {
             item.line1 = payload.line1;
-            item.line2 = payload.line2 || "";
+            if ("line2" in payload) item.line2 = payload.line2 || "";
           }
         } else if (input.command === "setStatus") {
           const item = nextItems.find((candidate) => candidate.id === input.actId);
@@ -2127,6 +2308,594 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       if (typeof onRendered === "function") onRendered(state, viewMode);
     }
     return { render };
+  }
+
+  // src/realtime-voice-agent.js
+  var DIALOGUES_STORAGE_KEY = "voicelist.realtime-dialogues.v1";
+  var OPENAI_KEY_STATUS_ENDPOINT = "/api/realtime/key/status";
+  var OPENAI_KEY_SETUP_ENDPOINT = "/api/realtime/key";
+  var MAX_DIALOGUES = 30;
+  var MAX_MESSAGES_PER_DIALOGUE = 240;
+  var TOOL_RESULT_REPLY_INSTRUCTIONS = [
+    "The task operation result is now available in the function_call_output.",
+    "Do not continue any previous sentence.",
+    "Answer only from that result, in one short Russian sentence."
+  ].join(" ");
+  var ALLOWED_STATUSES = /* @__PURE__ */ new Set(["Open", "Focus", "Pause", "Done", "Archive", "Info"]);
+  function parseStoredDialogues(storage) {
+    try {
+      const value = JSON.parse(storage.getItem(DIALOGUES_STORAGE_KEY) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+  function isoNow(now) {
+    const value = now();
+    return (value instanceof Date ? value : new Date(value)).toISOString();
+  }
+  function persistDialogues(storage, dialogues) {
+    storage.setItem(DIALOGUES_STORAGE_KEY, JSON.stringify(dialogues.slice(0, MAX_DIALOGUES)));
+  }
+  function createDialogueRepository({
+    storage,
+    now = () => /* @__PURE__ */ new Date(),
+    createId = () => crypto.randomUUID()
+  }) {
+    let dialogues = parseStoredDialogues(storage);
+    function update(id, updater) {
+      dialogues = dialogues.map((dialogue) => dialogue.id === id ? updater(dialogue) : dialogue);
+      persistDialogues(storage, dialogues);
+    }
+    return {
+      start() {
+        const dialogue = {
+          id: createId(),
+          startedAt: isoNow(now),
+          endedAt: null,
+          messages: []
+        };
+        dialogues = [dialogue, ...dialogues].slice(0, MAX_DIALOGUES);
+        persistDialogues(storage, dialogues);
+        return dialogue.id;
+      },
+      append(dialogueId, { role, text, eventId = null }) {
+        const cleanText = String(text || "").trim();
+        if (!cleanText) return;
+        const messageAt = isoNow(now);
+        update(dialogueId, (dialogue) => {
+          if (eventId && dialogue.messages.some((message) => message.eventId === eventId)) return dialogue;
+          const lastMessage = dialogue.messages.at(-1);
+          if (lastMessage?.role === role && lastMessage.text === cleanText && Math.abs(new Date(lastMessage.at).getTime() - new Date(messageAt).getTime()) < 2e3) {
+            return dialogue;
+          }
+          return {
+            ...dialogue,
+            messages: [...dialogue.messages, {
+              id: createId(),
+              eventId,
+              at: messageAt,
+              role,
+              text: cleanText
+            }].slice(-MAX_MESSAGES_PER_DIALOGUE)
+          };
+        });
+      },
+      finish(dialogueId) {
+        update(dialogueId, (dialogue) => ({ ...dialogue, endedAt: dialogue.endedAt || isoNow(now) }));
+      },
+      list() {
+        return structuredClone(dialogues);
+      }
+    };
+  }
+  function taskTreeFromState(state) {
+    const items = state?.snapshot?.items;
+    if (!Array.isArray(items)) return [];
+    const nodes = /* @__PURE__ */ new Map();
+    for (const item of items) {
+      const id = String(item?.id || "");
+      if (!id) continue;
+      nodes.set(id, {
+        id,
+        title: String(item?.line1 || ""),
+        status: String(item?.status || "Open"),
+        children: []
+      });
+    }
+    const roots = [];
+    for (const item of items) {
+      const id = String(item?.id || "");
+      const node = nodes.get(id);
+      if (!node) continue;
+      const parent = item?.parentId == null ? null : nodes.get(String(item.parentId));
+      if (parent) parent.children.push(node);
+      else roots.push(node);
+    }
+    return roots;
+  }
+  function requireText(value, label) {
+    const text = String(value || "").trim();
+    if (!text) throw new Error(`${label} is required`);
+    return text;
+  }
+  function withTranscript(input, transcript) {
+    const cleanTranscript = String(transcript || "").trim();
+    return cleanTranscript ? { ...input, transcript: cleanTranscript } : input;
+  }
+  function taskInputFromToolCall(name, rawArguments, { transcript = "" } = {}) {
+    let args;
+    try {
+      args = typeof rawArguments === "string" ? JSON.parse(rawArguments || "{}") : rawArguments || {};
+    } catch {
+      throw new Error("Tool arguments are not valid JSON");
+    }
+    if (name === "addItem") {
+      return withTranscript({
+        actId: "list",
+        actType: "list",
+        command: "addItem",
+        payload: { line1: requireText(args.line1, "line1") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "addChild") {
+      return withTranscript({
+        actId: requireText(args.parentId, "parentId"),
+        actType: "task",
+        command: "addChild",
+        payload: { line1: requireText(args.line1, "line1") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "addInfo") {
+      return withTranscript({
+        actId: requireText(args.parentId, "parentId"),
+        actType: "task",
+        command: "addChild",
+        payload: { line1: requireText(args.line1, "line1"), status: "Info" },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "setStatus") {
+      const status = String(args.status || "");
+      if (!ALLOWED_STATUSES.has(status)) throw new Error("Unsupported task status");
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "setStatus",
+        payload: { status },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "editItem") {
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "editItem",
+        payload: { line1: requireText(args.line1, "line1") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "setParent") {
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "setParent",
+        payload: { parentId: args.parentId == null ? null : requireText(args.parentId, "parentId") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    throw new Error(`Unsupported task operation: ${name}`);
+  }
+  function operationLabel(input) {
+    if (input.command === "addItem") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
+    if (input.command === "addChild" && input.payload.status === "Info") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F: ${input.payload.line1}`;
+    if (input.command === "addChild") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
+    if (input.command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441 ${input.actId}: ${input.payload.status}`;
+    if (input.command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}: ${input.payload.line1}`;
+    if (input.command === "setParent") return `\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}`;
+    return input.command;
+  }
+  function roleLabel(role) {
+    if (role === "user") return "\u0412\u044B";
+    if (role === "assistant") return "\u0410\u0433\u0435\u043D\u0442";
+    if (role === "tool") return "\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0435";
+    return "\u0421\u0438\u0441\u0442\u0435\u043C\u0430";
+  }
+  function formatStartedAt(value) {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(value));
+  }
+  function openAISetupTokenFromHash(hash) {
+    return new URLSearchParams(String(hash || "").replace(/^#/, "")).get("openai-setup") || "";
+  }
+  function createRealtimeVoiceAgent({
+    voiceButton,
+    voiceStatus,
+    dialoguesButton,
+    dialoguesPanel,
+    dialoguesList,
+    dialoguesClose,
+    openAIKeyInput,
+    openAIKeyField,
+    openAIKeySaveButton,
+    openAIKeyStatus,
+    settingsOverlay,
+    rootPanel,
+    navigationButtons = [],
+    getTaskState,
+    executeTaskCommand,
+    endpoint = "/api/realtime/session",
+    keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
+    keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
+    fetchImpl = fetch,
+    mediaDevices = navigator.mediaDevices,
+    RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
+    documentLike = document,
+    windowLike = globalThis.window,
+    storage = localStorage,
+    locationLike = globalThis.location,
+    historyLike = globalThis.history,
+    now = () => /* @__PURE__ */ new Date(),
+    createId = () => crypto.randomUUID(),
+    AbortControllerCtor = globalThis.AbortController
+  }) {
+    const repository = createDialogueRepository({ storage, now, createId });
+    let active = null;
+    let keyConfigured = null;
+    let setupAvailable = false;
+    let setupToken = openAISetupTokenFromHash(locationLike?.hash);
+    function setKeyStatus(message, tone = "") {
+      if (!openAIKeyStatus) return;
+      openAIKeyStatus.textContent = message;
+      openAIKeyStatus.classList.toggle("success", tone === "success");
+      openAIKeyStatus.classList.toggle("error", tone === "error");
+    }
+    function renderKeySettings() {
+      if (!openAIKeyInput || !openAIKeySaveButton) return;
+      const locked = keyConfigured === true;
+      if (openAIKeyField) openAIKeyField.hidden = locked;
+      openAIKeySaveButton.hidden = locked;
+      openAIKeySaveButton.disabled = !setupToken || !setupAvailable;
+      if (locked) setKeyStatus("\u041A\u043B\u044E\u0447 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0438 \u0433\u043E\u0442\u043E\u0432 \u043A \u0440\u0430\u0431\u043E\u0442\u0435.", "success");
+      else if (setupToken && setupAvailable) setKeyStatus("\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u043B\u044E\u0447 OpenAI. \u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043E\u0434\u0438\u043D \u0440\u0430\u0437.");
+      else if (keyConfigured === false) setKeyStatus("\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043A\u043B\u044E\u0447\u0430.", "error");
+    }
+    function openKeySettings() {
+      settingsOverlay?.classList.add("open");
+      settingsOverlay?.setAttribute("aria-hidden", "false");
+      renderKeySettings();
+      if (keyConfigured !== true) openAIKeyInput?.focus();
+    }
+    function removeSetupTokenFromAddress() {
+      if (!locationLike || !historyLike?.replaceState) return;
+      const params = new URLSearchParams(String(locationLike.hash || "").replace(/^#/, ""));
+      params.delete("openai-setup");
+      const hash = params.toString();
+      historyLike.replaceState(null, "", `${locationLike.pathname || "/"}${locationLike.search || ""}${hash ? `#${hash}` : ""}`);
+    }
+    async function refreshKeyStatus() {
+      try {
+        const response = await fetchImpl(keyStatusEndpoint, { headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const status = await response.json();
+        keyConfigured = Boolean(status.configured);
+        setupAvailable = Boolean(status.setupAvailable);
+        renderKeySettings();
+        if (setupToken && !keyConfigured) openKeySettings();
+      } catch {
+      }
+    }
+    async function saveOpenAIKey() {
+      const apiKey = String(openAIKeyInput?.value || "").trim();
+      if (!apiKey.startsWith("sk-") || apiKey.length < 20 || /\s/.test(apiKey)) {
+        setKeyStatus("\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043A\u043B\u044E\u0447: \u043E\u043D \u0434\u043E\u043B\u0436\u0435\u043D \u043D\u0430\u0447\u0438\u043D\u0430\u0442\u044C\u0441\u044F \u0441 sk-.", "error");
+        return;
+      }
+      if (!setupToken || !setupAvailable) {
+        setKeyStatus("\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0430.", "error");
+        return;
+      }
+      openAIKeySaveButton.disabled = true;
+      setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E \u043A\u043B\u044E\u0447 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435\u2026");
+      try {
+        const response = await fetchImpl(keySetupEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey, setupToken })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        openAIKeyInput.value = "";
+        keyConfigured = true;
+        setupAvailable = false;
+        setupToken = "";
+        removeSetupTokenFromAddress();
+        renderKeySettings();
+      } catch (error) {
+        setKeyStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u043B\u044E\u0447.", "error");
+        openAIKeySaveButton.disabled = false;
+      }
+    }
+    function renderDialogues() {
+      dialoguesList.replaceChildren();
+      const dialogues = repository.list();
+      if (!dialogues.length) {
+        const empty = documentLike.createElement("p");
+        empty.className = "dialogues-empty";
+        empty.textContent = "\u0417\u0434\u0435\u0441\u044C \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0440\u0430\u0441\u0448\u0438\u0444\u0440\u043E\u0432\u043A\u0438 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u044B\u0445 \u0441\u0435\u0441\u0441\u0438\u0439.";
+        dialoguesList.append(empty);
+        return;
+      }
+      for (const dialogue of dialogues) {
+        const card = documentLike.createElement("article");
+        card.className = "dialogue-card";
+        const heading = documentLike.createElement("h3");
+        heading.textContent = formatStartedAt(dialogue.startedAt);
+        card.append(heading);
+        if (!dialogue.messages.length) {
+          const empty = documentLike.createElement("p");
+          empty.className = "dialogue-message system";
+          empty.textContent = "\u041D\u0435\u0442 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u043D\u044B\u0445 \u0440\u0435\u043F\u043B\u0438\u043A.";
+          card.append(empty);
+        }
+        for (const message of dialogue.messages) {
+          const row = documentLike.createElement("p");
+          row.className = `dialogue-message ${message.role}`;
+          const label = documentLike.createElement("strong");
+          label.textContent = `${roleLabel(message.role)}: `;
+          row.append(label, documentLike.createTextNode(message.text));
+          card.append(row);
+        }
+        dialoguesList.append(card);
+      }
+    }
+    function setDialoguesOpen(open) {
+      rootPanel.dataset.dialoguesOpen = open ? "true" : "false";
+      dialoguesPanel.hidden = !open;
+      dialoguesButton.classList.toggle("active", open);
+      dialoguesButton.setAttribute("aria-pressed", String(open));
+      if (open) renderDialogues();
+    }
+    function setVoiceState(state, message) {
+      voiceButton.dataset.state = state;
+      voiceButton.setAttribute("aria-pressed", String(state === "active" || state === "connecting"));
+      voiceButton.setAttribute("aria-label", state === "idle" ? "\u041D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433" : "\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
+      voiceStatus.textContent = message || "";
+      voiceStatus.hidden = !message;
+    }
+    function append(role, text, eventId = null) {
+      if (!active) return;
+      repository.append(active.dialogueId, { role, text, eventId });
+      if (rootPanel.dataset.dialoguesOpen === "true") renderDialogues();
+    }
+    function clientEventId(prefix) {
+      return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    function sendRealtimeEvent(session, event, { ignoreError = false } = {}) {
+      if (session.channel?.readyState !== "open") return false;
+      if (ignoreError && event.event_id) session.ignoredErrorEventIds.add(event.event_id);
+      session.channel.send(JSON.stringify(event));
+      return true;
+    }
+    function cancelRealtimeSpeech(session) {
+      sendRealtimeEvent(session, { type: "response.cancel", event_id: clientEventId("cancel-tool") }, { ignoreError: true });
+      sendRealtimeEvent(session, { type: "output_audio_buffer.clear", event_id: clientEventId("clear-tool-audio") }, { ignoreError: true });
+    }
+    async function handleToolCall(item) {
+      const session = active;
+      if (!session || session.toolCalls.has(item.call_id)) return;
+      session.toolCalls.add(item.call_id);
+      let output;
+      let applied = false;
+      try {
+        const input = taskInputFromToolCall(item.name, item.arguments, {
+          transcript: session.latestUserTranscript
+        });
+        const ack = await executeTaskCommand(input);
+        if (ack?.status && ack.status !== "applied") throw new Error(ack.reason || "Task operation was rejected");
+        repository.append(session.dialogueId, {
+          role: "tool",
+          text: `Tool ${item.name}(${item.arguments || "{}"}): ${operationLabel(input)}`,
+          eventId: `tool-${item.call_id}`
+        });
+        output = { status: "applied", operation: input.command, target: ack?.newTarget || input.actId };
+        applied = true;
+      } catch (error) {
+        repository.append(session.dialogueId, {
+          role: "system",
+          text: `\u041E\u0448\u0438\u0431\u043A\u0430 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0434\u0430\u0447\u0438: ${error.message}`,
+          eventId: `tool-error-${item.call_id}`
+        });
+        output = { status: "rejected", reason: error.message };
+      }
+      if (rootPanel.dataset.dialoguesOpen === "true") renderDialogues();
+      if (active !== session || session.channel?.readyState !== "open") return;
+      if (applied) cancelRealtimeSpeech(session);
+      sendRealtimeEvent(session, {
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: item.call_id,
+          output: JSON.stringify(output)
+        }
+      });
+      sendRealtimeEvent(session, {
+        type: "response.create",
+        response: {
+          instructions: TOOL_RESULT_REPLY_INSTRUCTIONS
+        }
+      });
+    }
+    function transcriptFromAssistantItem(item) {
+      if (item?.type !== "message" || item?.role !== "assistant" || !Array.isArray(item.content)) return "";
+      return item.content.map((part) => part.transcript || part.text || "").filter(Boolean).join(" ").trim();
+    }
+    async function handleRealtimeEvent(event) {
+      if (!active || !event?.type) return;
+      if (event.type === "conversation.item.input_audio_transcription.completed") {
+        active.latestUserTranscript = String(event.transcript || "").trim();
+        append("user", event.transcript, event.event_id || `user-${event.item_id || event.content_index || ""}`);
+        return;
+      }
+      if (event.type === "response.output_audio_transcript.done" || event.type === "response.audio_transcript.done" || event.type === "response.output_text.done") {
+        append("assistant", event.transcript || event.text, event.event_id || `assistant-${event.response_id || ""}-${event.output_index || 0}`);
+        return;
+      }
+      if (event.type === "response.output_item.done") {
+        if (event.item?.type === "function_call") {
+          await handleToolCall(event.item);
+          return;
+        }
+        const transcript = transcriptFromAssistantItem(event.item);
+        append("assistant", transcript, event.event_id || `assistant-item-${event.item?.id || ""}`);
+        return;
+      }
+      if (event.type === "error") {
+        const clientEventId2 = event.error?.event_id || event.event_id || null;
+        if (clientEventId2 && active.ignoredErrorEventIds.delete(clientEventId2)) return;
+        append("system", event.error?.message || "\u041E\u0448\u0438\u0431\u043A\u0430 OpenAI Realtime", event.event_id || null);
+      }
+    }
+    function cleanupVoiceSession(session) {
+      session.abortController?.abort();
+      try {
+        session.channel?.close();
+      } catch {
+      }
+      try {
+        session.peerConnection?.close();
+      } catch {
+      }
+      for (const track of session.mediaStream?.getTracks?.() || []) track.stop();
+      if (session.audioElement) {
+        session.audioElement.srcObject = null;
+        session.audioElement.remove();
+      }
+    }
+    function stopVoice() {
+      const session = active;
+      if (!session) return;
+      active = null;
+      cleanupVoiceSession(session);
+      repository.finish(session.dialogueId);
+      renderDialogues();
+      setVoiceState("idle", "");
+    }
+    async function startVoice() {
+      const dialogueId = repository.start();
+      const session = {
+        dialogueId,
+        abortController: new AbortControllerCtor(),
+        peerConnection: null,
+        mediaStream: null,
+        audioElement: null,
+        channel: null,
+        ignoredErrorEventIds: /* @__PURE__ */ new Set(),
+        toolCalls: /* @__PURE__ */ new Set(),
+        latestUserTranscript: ""
+      };
+      active = session;
+      renderDialogues();
+      setVoiceState("connecting", "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u2026");
+      try {
+        if (!RTCPeerConnectionCtor || !mediaDevices?.getUserMedia) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
+        session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
+        if (active !== session) return cleanupVoiceSession(session);
+        const pc = new RTCPeerConnectionCtor();
+        session.peerConnection = pc;
+        const audio = documentLike.createElement("audio");
+        audio.autoplay = true;
+        audio.playsInline = true;
+        audio.hidden = true;
+        documentLike.body.append(audio);
+        session.audioElement = audio;
+        pc.ontrack = (event) => {
+          audio.srcObject = event.streams[0];
+        };
+        for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
+        const channel = pc.createDataChannel("oai-events");
+        session.channel = channel;
+        channel.addEventListener("open", () => {
+          if (active === session) setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
+        });
+        channel.addEventListener("message", (message) => {
+          try {
+            void handleRealtimeEvent(JSON.parse(message.data));
+          } catch {
+            append("system", "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \u043D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u043E\u0435 \u0441\u043E\u0431\u044B\u0442\u0438\u0435 Realtime");
+          }
+        });
+        channel.addEventListener("close", () => {
+          if (active === session) stopVoice();
+        });
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        const response = await fetchImpl(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sdp: offer.sdp,
+            taskTree: taskTreeFromState(getTaskState())
+          }),
+          signal: session.abortController.signal
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.error || `Realtime HTTP ${response.status}`);
+        }
+        await pc.setRemoteDescription({ type: "answer", sdp: await response.text() });
+        if (active === session && channel.readyState === "open") setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
+      } catch (error) {
+        if (active !== session || error.name === "AbortError") return;
+        append("system", error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
+        stopVoice();
+        setVoiceState("error", "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F");
+      }
+    }
+    voiceButton.addEventListener("click", () => {
+      if (active) stopVoice();
+      else if (keyConfigured === false) openKeySettings();
+      else void startVoice();
+    });
+    openAIKeySaveButton?.addEventListener("click", () => {
+      void saveOpenAIKey();
+    });
+    openAIKeyInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void saveOpenAIKey();
+      }
+    });
+    dialoguesButton.addEventListener("click", () => {
+      setDialoguesOpen(rootPanel.dataset.dialoguesOpen !== "true");
+    });
+    dialoguesClose.addEventListener("click", () => setDialoguesOpen(false));
+    for (const button of navigationButtons) button?.addEventListener("click", () => setDialoguesOpen(false));
+    documentLike.addEventListener("visibilitychange", () => {
+      if (documentLike.visibilityState === "hidden") stopVoice();
+    });
+    windowLike?.addEventListener("pagehide", () => {
+      stopVoice();
+    });
+    setVoiceState("idle", "");
+    setDialoguesOpen(false);
+    renderDialogues();
+    void refreshKeyStatus();
+    return {
+      renderDialogues,
+      start: startVoice,
+      stop: stopVoice,
+      refreshKeyStatus,
+      openDialogues() {
+        setDialoguesOpen(true);
+      }
+    };
   }
 
   // src/list-store.js
@@ -4272,6 +5041,30 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       }
     });
     await app.init();
+    const executeTaskCommand = documentClient?.sendCommandAndWait ? (input) => documentClient.sendCommandAndWait(input) : async (input) => {
+      await app.dispatchUserInput(input);
+      return { status: "applied", newTarget: input.actId };
+    };
+    window.__realtimeVoiceAgent = createRealtimeVoiceAgent({
+      voiceButton: document.getElementById("realtime-voice-btn"),
+      voiceStatus: document.getElementById("realtime-voice-status"),
+      dialoguesButton: document.getElementById("dialogues-tab-btn"),
+      dialoguesPanel: document.getElementById("dialogues-panel"),
+      dialoguesList: document.getElementById("dialogues-list"),
+      dialoguesClose: document.getElementById("dialogues-close"),
+      openAIKeyInput: document.getElementById("openai-key-input"),
+      openAIKeyField: document.getElementById("openai-key-field"),
+      openAIKeySaveButton: document.getElementById("openai-key-save"),
+      openAIKeyStatus: document.getElementById("openai-key-status"),
+      settingsOverlay: document.getElementById("settings-overlay"),
+      rootPanel: document.getElementById("app-root"),
+      navigationButtons: [
+        document.getElementById("frontier-tab-btn"),
+        document.getElementById("view-toggle-btn")
+      ],
+      getTaskState: () => app.getState(),
+      executeTaskCommand
+    });
   }
   bootstrapListManagerPreview().catch((error) => {
     console.error("Failed to bootstrap list manager", error);

@@ -4,6 +4,7 @@ import { createCloudflareDocumentClient } from './cloudflare-document-client.js'
 import { createInterpreter } from './list-interpreter.js';
 import { createLogStore } from './list-log-store.js';
 import { createRenderer } from './list-renderer.js';
+import { createRealtimeVoiceAgent } from './realtime-voice-agent.js';
 import { createStore } from './list-store.js';
 import { createSync } from './list-sync.js';
 import { createUI } from './list-ui.js';
@@ -122,6 +123,34 @@ async function bootstrapListManagerPreview() {
   });
 
   await app.init();
+
+  const executeTaskCommand = documentClient?.sendCommandAndWait
+    ? (input) => documentClient.sendCommandAndWait(input)
+    : async (input) => {
+        await app.dispatchUserInput(input);
+        return { status: 'applied', newTarget: input.actId };
+      };
+
+  window.__realtimeVoiceAgent = createRealtimeVoiceAgent({
+    voiceButton: document.getElementById('realtime-voice-btn'),
+    voiceStatus: document.getElementById('realtime-voice-status'),
+    dialoguesButton: document.getElementById('dialogues-tab-btn'),
+    dialoguesPanel: document.getElementById('dialogues-panel'),
+    dialoguesList: document.getElementById('dialogues-list'),
+    dialoguesClose: document.getElementById('dialogues-close'),
+    openAIKeyInput: document.getElementById('openai-key-input'),
+    openAIKeyField: document.getElementById('openai-key-field'),
+    openAIKeySaveButton: document.getElementById('openai-key-save'),
+    openAIKeyStatus: document.getElementById('openai-key-status'),
+    settingsOverlay: document.getElementById('settings-overlay'),
+    rootPanel: document.getElementById('app-root'),
+    navigationButtons: [
+      document.getElementById('frontier-tab-btn'),
+      document.getElementById('view-toggle-btn')
+    ],
+    getTaskState: () => app.getState(),
+    executeTaskCommand
+  });
 }
 
 bootstrapListManagerPreview().catch((error) => {

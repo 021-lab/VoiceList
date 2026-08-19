@@ -245,6 +245,245 @@ test('cloudflare mode reconnects after an idle WebSocket close and renders statu
   await expect(taskRow).toContainText('Done');
 });
 
+test('OpenAI Realtime button sends hidden task context, applies a tool call, and persists Dialogues', async ({ page }) => {
+  let sessionRequest = null;
+  let keySetupRequest = null;
+  let keyConfigured = false;
+  await page.addInitScript(() => {
+    window.__realtimeChannels = [];
+    window.__realtimeLifecycle = { channelClosed: 0, peerClosed: 0, tracksStopped: 0 };
+    class FakeDataChannel {
+      constructor() {
+        this.readyState = 'connecting';
+        this.listeners = {};
+        this.sent = [];
+        window.__realtimeChannels.push(this);
+      }
+      addEventListener(type, handler) {
+        this.listeners[type] ||= [];
+        this.listeners[type].push(handler);
+      }
+      emit(type, payload = {}) {
+        for (const handler of this.listeners[type] || []) handler(payload);
+      }
+      send(payload) { this.sent.push(JSON.parse(payload)); }
+      close() {
+        if (this.readyState === 'closed') return;
+        this.readyState = 'closed';
+        window.__realtimeLifecycle.channelClosed += 1;
+        this.emit('close');
+      }
+    }
+    class FakePeerConnection {
+      addTrack() {}
+      createDataChannel() {
+        this.channel = new FakeDataChannel();
+        return this.channel;
+      }
+      async createOffer() { return { type: 'offer', sdp: 'test-offer-sdp' }; }
+      async setLocalDescription() {}
+      async setRemoteDescription() {
+        this.channel.readyState = 'open';
+        this.channel.emit('open');
+      }
+      close() {
+        window.__realtimeLifecycle.peerClosed += 1;
+      }
+    }
+    Object.defineProperty(window, 'RTCPeerConnection', { value: FakePeerConnection, configurable: true });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        async getUserMedia() {
+          return { getTracks: () => [{ stop() { window.__realtimeLifecycle.tracksStopped += 1; } }] };
+        }
+      },
+      configurable: true
+    });
+  });
+  await page.route('**/api/realtime/session', async (route) => {
+    sessionRequest = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: 'application/sdp', body: 'test-answer-sdp' });
+  });
+  await page.route('**/api/realtime/key/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ configured: keyConfigured, setupAvailable: !keyConfigured })
+    });
+  });
+  await page.route('**/api/realtime/key', async (route) => {
+    keySetupRequest = route.request().postDataJSON();
+    keyConfigured = true;
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ configured: true }) });
+  });
+
+  await page.goto('#openai-setup=test-mobile-setup-token-12345678901234567890');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  await expect(page.locator('#realtime-voice-btn')).toBeVisible();
+  await expect(page.locator('#settings-overlay')).toHaveClass(/open/);
+  await page.locator('#openai-key-input').fill('sk-example-mobile-key-1234567890');
+  await page.locator('#openai-key-save').click();
+  await expect(page.locator('#openai-key-status')).toContainText('Ключ сохранён на сервере');
+  expect(keySetupRequest).toEqual({
+    apiKey: 'sk-example-mobile-key-1234567890',
+    setupToken: 'test-mobile-setup-token-12345678901234567890'
+  });
+  expect(new URL(page.url()).hash).toBe('');
+  expect(await page.evaluate(() => `${JSON.stringify(localStorage)}${JSON.stringify(sessionStorage)}`)).not.toContain('sk-example');
+  await page.locator('#settings-close').click();
+
+  const box = await page.locator('#realtime-voice-btn').boundingBox();
+  const viewport = page.viewportSize();
+  expect(box.x + box.width).toBeGreaterThan(viewport.width - 90);
+  expect(Math.abs((box.y + box.height / 2) - viewport.height / 2)).toBeLessThan(8);
+
+  await page.locator('#realtime-voice-btn').click();
+  await expect(page.locator('#realtime-voice-btn')).toHaveAttribute('data-state', 'active');
+  expect(sessionRequest.sdp).toBe('test-offer-sdp');
+  expect(JSON.stringify(sessionRequest.taskTree)).toContain('"id":"milk1"');
+  expect(JSON.stringify(sessionRequest.taskTree)).toContain('"title":"Молоко 3.2%"');
+  expect(JSON.stringify(sessionRequest)).not.toContain('actionLog');
+  expect(JSON.stringify(sessionRequest)).not.toContain('"line2"');
+
+  await page.evaluate(() => {
+    const channel = window.__realtimeChannels.at(-1);
+    channel.emit('message', {
+      data: JSON.stringify({
+        type: 'conversation.item.input_audio_transcription.completed',
+        event_id: 'user-1',
+        transcript: 'Добавь задачу Позвонить маме'
+      })
+    });
+    channel.emit('message', {
+      data: JSON.stringify({
+        type: 'response.output_item.done',
+        event_id: 'tool-1',
+        item: {
+          type: 'function_call',
+          call_id: 'call-1',
+          name: 'addItem',
+          arguments: JSON.stringify({ line1: 'Позвонить маме' })
+        }
+      })
+    });
+  });
+
+  await expect.poll(() => page.evaluate(() => (
+    document.body.textContent.includes('Позвонить маме') &&
+    window.__realtimeChannels.at(-1).sent.map((event) => event.type).join('|')
+  ))).toBe('response.cancel|output_audio_buffer.clear|conversation.item.create|response.create');
+  expect(await page.evaluate(() => (
+    window.__realtimeChannels.at(-1).sent.at(-1).response.instructions
+  ))).toContain('function_call_output');
+
+  await page.evaluate(() => {
+    const channel = window.__realtimeChannels.at(-1);
+    channel.emit('message', {
+      data: JSON.stringify({
+        type: 'response.output_audio_transcript.done',
+        event_id: 'assistant-1',
+        transcript: 'Готово, добавила задачу.'
+      })
+    });
+  });
+
+  await expect(page.locator('#list-container')).toContainText('Позвонить маме');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.locator('#realtime-voice-btn')).toHaveAttribute('data-state', 'idle');
+  await expect.poll(() => page.evaluate(() => window.__realtimeLifecycle)).toEqual({
+    channelClosed: 1,
+    peerClosed: 1,
+    tracksStopped: 1
+  });
+  await page.locator('#dialogues-tab-btn').click();
+  await expect(page.locator('#dialogues-panel')).toBeVisible();
+  await expect(page.locator('#dialogues-list')).toContainText('Добавь задачу Позвонить маме');
+  await expect(page.locator('#dialogues-list')).toContainText('Готово, добавила задачу.');
+  await expect(page.locator('#dialogues-list')).toContainText('Tool addItem');
+  await expect(page.locator('#dialogues-list')).toContainText('Добавлена задача: Позвонить маме');
+
+  await page.reload();
+  await page.locator('#dialogues-tab-btn').click();
+  await expect(page.locator('#dialogues-list')).toContainText('Добавь задачу Позвонить маме');
+});
+
+test('OpenAI Realtime session stops on pagehide teardown', async ({ page }) => {
+  let keyConfigured = true;
+  await page.addInitScript(() => {
+    window.__realtimeLifecycle = { channelClosed: 0, peerClosed: 0, tracksStopped: 0 };
+    class FakeDataChannel {
+      constructor() {
+        this.readyState = 'connecting';
+        this.listeners = {};
+      }
+      addEventListener(type, handler) {
+        this.listeners[type] ||= [];
+        this.listeners[type].push(handler);
+      }
+      emit(type, payload = {}) {
+        for (const handler of this.listeners[type] || []) handler(payload);
+      }
+      send() {}
+      close() {
+        if (this.readyState === 'closed') return;
+        this.readyState = 'closed';
+        window.__realtimeLifecycle.channelClosed += 1;
+        this.emit('close');
+      }
+    }
+    class FakePeerConnection {
+      addTrack() {}
+      createDataChannel() {
+        this.channel = new FakeDataChannel();
+        return this.channel;
+      }
+      async createOffer() { return { type: 'offer', sdp: 'pagehide-offer-sdp' }; }
+      async setLocalDescription() {}
+      async setRemoteDescription() {
+        this.channel.readyState = 'open';
+        this.channel.emit('open');
+      }
+      close() {
+        window.__realtimeLifecycle.peerClosed += 1;
+      }
+    }
+    Object.defineProperty(window, 'RTCPeerConnection', { value: FakePeerConnection, configurable: true });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        async getUserMedia() {
+          return { getTracks: () => [{ stop() { window.__realtimeLifecycle.tracksStopped += 1; } }] };
+        }
+      },
+      configurable: true
+    });
+  });
+  await page.route('**/api/realtime/session', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/sdp', body: 'test-answer-sdp' });
+  });
+  await page.route('**/api/realtime/key/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ configured: keyConfigured, setupAvailable: false })
+    });
+  });
+
+  await page.goto('');
+  await page.locator('#realtime-voice-btn').click();
+  await expect(page.locator('#realtime-voice-btn')).toHaveAttribute('data-state', 'active');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  await expect(page.locator('#realtime-voice-btn')).toHaveAttribute('data-state', 'idle');
+  await expect.poll(() => page.evaluate(() => window.__realtimeLifecycle)).toEqual({
+    channelClosed: 1,
+    peerClosed: 1,
+    tracksStopped: 1
+  });
+});
+
 test('preview app keeps list drag and left tag gestures when task-list voice is disabled', async ({ page }) => {
   await page.goto('');
   await page.evaluate(() => window.localStorage.clear());

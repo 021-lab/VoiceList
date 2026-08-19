@@ -3,8 +3,13 @@ import { DurableObject } from 'cloudflare:workers';
 import { seedState } from '../list-data.js';
 import { LIST_MANAGER_HTML } from './generated-html.js';
 import { createDocumentCore } from './list-document-core.js';
+import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from './openai-key-setup.js';
+import { handleOpenAIRealtimeSession } from './openai-realtime.js';
+import { taskTreeFromItems } from './task-tree.js';
 
 const STORAGE_KEY = 'voicelist.document.v1';
+const OPENAI_API_KEY_STORAGE_KEY = 'voicelist.openai-api-key.v1';
+const OPENAI_SETUP_USED_STORAGE_KEY = 'voicelist.openai-setup-used.v1';
 
 function json(data, init = {}) {
   return Response.json(data, {
@@ -59,6 +64,28 @@ export class ListDocumentDO extends DurableObject {
     const state = this.core.getSnapshot();
     this.broadcastState(state);
     return state;
+  }
+
+  async getOpenAIApiKey() {
+    return await this.ctx.storage.get(OPENAI_API_KEY_STORAGE_KEY) || '';
+  }
+
+  async isOpenAIKeyConfigured() {
+    return Boolean(await this.getOpenAIApiKey());
+  }
+
+  async getTaskTree() {
+    const core = await this.ensureCore();
+    return taskTreeFromItems(core.getSnapshot().content.snapshot.items);
+  }
+
+  async configureOpenAIApiKey(apiKey) {
+    if (await this.ctx.storage.get(OPENAI_SETUP_USED_STORAGE_KEY)) return false;
+    await this.ctx.storage.put({
+      [OPENAI_API_KEY_STORAGE_KEY]: apiKey,
+      [OPENAI_SETUP_USED_STORAGE_KEY]: true
+    });
+    return true;
   }
 
   broadcastState(state) {
@@ -151,6 +178,30 @@ export default {
 
     if (url.pathname === '/ws') {
       return documentStub(env).fetch(request);
+    }
+
+    if (url.pathname === '/api/realtime/key/status') {
+      const configured = Boolean(env.OPENAI_API_KEY) || await documentStub(env).isOpenAIKeyConfigured();
+      return handleOpenAIKeyStatus({
+        configured,
+        setupAvailable: Boolean(env.OPENAI_SETUP_TOKEN_HASH) && !configured
+      });
+    }
+
+    if (url.pathname === '/api/realtime/key') {
+      return handleOpenAIKeySetup(request, {
+        setupTokenHash: env.OPENAI_SETUP_TOKEN_HASH || '',
+        configureKey: (apiKey) => documentStub(env).configureOpenAIApiKey(apiKey)
+      });
+    }
+
+    if (url.pathname === '/api/realtime/session') {
+      const apiKey = env.OPENAI_API_KEY || await documentStub(env).getOpenAIApiKey();
+      return handleOpenAIRealtimeSession(request, env, { apiKey });
+    }
+
+    if (url.pathname === '/api/tasks/tree.json') {
+      return json({ tasks: await documentStub(env).getTaskTree() });
     }
 
     if (url.pathname === '/reset' && request.method === 'POST') {

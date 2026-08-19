@@ -95,13 +95,14 @@ describe('Cloudflare document client', () => {
     });
     expect(onState).toHaveBeenCalledOnce();
 
-    await client.sendCommand({
+    const seq = await client.sendCommand({
       actId: 'list',
       actType: 'list',
       command: 'addItem',
       payload: { line1: 'Backend task', line2: '' },
       source: 'unit-test'
     });
+    expect(seq).toBe(1);
 
     expect(socket.sent[1]).toMatchObject({
       type: 'command',
@@ -115,6 +116,19 @@ describe('Cloudflare document client', () => {
       }
     });
     expect(socket.sent[1].clientKey).toMatch(/^tab-/);
+
+    const waited = client.sendCommandAndWait({
+      actId: 'milk1',
+      actType: 'task',
+      command: 'setStatus',
+      payload: { status: 'Done' },
+      source: 'unit-test'
+    });
+    socket.message({
+      type: 'ack',
+      ack: { seq: 2, id: 'log-2', status: 'applied', reason: null, newTarget: 'milk1' }
+    });
+    await expect(waited).resolves.toMatchObject({ seq: 2, status: 'applied', newTarget: 'milk1' });
   });
 
   test('reconnects and flushes pending commands after an idle WebSocket close', async () => {

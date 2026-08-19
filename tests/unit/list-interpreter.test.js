@@ -149,6 +149,48 @@ describe('list interpreter', () => {
     expect(result.logEntryDraft.label).toBe('Статус изменён: Info');
   });
 
+  test('creates an information child and preserves details when title-only editing', () => {
+    let nextId = 0;
+    const interpreter = createInterpreter({
+      createItemId: () => `info-${++nextId}`
+    });
+    const state = {
+      snapshot: {
+        items: [
+          { id: 'apple', parentId: null, order: 10, status: 'Open', line1: 'Яблоки', line2: 'old details', collapsed: false, tags: [] }
+        ]
+      },
+      actionLog: []
+    };
+
+    const added = interpreter.execute(state, {
+      actId: 'apple',
+      actType: 'task',
+      command: 'addChild',
+      payload: { line1: 'Сезонные дешевле в сентябре', status: 'Info' },
+      source: 'unit-test'
+    });
+    const infoChild = added.patch[0].value.find((item) => item.id === 'info-1');
+    expect(infoChild).toMatchObject({
+      parentId: 'apple',
+      status: 'Info',
+      line1: 'Сезонные дешевле в сентябре'
+    });
+    expect(added.logEntryDraft.label).toBe('Добавлена информация: Сезонные дешевле в сентябре');
+
+    const edited = interpreter.execute(state, {
+      actId: 'apple',
+      actType: 'task',
+      command: 'editItem',
+      payload: { line1: 'Яблоки сезонные' },
+      source: 'unit-test'
+    });
+    expect(edited.patch[0].value.find((item) => item.id === 'apple')).toMatchObject({
+      line1: 'Яблоки сезонные',
+      line2: 'old details'
+    });
+  });
+
   test('imports a Workflowy tree as Open tasks appended to the list', () => {
     let nextId = 0;
     const interpreter = createInterpreter({

@@ -39,6 +39,7 @@ export function createCloudflareDocumentClient({
   const nextSeqKey = `voicelist.nextSeq.${clientKey}`;
   const stateHandlers = new Set();
   const ackHandlers = new Set();
+  const ackWaiters = new Map();
   let socket = null;
   let knownRev = 0;
   let connectPromise = null;
@@ -85,6 +86,12 @@ export function createCloudflareDocumentClient({
       firstStateResolve = null;
     } else if (message.type === 'ack' && message.ack) {
       if (message.ack.status === 'applied') removePending(message.ack.seq);
+      const waiter = ackWaiters.get(message.ack.seq);
+      if (waiter) {
+        clearTimeoutFn(waiter.timeoutId);
+        ackWaiters.delete(message.ack.seq);
+        waiter.resolve(message.ack);
+      }
       for (const handler of ackHandlers) handler(message.ack);
     }
   }
@@ -148,15 +155,35 @@ export function createCloudflareDocumentClient({
     return connectPromise;
   }
 
-  async function sendCommand(input) {
+  function queueCommand(input) {
+    const seq = nextSeq();
     const message = {
       type: 'command',
       clientKey,
-      seq: nextSeq(),
+      seq,
       input
     };
     writePending([...readPending(), message]);
+    return message;
+  }
+
+  function sendCommand(input) {
+    const message = queueCommand(input);
     sendRaw(message);
+    return message.seq;
+  }
+
+  function sendCommandAndWait(input, { timeoutMs = 10_000 } = {}) {
+    const message = queueCommand(input);
+    const result = new Promise((resolve, reject) => {
+      const timeoutId = setTimeoutFn(() => {
+        ackWaiters.delete(message.seq);
+        reject(new Error('Timed out waiting for task update'));
+      }, timeoutMs);
+      ackWaiters.set(message.seq, { resolve, reject, timeoutId });
+    });
+    sendRaw(message);
+    return result;
   }
 
   async function sendUtterance({ target, transcript }) {
@@ -182,6 +209,7 @@ export function createCloudflareDocumentClient({
       return () => stateHandlers.delete(handler);
     },
     sendCommand,
+    sendCommandAndWait,
     sendUtterance
   };
 }
