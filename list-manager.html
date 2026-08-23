@@ -628,7 +628,20 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 15px;
   outline: none;
 }
-.settings-field input:focus { border-color: #007aff; }
+.settings-field input:focus,
+.settings-field textarea:focus { border-color: #007aff; }
+.settings-field textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #1a1a2e;
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+}
 .settings-primary {
   width: 100%;
   margin-top: 12px;
@@ -889,6 +902,12 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	        </label>
 	        <button id="openai-key-save" class="settings-primary" type="button">Сохранить ключ на сервере</button>
 	        <div id="openai-key-status" class="settings-status" aria-live="polite"></div>
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Системный промпт голосового агента</span>
+	          <textarea id="openai-prompt-input" placeholder="Введите новый системный промпт для realtime-сессии"></textarea>
+	        </label>
+	        <button id="openai-prompt-save" class="settings-primary" type="button">Сохранить промпт на сервере</button>
+	        <div id="openai-prompt-status" class="settings-status" aria-live="polite"></div>
 	      </section>
 	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
 	        <h3 id="workflowy-heading">Workflowy</h3>
@@ -2314,6 +2333,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
   var DIALOGUES_STORAGE_KEY = "voicelist.realtime-dialogues.v1";
   var OPENAI_KEY_STATUS_ENDPOINT = "/api/realtime/key/status";
   var OPENAI_KEY_SETUP_ENDPOINT = "/api/realtime/key";
+  var OPENAI_PROMPT_ENDPOINT = "/api/realtime/prompt";
   var MAX_DIALOGUES = 30;
   var MAX_MESSAGES_PER_DIALOGUE = 240;
   var TOOL_RESULT_REPLY_INSTRUCTIONS = [
@@ -2525,6 +2545,9 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     openAIKeyField,
     openAIKeySaveButton,
     openAIKeyStatus,
+    openAIPromptInput,
+    openAIPromptSaveButton,
+    openAIPromptStatus,
     settingsOverlay,
     rootPanel,
     navigationButtons = [],
@@ -2533,6 +2556,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     endpoint = "/api/realtime/session",
     keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
     keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
+    promptEndpoint = OPENAI_PROMPT_ENDPOINT,
     fetchImpl = fetch,
     mediaDevices = navigator.mediaDevices,
     RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
@@ -2550,11 +2574,18 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     let keyConfigured = null;
     let setupAvailable = false;
     let setupToken = openAISetupTokenFromHash(locationLike?.hash);
+    let promptConfigured = false;
     function setKeyStatus(message, tone = "") {
       if (!openAIKeyStatus) return;
       openAIKeyStatus.textContent = message;
       openAIKeyStatus.classList.toggle("success", tone === "success");
       openAIKeyStatus.classList.toggle("error", tone === "error");
+    }
+    function setPromptStatus(message, tone = "") {
+      if (!openAIPromptStatus) return;
+      openAIPromptStatus.textContent = message;
+      openAIPromptStatus.classList.toggle("success", tone === "success");
+      openAIPromptStatus.classList.toggle("error", tone === "error");
     }
     function renderKeySettings() {
       if (!openAIKeyInput || !openAIKeySaveButton) return;
@@ -2565,6 +2596,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       if (locked) setKeyStatus("\u041A\u043B\u044E\u0447 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0438 \u0433\u043E\u0442\u043E\u0432 \u043A \u0440\u0430\u0431\u043E\u0442\u0435.", "success");
       else if (setupToken && setupAvailable) setKeyStatus("\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u043B\u044E\u0447 OpenAI. \u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043E\u0434\u0438\u043D \u0440\u0430\u0437.");
       else if (keyConfigured === false) setKeyStatus("\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043A\u043B\u044E\u0447\u0430.", "error");
+    }
+    function renderPromptSettings() {
+      if (!openAIPromptInput || !openAIPromptSaveButton) return;
+      openAIPromptSaveButton.disabled = false;
+      setPromptStatus(promptConfigured ? "\u041F\u0440\u043E\u043C\u043F\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435." : "\u0417\u0434\u0435\u0441\u044C \u043C\u043E\u0436\u043D\u043E \u0437\u0430\u0434\u0430\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0430\u0433\u0435\u043D\u0442\u0430.", promptConfigured ? "success" : "");
     }
     function openKeySettings() {
       settingsOverlay?.classList.add("open");
@@ -2588,6 +2624,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         setupAvailable = Boolean(status.setupAvailable);
         renderKeySettings();
         if (setupToken && !keyConfigured) openKeySettings();
+      } catch {
+      }
+    }
+    async function refreshPrompt() {
+      try {
+        const response = await fetchImpl(promptEndpoint, { headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (openAIPromptInput) openAIPromptInput.value = String(data.prompt || "");
+        promptConfigured = true;
+        renderPromptSettings();
       } catch {
       }
     }
@@ -2620,6 +2667,25 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       } catch (error) {
         setKeyStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u043B\u044E\u0447.", "error");
         openAIKeySaveButton.disabled = false;
+      }
+    }
+    async function saveOpenAIPrompt() {
+      const prompt = String(openAIPromptInput?.value || "").trim();
+      openAIPromptSaveButton.disabled = true;
+      setPromptStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435\u2026");
+      try {
+        const response = await fetchImpl(promptEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        promptConfigured = true;
+        renderPromptSettings();
+      } catch (error) {
+        setPromptStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442.", "error");
+        openAIPromptSaveButton.disabled = false;
       }
     }
     function renderDialogues() {
@@ -2866,6 +2932,9 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     openAIKeySaveButton?.addEventListener("click", () => {
       void saveOpenAIKey();
     });
+    openAIPromptSaveButton?.addEventListener("click", () => {
+      void saveOpenAIPrompt();
+    });
     openAIKeyInput?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -2887,6 +2956,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     setDialoguesOpen(false);
     renderDialogues();
     void refreshKeyStatus();
+    void refreshPrompt();
     return {
       renderDialogues,
       start: startVoice,
@@ -5056,6 +5126,9 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       openAIKeyField: document.getElementById("openai-key-field"),
       openAIKeySaveButton: document.getElementById("openai-key-save"),
       openAIKeyStatus: document.getElementById("openai-key-status"),
+      openAIPromptInput: document.getElementById("openai-prompt-input"),
+      openAIPromptSaveButton: document.getElementById("openai-prompt-save"),
+      openAIPromptStatus: document.getElementById("openai-prompt-status"),
       settingsOverlay: document.getElementById("settings-overlay"),
       rootPanel: document.getElementById("app-root"),
       navigationButtons: [

@@ -1,6 +1,7 @@
 export const DIALOGUES_STORAGE_KEY = 'voicelist.realtime-dialogues.v1';
 export const OPENAI_KEY_STATUS_ENDPOINT = '/api/realtime/key/status';
 export const OPENAI_KEY_SETUP_ENDPOINT = '/api/realtime/key';
+export const OPENAI_PROMPT_ENDPOINT = '/api/realtime/prompt';
 
 const MAX_DIALOGUES = 30;
 const MAX_MESSAGES_PER_DIALOGUE = 240;
@@ -246,6 +247,9 @@ export function createRealtimeVoiceAgent({
   openAIKeyField,
   openAIKeySaveButton,
   openAIKeyStatus,
+  openAIPromptInput,
+  openAIPromptSaveButton,
+  openAIPromptStatus,
   settingsOverlay,
   rootPanel,
   navigationButtons = [],
@@ -254,6 +258,7 @@ export function createRealtimeVoiceAgent({
   endpoint = '/api/realtime/session',
   keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
   keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
+  promptEndpoint = OPENAI_PROMPT_ENDPOINT,
   fetchImpl = fetch,
   mediaDevices = navigator.mediaDevices,
   RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
@@ -271,12 +276,20 @@ export function createRealtimeVoiceAgent({
   let keyConfigured = null;
   let setupAvailable = false;
   let setupToken = openAISetupTokenFromHash(locationLike?.hash);
+  let promptConfigured = false;
 
   function setKeyStatus(message, tone = '') {
     if (!openAIKeyStatus) return;
     openAIKeyStatus.textContent = message;
     openAIKeyStatus.classList.toggle('success', tone === 'success');
     openAIKeyStatus.classList.toggle('error', tone === 'error');
+  }
+
+  function setPromptStatus(message, tone = '') {
+    if (!openAIPromptStatus) return;
+    openAIPromptStatus.textContent = message;
+    openAIPromptStatus.classList.toggle('success', tone === 'success');
+    openAIPromptStatus.classList.toggle('error', tone === 'error');
   }
 
   function renderKeySettings() {
@@ -288,6 +301,12 @@ export function createRealtimeVoiceAgent({
     if (locked) setKeyStatus('Ключ сохранён на сервере и готов к работе.', 'success');
     else if (setupToken && setupAvailable) setKeyStatus('Вставьте ключ OpenAI. Ссылка настройки сработает один раз.');
     else if (keyConfigured === false) setKeyStatus('Откройте одноразовую ссылку настройки ключа.', 'error');
+  }
+
+  function renderPromptSettings() {
+    if (!openAIPromptInput || !openAIPromptSaveButton) return;
+    openAIPromptSaveButton.disabled = false;
+    setPromptStatus(promptConfigured ? 'Промпт сохранён на сервере.' : 'Здесь можно задать системный промпт голосового агента.', promptConfigured ? 'success' : '');
   }
 
   function openKeySettings() {
@@ -316,6 +335,18 @@ export function createRealtimeVoiceAgent({
       if (setupToken && !keyConfigured) openKeySettings();
     } catch {
       // Static/local preview can run without the Worker status endpoint.
+    }
+  }
+
+  async function refreshPrompt() {
+    try {
+      const response = await fetchImpl(promptEndpoint, { headers: { Accept: 'application/json' } });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (openAIPromptInput) openAIPromptInput.value = String(data.prompt || '');
+      promptConfigured = true;
+      renderPromptSettings();
+    } catch {
     }
   }
 
@@ -349,6 +380,26 @@ export function createRealtimeVoiceAgent({
     } catch (error) {
       setKeyStatus(error.message || 'Не удалось сохранить ключ.', 'error');
       openAIKeySaveButton.disabled = false;
+    }
+  }
+
+  async function saveOpenAIPrompt() {
+    const prompt = String(openAIPromptInput?.value || '').trim();
+    openAIPromptSaveButton.disabled = true;
+    setPromptStatus('Сохраняю системный промпт на сервере…');
+    try {
+      const response = await fetchImpl(promptEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      promptConfigured = true;
+      renderPromptSettings();
+    } catch (error) {
+      setPromptStatus(error.message || 'Не удалось сохранить системный промпт.', 'error');
+      openAIPromptSaveButton.disabled = false;
     }
   }
 
@@ -611,6 +662,7 @@ export function createRealtimeVoiceAgent({
     else void startVoice();
   });
   openAIKeySaveButton?.addEventListener('click', () => { void saveOpenAIKey(); });
+  openAIPromptSaveButton?.addEventListener('click', () => { void saveOpenAIPrompt(); });
   openAIKeyInput?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -636,6 +688,7 @@ export function createRealtimeVoiceAgent({
   setDialoguesOpen(false);
   renderDialogues();
   void refreshKeyStatus();
+  void refreshPrompt();
 
   return {
     renderDialogues,

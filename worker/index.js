@@ -4,12 +4,13 @@ import { seedState } from '../list-data.js';
 import { LIST_MANAGER_HTML } from './generated-html.js';
 import { createDocumentCore } from './list-document-core.js';
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from './openai-key-setup.js';
-import { handleOpenAIRealtimeSession } from './openai-realtime.js';
+import { getDefaultRealtimeSystemPrompt, handleOpenAIRealtimeSession } from './openai-realtime.js';
 import { taskTreeFromItems } from './task-tree.js';
 
 const STORAGE_KEY = 'voicelist.document.v1';
 const OPENAI_API_KEY_STORAGE_KEY = 'voicelist.openai-api-key.v1';
 const OPENAI_SETUP_USED_STORAGE_KEY = 'voicelist.openai-setup-used.v1';
+const OPENAI_SYSTEM_PROMPT_STORAGE_KEY = 'voicelist.openai-system-prompt.v1';
 
 function json(data, init = {}) {
   return Response.json(data, {
@@ -70,6 +71,10 @@ export class ListDocumentDO extends DurableObject {
     return await this.ctx.storage.get(OPENAI_API_KEY_STORAGE_KEY) || '';
   }
 
+  async getOpenAISystemPrompt() {
+    return await this.ctx.storage.get(OPENAI_SYSTEM_PROMPT_STORAGE_KEY) || '';
+  }
+
   async isOpenAIKeyConfigured() {
     return Boolean(await this.getOpenAIApiKey());
   }
@@ -85,6 +90,12 @@ export class ListDocumentDO extends DurableObject {
       [OPENAI_API_KEY_STORAGE_KEY]: apiKey,
       [OPENAI_SETUP_USED_STORAGE_KEY]: true
     });
+    return true;
+  }
+
+  async configureOpenAISystemPrompt(prompt) {
+    const value = String(prompt || '').trim();
+    await this.ctx.storage.put(OPENAI_SYSTEM_PROMPT_STORAGE_KEY, value);
     return true;
   }
 
@@ -195,9 +206,24 @@ export default {
       });
     }
 
+    if (url.pathname === '/api/realtime/prompt') {
+      if (request.method === 'GET') {
+        const prompt = await documentStub(env).getOpenAISystemPrompt();
+        return json({ prompt: prompt || getDefaultRealtimeSystemPrompt() });
+      }
+      if (request.method === 'POST') {
+        const body = await readRequestJson(request);
+        if (!body || typeof body.prompt !== 'string') return json({ error: 'Invalid prompt' }, { status: 400 });
+        await documentStub(env).configureOpenAISystemPrompt(body.prompt);
+        return json({ configured: true });
+      }
+      return json({ error: 'Method not allowed' }, { status: 405 });
+    }
+
     if (url.pathname === '/api/realtime/session') {
       const apiKey = env.OPENAI_API_KEY || await documentStub(env).getOpenAIApiKey();
-      return handleOpenAIRealtimeSession(request, env, { apiKey });
+      const systemPrompt = await documentStub(env).getOpenAISystemPrompt();
+      return handleOpenAIRealtimeSession(request, env, { apiKey, systemPrompt });
     }
 
     if (url.pathname === '/api/tasks/tree.json') {

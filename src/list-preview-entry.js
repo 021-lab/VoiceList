@@ -142,6 +142,9 @@ async function bootstrapListManagerPreview() {
     openAIKeyField: document.getElementById('openai-key-field'),
     openAIKeySaveButton: document.getElementById('openai-key-save'),
     openAIKeyStatus: document.getElementById('openai-key-status'),
+    openAIPromptInput: document.getElementById('openai-prompt-input'),
+    openAIPromptSaveButton: document.getElementById('openai-prompt-save'),
+    openAIPromptStatus: document.getElementById('openai-prompt-status'),
     settingsOverlay: document.getElementById('settings-overlay'),
     rootPanel: document.getElementById('app-root'),
     navigationButtons: [

@@ -620,7 +620,20 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 15px;
   outline: none;
 }
-.settings-field input:focus { border-color: #007aff; }
+.settings-field input:focus,
+.settings-field textarea:focus { border-color: #007aff; }
+.settings-field textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #1a1a2e;
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+}
 .settings-primary {
   width: 100%;
   margin-top: 12px;

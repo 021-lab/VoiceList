@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   buildRealtimeSessionConfig,
   handleOpenAIRealtimeSession,
+  OPENAI_REALTIME_MODEL,
   TASK_OPERATION_INSTRUCTIONS
 } from '../../worker/openai-realtime.js';
 
@@ -15,7 +16,7 @@ describe('OpenAI Realtime Worker session', () => {
       children: []
     }]);
 
-    expect(config.model).toBe('gpt-realtime-2.1-mini');
+    expect(config.model).toBe(OPENAI_REALTIME_MODEL);
     expect(config.instructions).toContain('Молоко 3.2%');
     expect(config.instructions).toContain('current_task_tree_json');
     expect(config.instructions).toContain('Never read, enumerate, or summarize it automatically');
@@ -43,6 +44,16 @@ describe('OpenAI Realtime Worker session', () => {
     expect(config.tools.flatMap((tool) => Object.keys(tool.parameters.properties))).not.toContain('line2');
     expect(config.tool_choice).toBe('auto');
     expect(config.instructions).not.toContain('deleteItem');
+  });
+
+  test('keeps mandatory VoiceList rules after a saved custom prompt', () => {
+    const config = buildRealtimeSessionConfig([], {
+      systemPrompt: 'Всегда называй себя Помощником.'
+    });
+
+    expect(config.instructions.startsWith('Всегда называй себя Помощником.')).toBe(true);
+    expect(config.instructions).toContain(TASK_OPERATION_INSTRUCTIONS);
+    expect(config.instructions).toContain('current_task_tree_json');
   });
 
   test('proxies SDP and server-owned session configuration without exposing the API key', async () => {
