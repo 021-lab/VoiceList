@@ -1,7 +1,15 @@
 # Realtime Agent Instructions
 
-Generated from `buildRealtimeSessionConfig()` using the current dev task tree from
-`https://vlist-dev.smileme.ai/api/tasks/tree.json`.
+> Generated reference, not a runtime input file. The runtime source is
+> worker/openai-realtime.js. Refresh with npm run docs:realtime whenever
+> the model, instructions, or tools change.
+
+Model: `gpt-realtime-2.1`
+
+## Instructions
+
+The placeholder below is intentional: the browser supplies the current task
+tree when it creates a session. No live development tasks are committed here.
 
 ```text
 You are the Russian-speaking voice interface for VoiceList. Listen first and answer briefly in Russian unless the user switches language.
@@ -63,7 +71,7 @@ When a mutation request is clear, call the matching tool immediately without a s
 </task_operations>
 
 <current_task_tree_json>
-[{"id":"inbox","title":"Входящие","status":"Open","children":[]},{"id":"milk1","title":"Молоко 3.2%","status":"Open","children":[]},{"id":"bread","title":"Хлеб ржаной","status":"Open","children":[{"id":"goldn","title":"Голден","status":"Info","children":[{"id":"rs","title":"Бутылка воды","status":"Open","children":[]},{"id":"rt","title":"Лампочка перегорела","status":"Info","children":[]}]},{"id":"stoli","title":"Столичный","status":"Archive","children":[]}]},{"id":"apple","title":"Яблоки","status":"Focus","children":[{"id":"borod","title":"Бородинский","status":"Open","children":[{"id":"first","title":"Первый позад","status":"Info","children":[]},{"id":"fudji","title":"Яблоки и Голден","status":"Pause","children":[{"id":"pozzd","title":"Позззд","status":"Done","children":[{"id":"voovo","title":"Воовоага","status":"Open","children":[]}]}]}]},{"id":"grnsm","title":"Гренни Смит","status":"Open","children":[{"id":"cofee","title":"Кофе","status":"Open","children":[]}]}]},{"id":"tooth","title":"Зубная пастааоаоа","status":"Open","children":[]},{"id":"shamp","title":"Шампунь","status":"Archive","children":[]}]
+<current task tree is inserted at session start>
 </current_task_tree_json>
 
 When the session begins, stay silent and wait for the user. Do not announce that you loaded the task list.
@@ -71,7 +79,7 @@ When the session begins, stay silent and wait for the user. Do not announce that
 
 ## Tools
 
-Generated from `buildRealtimeSessionConfig().tools`.
+Generated from TASK_OPERATION_TOOLS.
 
 ```json
 [
@@ -223,7 +231,7 @@ Generated from `buildRealtimeSessionConfig().tools`.
 
 ## Tool Choice
 
-Generated from `buildRealtimeSessionConfig().tool_choice`.
+Generated from buildRealtimeSessionConfig().tool_choice.
 
 ```json
 "auto"

@@ -164,11 +164,9 @@ resolve(text, Θ):
 `resolver.js` — эталонный код §§2–4: параметры Θ вынесены в константы в
 шапке файла, экспортируются `queryPatterns` / `buildQuery` (SQL-путь) /
 `findCandidates` (отбор по массиву поллинга) / `resolve` /
-`resolveOverTasks`. `test_resolver.js` прогоняет корпус §5; оба файла
-кладутся в репо как есть (юнит-job CI запускает `node test_resolver.js`).
+`resolveOverTasks`. `tests/voice/test_resolver.js` прогоняет корпус §5.
 
-В этом репозитории оба файла лежат в `src/`; команда CI —
-`node src/test_resolver.js`.
+Команда проверки — `npm run test:voice`.
 
 ## 5. Тестовый корпус (юнит, job 1)
 

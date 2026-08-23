@@ -1,4 +1,10 @@
-# OpenAI Chatbot Prompt for VoiceList Worker
+# External Chatbot Integration Template for VoiceList Worker
+
+> This is an integration template, not a native Worker API contract. This branch
+> does not expose /mcp or an HTTP endpoint named applyTaskCommand. A tool host
+> must provide applyTaskCommand by speaking WebSocket /ws, as described below.
+> Keep this document for external chatbot integrations; do not treat it as
+> runtime documentation for the voice button.
 
 Use this as the chatbot system/developer prompt. It assumes the chatbot has tools
 connected to the VoiceList Worker. The prompt intentionally does not embed the

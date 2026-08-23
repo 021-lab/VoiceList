@@ -1,5 +1,9 @@
 # Задача: голосовое управление списком
 
+> Исторический документ о legacy-голосовом вводе с долгим удержанием.
+> Текущая OpenAI Realtime-кнопка описана в
+> [Voice-Realtime-Button.md](Voice-Realtime-Button.md).
+
 Голос добавляется поверх существующего списка отдельным модулем, который
 формирует команду и передаёт её на исполнение существующему исполнителю.
 
@@ -17,8 +21,8 @@
   принимает `{command, actId, payload}`, возвращает `{patch,
   actionLogEntry}`, а для команд отображения — `viewMode`/`effect`.
   Разбора текста в нём нет.
-- `src/resolver.js` + `src/test_resolver.js` — резолвер цели,
-  `node src/test_resolver.js`, 10/10 PASS.
+- `src/resolver.js` + `tests/voice/test_resolver.js` — резолвер цели,
+  `npm run test:voice`.
 - Интерактивные элементы размечены `agent-action-id`.
 - Голосового ввода нет.
 
@@ -99,7 +103,7 @@
 |---|---|
 | `docs/INPUT_HANDLING_STANDARD.md` | Готов |
 | `docs/TASK_RESOLVER.md` | Готов |
-| `src/resolver.js`, `src/test_resolver.js` | Готовы, 10/10 PASS |
+| `src/resolver.js`, `tests/voice/test_resolver.js` | Готовы |
 | модуль приёма ввода | Жесты, пороги, оверлей |
 | модуль распознавателя `resolveCommands` | Словарь, ранжирование, вызов резолвера цели |
 | адаптер снимка | §3 |
@@ -140,4 +144,4 @@
   одним `undo`.
 - Весь путь пользователя проходится автотестом через поле ввода, без
   синтеза речи.
-- `node src/test_resolver.js` проходит в CI.
+- `npm run test:voice` проходит в CI.

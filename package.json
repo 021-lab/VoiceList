@@ -8,6 +8,7 @@
     "test:voice": "node tests/voice/test_resolver.js && node tests/voice/test_e2e.js",
     "test:gestures": "playwright test tests/e2e/gestures.spec.js",
     "test:e2e": "playwright test",
+    "docs:realtime": "node scripts/generate-realtime-agent-instructions.mjs",
     "prepare-preview": "node scripts/prepare-preview.mjs",
     "build:cloudflare": "npm run prepare-preview && node scripts/prepare-cloudflare-assets.mjs",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
