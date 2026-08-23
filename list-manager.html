@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="mrfy24y0-y3psju">
+<meta name="preview-build-hash" content="gapfix-20260806154849">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -51,6 +51,24 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 #undo-btn:active { background: #e0e0e0; }
 #undo-btn:disabled { opacity: 0.3; pointer-events: none; }
 
+.icon-header-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-header-btn:active { transform: scale(0.96); background: #e0e0e0; }
+
 #view-toggle-btn,
 .header-tab-btn {
   flex-shrink: 0;
@@ -76,7 +94,24 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   color: #fff;
 }
 
+@media (max-width: 720px) {
+  header { gap: 6px; padding-inline: 10px; }
+  header h1 { display: none; }
+  #view-toggle-btn,
+  .header-tab-btn { min-width: 0; padding-inline: 10px; font-size: 12px; }
+}
+
 #list-container { padding: 12px 0 88px; position: relative; }
+
+.search-summary {
+  margin: 0 12px 12px;
+  padding: 10px 12px;
+  border: 1px solid #d8e5ff;
+  background: #ffffff;
+  color: #1f3151;
+  font-size: 13px;
+  font-weight: 800;
+}
 
 .frontier-focus-strip {
   margin: 0 12px 12px;
@@ -201,7 +236,14 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 
 .item-line1 {
   font-size: 16px; font-weight: 600; color: #1a1a2e;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 .item-line2 {
   font-size: 13px; color: #888;
@@ -265,6 +307,100 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   z-index: 200; transition: transform 0.1s, background 0.1s;
 }
 .add-btn:active { transform: scale(0.92); background: #005fcb; }
+
+/* ── OpenAI Realtime voice button ── */
+.realtime-voice-btn {
+  position: fixed;
+  top: 50%;
+  right: max(14px, env(safe-area-inset-right));
+  width: 60px;
+  height: 60px;
+  border: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 27px;
+  box-shadow: 0 8px 28px rgba(26, 26, 46, 0.34);
+  z-index: 650;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.realtime-voice-btn:active { transform: translateY(-50%) scale(0.94); }
+.realtime-voice-btn[data-state="connecting"] { background: #ff9500; }
+.realtime-voice-btn[data-state="active"] {
+  background: #ff3b30;
+  box-shadow: 0 0 0 8px rgba(255, 59, 48, 0.15), 0 8px 28px rgba(255, 59, 48, 0.35);
+  animation: realtime-voice-pulse 1.8s ease-in-out infinite;
+}
+.realtime-voice-btn[data-state="error"] { background: #8e8e93; }
+.realtime-voice-status {
+  position: fixed;
+  top: 50%;
+  right: calc(max(14px, env(safe-area-inset-right)) + 70px);
+  transform: translateY(-50%);
+  z-index: 650;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(26, 26, 46, 0.92);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@keyframes realtime-voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(255, 59, 48, 0.12), 0 8px 28px rgba(255, 59, 48, 0.30); }
+  50% { box-shadow: 0 0 0 11px rgba(255, 59, 48, 0.04), 0 8px 32px rgba(255, 59, 48, 0.42); }
+}
+
+/* ── Realtime dialogue transcript ── */
+.dialogues-panel {
+  padding: 16px 14px 100px;
+}
+.dialogues-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.dialogues-header h2 { color: #1a1a2e; font-size: 22px; }
+.dialogues-header p { margin-top: 4px; color: #777; font-size: 12px; }
+.dialogues-close {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #555;
+  font-size: 25px;
+  cursor: pointer;
+}
+.dialogues-list { display: grid; gap: 12px; }
+.dialogue-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.dialogue-card h3 { margin-bottom: 10px; color: #777; font-size: 12px; }
+.dialogue-message {
+  margin-top: 7px;
+  color: #252634;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.dialogue-message.user strong { color: #007aff; }
+.dialogue-message.assistant strong { color: #7b3ff2; }
+.dialogue-message.tool strong { color: #1b8f4b; }
+.dialogue-message.system { color: #a14b00; }
+.dialogues-empty { padding: 48px 16px; color: #888; text-align: center; }
+#app-root[data-dialogues-open="true"] #list-container,
+#app-root[data-dialogues-open="true"] #action-log-panel,
+#app-root[data-dialogues-open="true"] #add-btn { display: none !important; }
 
 /* ── Modal ── */
 .modal-overlay {
@@ -336,6 +472,199 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 }
 .panel-icon  { width: 28px; font-size: 24px; line-height: 1; text-align: center; }
 .panel-label { font-size: 18px; font-weight: 800; letter-spacing: 0.01em; }
+
+/* ── Voice overlay ── */
+.voice-overlay {
+  position: fixed;
+  left: 50%;
+  top: 12px;
+  width: min(340px, calc(100vw - 32px));
+  transform: translateX(-50%) translateY(18px);
+  z-index: 720;
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(22, 24, 29, 0.94);
+  color: #fff;
+  padding: 14px;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.32);
+  transition: opacity 0.16s, transform 0.16s;
+}
+.voice-overlay.open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.voice-transcript {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.voice-context {
+  margin-top: 6px;
+  color: #b9c7d7;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-stack {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.voice-candidate,
+.voice-cancel {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.72);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.voice-candidate.selected {
+  background: #ffffff;
+  color: #111318;
+}
+.voice-cancel {
+  color: #ffb4a8;
+  background: rgba(255, 126, 102, 0.14);
+  font-size: 12px;
+  font-weight: 800;
+}
+.voice-cancel.selected {
+  background: #ffb4a8;
+  color: #1f2025;
+}
+
+/* ── Settings ── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.36);
+  display: flex;
+  align-items: flex-end;
+  z-index: 680;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+.settings-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+.settings-panel {
+  width: 100%;
+  max-height: min(86vh, 720px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 16px 18px 28px;
+  transform: translateY(100%);
+  transition: transform 0.24s cubic-bezier(.4,0,.2,1);
+}
+.settings-overlay.open .settings-panel { transform: translateY(0); }
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.settings-header h2 {
+  color: #1a1a2e;
+  font-size: 18px;
+  font-weight: 800;
+}
+.settings-section h3 {
+  margin-bottom: 7px;
+  color: #1a1a2e;
+  font-size: 15px;
+  font-weight: 850;
+}
+.settings-section-secondary {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #ececf1;
+}
+.settings-help {
+  margin-bottom: 11px;
+  color: #777;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.settings-field[hidden],
+.settings-primary[hidden] { display: none; }
+.settings-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 24px;
+  line-height: 1;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #555;
+  font-size: 12px;
+  font-weight: 800;
+}
+.settings-field input {
+  width: 100%;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #1a1a2e;
+  font-size: 15px;
+  outline: none;
+}
+.settings-field input:focus,
+.settings-field textarea:focus { border-color: #007aff; }
+.settings-field textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #1a1a2e;
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+}
+.settings-primary {
+  width: 100%;
+  margin-top: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #007aff;
+  color: #fff;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.settings-primary:disabled {
+  opacity: 0.55;
+}
+.settings-status {
+  min-height: 18px;
+  margin-top: 10px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 700;
+}
+.settings-status.success { color: #1b8f4b; }
+.settings-status.error { color: #b42318; }
 
 /* ── Fullscreen task page ── */
 .task-page {
@@ -517,10 +846,12 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 <body>
 <div id="app-root" data-view-mode="list">
   <header>
-    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
-    <h1>Мой список</h1>
-    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
-    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
+	    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
+	    <h1>Мой список</h1>
+	    <button id="settings-btn" class="icon-header-btn" type="button" aria-label="Настройки" title="Настройки">⚙</button>
+	    <button id="dialogues-tab-btn" class="header-tab-btn" type="button" aria-pressed="false">Диалоги</button>
+	    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
+	    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
 
   <div id="list-container"></div>
@@ -532,14 +863,65 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
     <div id="action-log-list"></div>
   </section>
 
+  <section id="dialogues-panel" class="dialogues-panel" hidden aria-label="Диалоги">
+    <div class="dialogues-header">
+      <div>
+        <h2>Диалоги</h2>
+        <p>Текст голосовых сессий хранится только в этом браузере.</p>
+      </div>
+      <button id="dialogues-close" class="dialogues-close" type="button" aria-label="Закрыть диалоги">×</button>
+    </div>
+    <div id="dialogues-list" class="dialogues-list"></div>
+  </section>
+
   <div class="toast" id="toast"></div>
   <button class="add-btn" id="add-btn" aria-label="Добавить задачу">+</button>
+  <div id="realtime-voice-status" class="realtime-voice-status" hidden aria-live="polite"></div>
+  <button id="realtime-voice-btn" class="realtime-voice-btn" type="button" aria-label="Начать голосовой диалог" aria-pressed="false" data-state="idle">
+    <span aria-hidden="true">🎙</span>
+  </button>
 
   <div id="tag-panel" class="swipe-panel"></div>
 
   <div id="drop-zone-panel" class="swipe-panel"></div>
 
-  <section class="task-page" id="task-page" aria-hidden="true">
+	  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
+
+	  <div class="settings-overlay" id="settings-overlay" aria-hidden="true">
+	    <section class="settings-panel" aria-label="Настройки">
+	      <div class="settings-header">
+	        <h2>Настройки</h2>
+	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
+	      </div>
+	      <section class="settings-section" aria-labelledby="openai-key-heading">
+	        <h3 id="openai-key-heading">OpenAI Realtime</h3>
+	        <p class="settings-help">Ключ сохраняется на сервере для голосового агента и никогда не показывается после сохранения.</p>
+	        <label class="settings-field" id="openai-key-field">
+	          <span>OpenAI API key</span>
+	          <input type="password" id="openai-key-input" placeholder="sk-…" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="openai-key-save" class="settings-primary" type="button">Сохранить ключ на сервере</button>
+	        <div id="openai-key-status" class="settings-status" aria-live="polite"></div>
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Системный промпт голосового агента</span>
+	          <textarea id="openai-prompt-input" placeholder="Введите новый системный промпт для realtime-сессии"></textarea>
+	        </label>
+	        <button id="openai-prompt-save" class="settings-primary" type="button">Сохранить промпт на сервере</button>
+	        <div id="openai-prompt-status" class="settings-status" aria-live="polite"></div>
+	      </section>
+	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
+	        <h3 id="workflowy-heading">Workflowy</h3>
+	      <label class="settings-field">
+	        <span>Ссылка для импорта</span>
+	        <input type="url" id="workflowy-url-input" placeholder="https://workflowy.com/s/task-tree/..." inputmode="url">
+	      </label>
+	      <button id="workflowy-import-btn" class="settings-primary" type="button">Импорт</button>
+	      <div id="workflowy-import-status" class="settings-status" aria-live="polite"></div>
+	      </section>
+	    </section>
+	  </div>
+
+	  <section class="task-page" id="task-page" aria-hidden="true">
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
       <h2 id="task-page-title">Задача</h2>
@@ -562,6 +944,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
           <option>Focus</option>
           <option>Archive</option>
           <option>Pause</option>
+          <option>Info</option>
         </select>
       </label>
       <section class="task-page-subtasks">
@@ -594,7 +977,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
+window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
 </script>
 <script>
 (() => {
@@ -621,21 +1004,231 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     actionLog: []
   };
 
+  // src/workflowy-import.js
+  var WORKFLOWY_HOSTS = /* @__PURE__ */ new Set(["workflowy.com", "www.workflowy.com", "beta.workflowy.com"]);
+  var IGNORED_COOKIE_FIELDS = /* @__PURE__ */ new Set(["path", "domain", "expires", "max-age", "samesite", "secure", "httponly"]);
+  function stripHtml(value) {
+    return String(value || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+  }
+  function parseWorkflowyUrl(rawUrl) {
+    const url = new URL(String(rawUrl || "").trim());
+    if (!WORKFLOWY_HOSTS.has(url.hostname)) throw new Error("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0443\u0431\u043B\u0438\u0447\u043D\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 Workflowy");
+    if (!url.pathname.startsWith("/s/")) throw new Error("\u0421\u0441\u044B\u043B\u043A\u0430 Workflowy \u0434\u043E\u043B\u0436\u043D\u0430 \u0432\u0435\u0441\u0442\u0438 \u043D\u0430 shared tree");
+    return url;
+  }
+  function extractShareId(html) {
+    const match = String(html || "").match(/PROJECT_TREE_DATA_URL_PARAMS\s*=\s*({[^;]+})/);
+    if (!match) throw new Error("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0439\u0442\u0438 share_id \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 Workflowy");
+    const data = JSON.parse(match[1]);
+    if (!data.share_id) throw new Error("Workflowy \u043D\u0435 \u0432\u0435\u0440\u043D\u0443\u043B share_id");
+    return data.share_id;
+  }
+  function mergeCookies(currentCookieHeader, setCookieHeader) {
+    if (!setCookieHeader) return currentCookieHeader;
+    const cookies = /* @__PURE__ */ new Map();
+    for (const part of String(currentCookieHeader || "").split(";")) {
+      const trimmed = part.trim();
+      const index = trimmed.indexOf("=");
+      if (index > 0) cookies.set(trimmed.slice(0, index), trimmed.slice(index + 1));
+    }
+    for (const match of String(setCookieHeader).matchAll(/(?:^|,\s*|;\s*)([^=;,\s]+)=([^;,]+)/g)) {
+      const name = match[1].trim();
+      const lower = name.toLowerCase();
+      if (IGNORED_COOKIE_FIELDS.has(lower)) continue;
+      cookies.set(name, match[2].trim());
+    }
+    return [...cookies.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
+  async function readJsonResponse(response, label) {
+    if (!response.ok) throw new Error(`${label}: Workflowy returned ${response.status}`);
+    return response.json();
+  }
+  async function readTextResponse(response, label) {
+    if (!response.ok) throw new Error(`${label}: Workflowy returned ${response.status}`);
+    return response.text();
+  }
+  function workflowyJsonHeaders(cookieHeader, fetchImpl) {
+    const canSetCookie = typeof window === "undefined" || fetchImpl !== globalThis.fetch;
+    return {
+      Accept: "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      ...cookieHeader && canSetCookie ? { Cookie: cookieHeader } : {}
+    };
+  }
+  function renderPlainTextExport(rootProject, treeData) {
+    const rootId = rootProject?.id;
+    const title = stripHtml(rootProject?.nm);
+    if (!rootId || !title) throw new Error("Workflowy tree root is empty");
+    const childrenByParent = /* @__PURE__ */ new Map();
+    for (const item of treeData?.items || []) {
+      if (!item?.id || !item.prnt) continue;
+      if (!childrenByParent.has(item.prnt)) childrenByParent.set(item.prnt, []);
+      childrenByParent.get(item.prnt).push(item);
+    }
+    for (const children of childrenByParent.values()) {
+      children.sort((left, right) => (left.pr || 0) - (right.pr || 0));
+    }
+    const lines = [title, ""];
+    function appendChildren(parentId, depth) {
+      for (const item of childrenByParent.get(parentId) || []) {
+        const itemTitle = stripHtml(item.nm);
+        if (!itemTitle) continue;
+        lines.push(`${"  ".repeat(depth)}- ${itemTitle}`);
+        appendChildren(item.id, depth + 1);
+      }
+    }
+    appendChildren(rootId, 0);
+    return lines.join("\n");
+  }
+  function parseWorkflowyPlainTextExport(text) {
+    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    const firstLineIndex = lines.findIndex((line) => line.trim());
+    if (firstLineIndex < 0) throw new Error("Workflowy export is empty");
+    const root = {
+      title: lines[firstLineIndex].trim(),
+      children: []
+    };
+    const stack = [root];
+    let lastNode = root;
+    for (const line of lines.slice(firstLineIndex + 1)) {
+      if (!line.trim()) continue;
+      const bullet = line.match(/^(\s*)-\s?(.*)$/);
+      if (!bullet) {
+        if (lastNode) lastNode.title = `${lastNode.title} ${line.trim()}`.trim();
+        continue;
+      }
+      const title = bullet[2].trim();
+      if (!title) continue;
+      const level = Math.floor(bullet[1].length / 2) + 1;
+      const parent = stack[level - 1] || root;
+      const node = { title, children: [] };
+      parent.children.push(node);
+      stack[level] = node;
+      stack.length = level + 1;
+      lastNode = node;
+    }
+    return root;
+  }
+  async function loadWorkflowyPlainTextExportFromUrl(rawUrl, { fetchImpl = fetch } = {}) {
+    const shareUrl = parseWorkflowyUrl(rawUrl);
+    let cookieHeader = "";
+    const shareResponse = await fetchImpl(shareUrl.href, { redirect: "follow" });
+    cookieHeader = mergeCookies(cookieHeader, shareResponse.headers?.get?.("set-cookie"));
+    const shareHtml = await readTextResponse(shareResponse, "Workflowy share page");
+    const shareId = extractShareId(shareHtml);
+    const initUrl = new URL("/get_initialization_data", shareUrl.origin);
+    initUrl.searchParams.set("share_id", shareId);
+    initUrl.searchParams.set("client_version", "21");
+    initUrl.searchParams.set("client_version_v2", "28");
+    initUrl.searchParams.set("no_root_children", "1");
+    initUrl.searchParams.set("include_main_tree", "1");
+    const initData = await readJsonResponse(await fetchImpl(initUrl.href, {
+      headers: workflowyJsonHeaders(cookieHeader, fetchImpl),
+      credentials: "include"
+    }), "Workflowy initialization");
+    const rootProject = initData?.projectTreeData?.auxiliaryProjectTreeInfos?.[0]?.rootProject || initData?.projectTreeData?.mainProjectTreeInfo?.rootProject;
+    const operationId = initData?.projectTreeData?.initialMostRecentOperationTransactionId || "0";
+    const treeUrl = new URL("/get_tree_data/", shareUrl.origin);
+    treeUrl.searchParams.set("share_id", shareId);
+    treeUrl.searchParams.set("ot", operationId);
+    const treeData = await readJsonResponse(await fetchImpl(treeUrl.href, {
+      headers: workflowyJsonHeaders(cookieHeader, fetchImpl),
+      credentials: "include"
+    }), "Workflowy tree data");
+    return renderPlainTextExport(rootProject, treeData);
+  }
+  async function importWorkflowyTreeFromUrl(rawUrl, { fetchImpl = fetch } = {}) {
+    const text = await loadWorkflowyPlainTextExportFromUrl(rawUrl, { fetchImpl });
+    return parseWorkflowyPlainTextExport(text);
+  }
+
   // src/list-app.js
-  function createApp({ adapter, interpreter, renderer, store, sync, ui }) {
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+  function createCommentRecord(text) {
+    return {
+      id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      text
+    };
+  }
+  function isLocalUiCommand(input) {
+    return input.command === "showActionLog" || input.command === "showList" || input.command === "showFrontier" || input.command === "showSearch" || input.command === "showAddModal" || input.command === "showEditModal" || input.command === "showNestModal" || input.command === "viewItem";
+  }
+  function unpackServerState(serverState) {
+    if (!serverState?.content) return null;
+    return {
+      snapshot: clone(serverState.content.snapshot || { items: [] }),
+      actionLog: clone(serverState.content.actionLog || [])
+    };
+  }
+  function createApp({ adapter, documentClient = null, interpreter, renderer, store, logStore, sync, ui }) {
     let state = null;
+    let snapshotState = null;
+    let actionLog = [];
     let viewMode = "list";
+    let viewContext = {};
+    function composeState(nextSnapshot = snapshotState, nextActionLog = actionLog) {
+      return {
+        ...clone(nextSnapshot),
+        actionLog: clone(nextActionLog)
+      };
+    }
+    function refreshState(nextSnapshot = snapshotState, nextActionLog = actionLog) {
+      snapshotState = clone(nextSnapshot);
+      actionLog = clone(nextActionLog);
+      state = composeState(snapshotState, actionLog);
+      return state;
+    }
     function render() {
-      renderer.render(state, viewMode);
+      renderer.render(state, viewMode, viewContext);
+    }
+    function applyServerState(serverState) {
+      const unpacked = unpackServerState(serverState);
+      if (!unpacked) return;
+      refreshState({ snapshot: unpacked.snapshot }, unpacked.actionLog);
+      render();
     }
     function handleEffect(effect) {
       if (!effect) return;
       if (effect.type === "modal") ui.openModal(effect.mode, effect.itemId, state);
     }
+    async function appendLogComment(input) {
+      const text = String(input.payload?.text || "").trim();
+      if (!text) return;
+      const updatedEntry = logStore.updateEntry(input.actId, (entry) => ({
+        ...entry,
+        comments: [...entry.comments || [], createCommentRecord(text)],
+        syncStatus: "pending"
+      }));
+      if (!updatedEntry) return;
+      refreshState(snapshotState, logStore.listEntries());
+      render();
+      await sync.enqueueUpdate?.(updatedEntry);
+    }
     async function dispatchUserInput(input) {
+      if (documentClient && !isLocalUiCommand(input)) {
+        await documentClient.sendCommand(input);
+        return;
+      }
+      if (input.command === "importWorkflowy") {
+        const url = String(input.payload?.url || "").trim();
+        const tree = await importWorkflowyTreeFromUrl(url, { fetchImpl: fetch });
+        input = {
+          ...input,
+          command: "importWorkflowyTree",
+          payload: { sourceUrl: url, tree }
+        };
+      }
+      if (input.command === "commentLogEntry") {
+        await appendLogComment(input);
+        return;
+      }
       const result = interpreter.execute(state, input);
       if (result.viewMode) {
         viewMode = result.viewMode;
+        viewContext = result.effect || {};
         render();
         return;
       }
@@ -643,256 +1236,453 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         handleEffect(result.effect);
         return;
       }
-      if (result.patch?.length || result.actionLogEntry) {
-        state = store.applyMutation(result);
+      if (result.patch?.length || result.logEntryDraft) {
+        let persistedLogEntry = null;
+        if (result.logEntryDraft) {
+          persistedLogEntry = logStore.createEntry(result.logEntryDraft);
+          actionLog = logStore.listEntries();
+        }
+        if (result.patch?.length) {
+          snapshotState = store.applyMutation({ patch: result.patch });
+        }
+        refreshState(snapshotState, actionLog);
         render();
-        sync.enqueue(state, result.actionLogEntry);
+        if (persistedLogEntry) await sync.enqueueCreate?.(persistedLogEntry);
       }
     }
     return {
       async init() {
-        state = store.load();
+        if (documentClient) {
+          snapshotState = { snapshot: { items: [] } };
+          actionLog = [];
+          refreshState(snapshotState, actionLog);
+          ui.setDispatch(dispatchUserInput);
+          ui.setGetState(() => state);
+          ui.bindGlobal();
+          documentClient.onState?.(applyServerState);
+          const serverState = await documentClient.connect();
+          if (serverState) applyServerState(serverState);
+          if (!serverState) render();
+          return;
+        }
+        snapshotState = store.load();
+        logStore.importLegacyEntries?.(store.takeLegacyActionLog?.() || []);
+        actionLog = logStore.listEntries();
         const backendState = await adapter.load();
-        if (backendState) state = store.replaceState(backendState);
+        if (backendState) snapshotState = store.replaceState(backendState);
+        refreshState(snapshotState, actionLog);
         ui.setDispatch(dispatchUserInput);
         ui.setGetState(() => state);
         ui.bindGlobal();
         render();
-        sync.start?.(() => state);
       },
       getState() {
         return state;
       },
-      onSyncedState(nextState) {
-        state = nextState;
+      dispatchUserInput,
+      onLogEntriesChange(nextActionLog) {
+        refreshState(snapshotState, nextActionLog);
         render();
       }
     };
   }
 
-  // src/list-backend-adapter.js
-  var firebaseConfig = {
-    apiKey: "AIzaSyBtttOmje8yQvU1mf1-zDbOq5OlBHLt6Ic",
-    projectId: "ai-labg"
-  };
-  var firestoreCollections = Object.freeze({
-    state: "lists",
-    history: "list_state_history",
-    backups: "list_state_backups"
-  });
-  var defaultTarget = Object.freeze({
-    collection: firestoreCollections.state,
-    id: "main"
-  });
-  async function fetchWithTimeout(fetchImpl, url, options, timeoutMs) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  // src/cloudflare-document-client.js
+  function createClientKey(sessionStorage) {
+    const existing = sessionStorage.getItem("voicelist.clientKey");
+    if (existing) return existing;
+    const value = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    sessionStorage.setItem("voicelist.clientKey", value);
+    return value;
+  }
+  function readJson(storage, key, fallback) {
+    const raw = storage.getItem(key);
+    if (!raw) return fallback;
     try {
-      return await fetchImpl(url, {
-        ...options,
-        signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timeoutId);
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
     }
   }
-  function pad(value) {
-    return String(value).padStart(2, "0");
+  function writeJson(storage, key, value) {
+    storage.setItem(key, JSON.stringify(value));
   }
-  function formatMinuteStamp(date) {
-    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  function wsUrl(locationLike) {
+    const protocol = locationLike.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${locationLike.host}/ws`;
   }
-  function formatDayStamp(date) {
-    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
-  }
-  function formatMonthStamp(date) {
-    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}`;
-  }
-  function formatWeekStamp(date) {
-    const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-    const day = utcDate.getUTCDay() || 7;
-    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
-    const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
-    const weekNumber = Math.ceil(((utcDate - yearStart) / 864e5 + 1) / 7);
-    return `${utcDate.getUTCFullYear()}-W${pad(weekNumber)}`;
-  }
-  function buildDocumentUrl(target) {
-    const path = `projects/${firebaseConfig.projectId}/databases/(default)/documents/${target.collection}/${target.id}`;
-    return `https://firestore.googleapis.com/v1/${path}?key=${encodeURIComponent(firebaseConfig.apiKey)}`;
-  }
-  function extractState(snapshotData) {
-    if (!snapshotData || typeof snapshotData !== "object") return null;
-    if (snapshotData.snapshot?.items && Array.isArray(snapshotData.actionLog)) return snapshotData;
-    return null;
-  }
-  function encodeDocument(state, target, metadata) {
-    return {
-      fields: {
-        payload: {
-          stringValue: JSON.stringify({
-            snapshot: state.snapshot,
-            actionLog: state.actionLog
-          })
-        },
-        target: {
-          stringValue: `${target.collection}/${target.id}`
-        },
-        reason: {
-          stringValue: metadata.reason
-        },
-        backupKind: {
-          stringValue: metadata.backupKind
-        },
-        updatedAtMs: {
-          integerValue: String(metadata.updatedAtMs)
-        }
-      }
-    };
-  }
-  function decodeDocument(documentData) {
-    const payload = documentData?.fields?.payload?.stringValue;
-    if (!payload) return null;
-    try {
-      return extractState(JSON.parse(payload));
-    } catch (error) {
-      console.warn("Firestore payload parse skipped", error);
-      return null;
-    }
-  }
-  function createBackupTargets(target = defaultTarget, currentDate = /* @__PURE__ */ new Date()) {
-    const baseId = target.id;
-    return {
-      history: {
-        collection: firestoreCollections.history,
-        id: `${baseId}--minute--${formatMinuteStamp(currentDate)}`
-      },
-      day: {
-        collection: firestoreCollections.backups,
-        id: `${baseId}--day--${formatDayStamp(currentDate)}`
-      },
-      week: {
-        collection: firestoreCollections.backups,
-        id: `${baseId}--week--${formatWeekStamp(currentDate)}`
-      },
-      month: {
-        collection: firestoreCollections.backups,
-        id: `${baseId}--month--${formatMonthStamp(currentDate)}`
-      }
-    };
-  }
-  function describeFirestoreAccess(target = defaultTarget, currentDate = /* @__PURE__ */ new Date()) {
-    const backups = createBackupTargets(target, currentDate);
-    return {
-      current: {
-        collection: target.collection,
-        id: target.id,
-        path: `${target.collection}/${target.id}`
-      },
-      collections: {
-        state: firestoreCollections.state,
-        history: firestoreCollections.history,
-        backups: firestoreCollections.backups
-      },
-      backups: Object.fromEntries(
-        Object.entries(backups).map(([key, value]) => [
-          key,
-          {
-            ...value,
-            path: `${value.collection}/${value.id}`
-          }
-        ])
-      )
-    };
-  }
-  function createBackendAdapter({
-    target = defaultTarget,
-    fetchImpl = fetch,
-    now = () => /* @__PURE__ */ new Date(),
-    timeouts = { load: 1500, save: 4e3 }
+  function createCloudflareDocumentClient({
+    WebSocketCtor = WebSocket,
+    locationLike = window.location,
+    sessionStorage = window.sessionStorage,
+    queueStorage = window.localStorage,
+    setTimeoutFn = globalThis.setTimeout,
+    clearTimeoutFn = globalThis.clearTimeout,
+    reconnectDelayMs = 500
   } = {}) {
-    async function writeDocument(documentTarget, state, metadata) {
-      const response = await fetchWithTimeout(
-        fetchImpl,
-        buildDocumentUrl(documentTarget),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(encodeDocument(state, documentTarget, metadata))
-        },
-        timeouts.save
-      );
-      if (!response.ok) {
-        throw new Error(`Firestore save failed: ${response.status}`);
+    const clientKey = createClientKey(sessionStorage);
+    const pendingKey = `voicelist.pending.${clientKey}`;
+    const nextSeqKey = `voicelist.nextSeq.${clientKey}`;
+    const stateHandlers = /* @__PURE__ */ new Set();
+    const ackHandlers = /* @__PURE__ */ new Set();
+    const ackWaiters = /* @__PURE__ */ new Map();
+    let socket = null;
+    let knownRev = 0;
+    let connectPromise = null;
+    let firstStateResolve = null;
+    let reconnectTimer = null;
+    function readPending() {
+      return readJson(queueStorage, pendingKey, []);
+    }
+    function writePending(messages) {
+      writeJson(queueStorage, pendingKey, messages);
+    }
+    function nextSeq() {
+      const value = Number(queueStorage.getItem(nextSeqKey) || "1");
+      queueStorage.setItem(nextSeqKey, String(value + 1));
+      return value;
+    }
+    function sendRaw(message) {
+      if (socket?.readyState === WebSocketCtor.OPEN) {
+        socket.send(JSON.stringify(message));
+        return true;
+      }
+      scheduleReconnect(0);
+      return false;
+    }
+    function flushPending() {
+      for (const message of readPending()) sendRaw(message);
+    }
+    function removePending(seq) {
+      writePending(readPending().filter((message) => message.seq !== seq));
+    }
+    function handleMessage(event) {
+      const message = JSON.parse(event.data);
+      if (message.type === "state" && message.state) {
+        knownRev = message.state.rev ?? knownRev;
+        for (const handler of stateHandlers) handler(message.state);
+        firstStateResolve?.(message.state);
+        firstStateResolve = null;
+      } else if (message.type === "ack" && message.ack) {
+        if (message.ack.status === "applied") removePending(message.ack.seq);
+        const waiter = ackWaiters.get(message.ack.seq);
+        if (waiter) {
+          clearTimeoutFn(waiter.timeoutId);
+          ackWaiters.delete(message.ack.seq);
+          waiter.resolve(message.ack);
+        }
+        for (const handler of ackHandlers) handler(message.ack);
       }
     }
-    return {
-      getAccessInfo(currentDate = now()) {
-        return describeFirestoreAccess(target, currentDate);
-      },
-      async load() {
-        try {
-          const response = await fetchWithTimeout(fetchImpl, buildDocumentUrl(target), { method: "GET" }, timeouts.load);
-          if (response.status === 404) return null;
-          if (!response.ok) throw new Error(`Firestore load failed: ${response.status}`);
-          return decodeDocument(await response.json());
-        } catch (error) {
-          console.warn("Firestore load skipped", error);
-          return null;
-        }
-      },
-      async loadVersion(versionTarget) {
-        try {
-          const response = await fetchWithTimeout(fetchImpl, buildDocumentUrl(versionTarget), { method: "GET" }, timeouts.load);
-          if (response.status === 404) return null;
-          if (!response.ok) throw new Error(`Firestore load version failed: ${response.status}`);
-          return decodeDocument(await response.json());
-        } catch (error) {
-          console.warn("Firestore version load skipped", error);
-          return null;
-        }
-      },
-      async save(state, { reason = "mutation", createBackup = false } = {}) {
-        const timestamp = now();
-        const updatedAtMs = timestamp.getTime();
-        await writeDocument(target, state, {
-          reason,
-          backupKind: "live",
-          updatedAtMs
+    function clearReconnect() {
+      if (!reconnectTimer) return;
+      clearTimeoutFn(reconnectTimer);
+      reconnectTimer = null;
+    }
+    function isSocketConnectingOrOpen() {
+      return socket?.readyState === WebSocketCtor.CONNECTING || socket?.readyState === WebSocketCtor.OPEN;
+    }
+    function openSocket() {
+      if (isSocketConnectingOrOpen()) return;
+      clearReconnect();
+      const nextSocket = new WebSocketCtor(wsUrl(locationLike));
+      socket = nextSocket;
+      nextSocket.addEventListener("open", () => {
+        if (socket !== nextSocket) return;
+        const pending = readPending();
+        sendRaw({
+          type: "hello",
+          clientKey,
+          knownRev,
+          pendingSeq: pending.map((message) => message.seq)
         });
-        if (!createBackup) return state;
-        const backupTargets = createBackupTargets(target, timestamp);
-        await Promise.all([
-          writeDocument(backupTargets.history, state, {
-            reason,
-            backupKind: "minute",
-            updatedAtMs
-          }),
-          writeDocument(backupTargets.day, state, {
-            reason,
-            backupKind: "day",
-            updatedAtMs
-          }),
-          writeDocument(backupTargets.week, state, {
-            reason,
-            backupKind: "week",
-            updatedAtMs
-          }),
-          writeDocument(backupTargets.month, state, {
-            reason,
-            backupKind: "month",
-            updatedAtMs
-          })
-        ]);
-        return state;
+        flushPending();
+      });
+      nextSocket.addEventListener("message", handleMessage);
+      nextSocket.addEventListener("close", () => {
+        if (socket === nextSocket) socket = null;
+        scheduleReconnect(reconnectDelayMs);
+      });
+      nextSocket.addEventListener("error", () => {
+        if (socket === nextSocket && nextSocket.readyState !== WebSocketCtor.OPEN) socket = null;
+        scheduleReconnect(reconnectDelayMs);
+      });
+    }
+    function scheduleReconnect(delayMs) {
+      if (reconnectTimer || isSocketConnectingOrOpen()) return;
+      reconnectTimer = setTimeoutFn(() => {
+        reconnectTimer = null;
+        openSocket();
+      }, delayMs);
+    }
+    function connect() {
+      if (!connectPromise) {
+        connectPromise = new Promise((resolve2) => {
+          firstStateResolve = resolve2;
+          openSocket();
+        });
+      } else {
+        openSocket();
       }
+      return connectPromise;
+    }
+    function queueCommand(input) {
+      const seq = nextSeq();
+      const message = {
+        type: "command",
+        clientKey,
+        seq,
+        input
+      };
+      writePending([...readPending(), message]);
+      return message;
+    }
+    function sendCommand(input) {
+      const message = queueCommand(input);
+      sendRaw(message);
+      return message.seq;
+    }
+    function sendCommandAndWait(input, { timeoutMs = 1e4 } = {}) {
+      const message = queueCommand(input);
+      const result = new Promise((resolve2, reject) => {
+        const timeoutId = setTimeoutFn(() => {
+          ackWaiters.delete(message.seq);
+          reject(new Error("Timed out waiting for task update"));
+        }, timeoutMs);
+        ackWaiters.set(message.seq, { resolve: resolve2, reject, timeoutId });
+      });
+      sendRaw(message);
+      return result;
+    }
+    async function sendUtterance({ target, transcript }) {
+      const message = {
+        type: "utterance",
+        clientKey,
+        seq: nextSeq(),
+        target,
+        transcript
+      };
+      writePending([...readPending(), message]);
+      sendRaw(message);
+    }
+    return {
+      connect,
+      onAck(handler) {
+        ackHandlers.add(handler);
+        return () => ackHandlers.delete(handler);
+      },
+      onState(handler) {
+        stateHandlers.add(handler);
+        return () => stateHandlers.delete(handler);
+      },
+      sendCommand,
+      sendCommandAndWait,
+      sendUtterance
     };
   }
 
+  // src/resolver.js
+  var STEM_PREFIX = 4;
+  var STEM_NUM = 2;
+  var STEM_DEN = 3;
+  var TYPO_DIST = 1;
+  var TYPO_MINLEN = 5;
+  var W_EXACT = 3;
+  var W_STEM = 2;
+  var W_TYPO = 1;
+  var MAX_MISS = 0;
+  var COVER_NUM = 1;
+  var COVER_DEN = 2;
+  var LEAD = 1;
+  var CAND_LIMIT = 7;
+  var FOUND_CAP = 200;
+  var PART_MIN = 2;
+  function normalize(s) {
+    return s.toLowerCase().replace(/ё/g, "\u0435").replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
+  }
+  function tokenize(s) {
+    return normalize(s).split(" ").filter(Boolean);
+  }
+  function queryPatterns(text) {
+    const pats = /* @__PURE__ */ new Set();
+    for (const q of tokenize(text)) {
+      if (q.length < STEM_PREFIX) {
+        pats.add(q);
+        continue;
+      }
+      pats.add(q.slice(0, STEM_PREFIX));
+      if (q.length >= TYPO_MINLEN && TYPO_DIST > 0) {
+        const a = Math.ceil(q.length / 3), b = Math.ceil(2 * q.length / 3);
+        for (const part of [q.slice(0, a), q.slice(a, b), q.slice(b)])
+          if (part.length >= PART_MIN) pats.add(part);
+      }
+    }
+    return [...pats];
+  }
+  function buildQuery(text) {
+    const pats = queryPatterns(text);
+    const like = pats.map(() => "title_norm LIKE '%' || ? || '%'").join(" OR ");
+    return {
+      sql: `SELECT id, title, title_norm, status FROM tasks
+          WHERE status NOT IN ('closed','superseded')
+            AND (${like}) LIMIT ${FOUND_CAP}`,
+      params: pats
+    };
+  }
+  function findCandidates(text, tasks) {
+    const pats = queryPatterns(text);
+    const found = [];
+    for (const t of tasks) {
+      if (t.status === "closed" || t.status === "superseded") continue;
+      const tn = t.title_norm ?? normalize(t.title);
+      if (pats.some((p) => tn.includes(p))) {
+        found.push({ ...t, title_norm: tn });
+        if (found.length >= FOUND_CAP) {
+          console.warn("resolver: FOUND_CAP reached");
+          break;
+        }
+      }
+    }
+    return found;
+  }
+  function damerauLevenshtein(a, b) {
+    const n = a.length, m = b.length;
+    if (Math.abs(n - m) > TYPO_DIST + 1) return TYPO_DIST + 1;
+    let prev2 = null;
+    let prev = Array.from({ length: m + 1 }, (_, j) => j);
+    for (let i = 1; i <= n; i++) {
+      const cur = [i];
+      for (let j = 1; j <= m; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+          v = Math.min(v, prev2[j - 2] + 1);
+        cur.push(v);
+      }
+      prev2 = prev;
+      prev = cur;
+    }
+    return prev[m];
+  }
+  function pairTier(q, t) {
+    if (q === t) return W_EXACT;
+    const minLen = Math.min(q.length, t.length);
+    let c = 0;
+    while (c < minLen && q[c] === t[c]) c++;
+    if (c >= STEM_PREFIX && c * STEM_DEN >= STEM_NUM * minLen) return W_STEM;
+    if (TYPO_DIST > 0 && q.length >= TYPO_MINLEN && t.length >= TYPO_MINLEN && damerauLevenshtein(q, t) <= TYPO_DIST) return W_TYPO;
+    return 0;
+  }
+  function signature(Q, titleTokens) {
+    const pairs = [];
+    Q.forEach((q, qi) => titleTokens.forEach((t, ti) => {
+      const w = pairTier(q, t);
+      if (w > 0) pairs.push({ qi, ti, w });
+    }));
+    pairs.sort((x, y) => y.w - x.w);
+    const usedQ = /* @__PURE__ */ new Set(), usedT = /* @__PURE__ */ new Set();
+    let m = 0, s = 0;
+    for (const p of pairs) {
+      if (usedQ.has(p.qi) || usedT.has(p.ti)) continue;
+      usedQ.add(p.qi);
+      usedT.add(p.ti);
+      m += 1;
+      s += p.w;
+    }
+    return { m, s, t: usedT.size };
+  }
+  function resolve(text, rows) {
+    const qn = normalize(text);
+    const Q = tokenize(text);
+    if (Q.length === 0) return { kind: "empty" };
+    const withNorm = rows.map((r) => ({ ...r, title_norm: r.title_norm ?? normalize(r.title) }));
+    const exact = withNorm.filter((r) => r.title_norm === qn);
+    if (exact.length === 1) return { kind: "one", id: exact[0].id, why: "R1" };
+    if (exact.length > 1)
+      return {
+        kind: "vector",
+        why: "R1-dup",
+        candidates: exact.slice(0, CAND_LIMIT).map((r) => ({
+          id: r.id,
+          title: r.title,
+          sig: { m: Q.length, s: Q.length * W_EXACT, t: Q.length }
+        }))
+      };
+    const cands = withNorm.map((r) => ({ id: r.id, title: r.title, sig: signature(Q, tokenize(r.title_norm)) })).filter((c) => c.sig.m > 0);
+    if (cands.length === 0) return { kind: "empty" };
+    cands.sort((a, b) => b.sig.m - a.sig.m || b.sig.s - a.sig.s || b.sig.t - a.sig.t);
+    const best = cands[0], second = cands[1];
+    const tie = !!second && best.sig.m === second.sig.m && best.sig.s === second.sig.s;
+    if (!tie) {
+      if (best.sig.m >= Q.length - MAX_MISS)
+        return { kind: "one", id: best.id, why: "R2" };
+      if ((!second || best.sig.m - second.sig.m >= LEAD) && best.sig.m * COVER_DEN >= Q.length * COVER_NUM)
+        return { kind: "one", id: best.id, why: "R3" };
+    }
+    return {
+      kind: "vector",
+      why: tie ? "tie" : "doubt",
+      candidates: cands.slice(0, CAND_LIMIT)
+    };
+  }
+  function resolveOverTasks(text, tasks) {
+    return resolve(text, findCandidates(text, tasks));
+  }
+  var api = {
+    normalize,
+    tokenize,
+    queryPatterns,
+    buildQuery,
+    findCandidates,
+    damerauLevenshtein,
+    pairTier,
+    signature,
+    resolve,
+    resolveOverTasks
+  };
+  if (typeof window !== "undefined") window.resolver = api;
+
+  // src/snapshot-adapter.js
+  var STATUS_MAP = {
+    Open: "open",
+    Focus: "open",
+    Pause: "open",
+    Done: "closed",
+    Archive: "superseded"
+  };
+  function adaptItem(item) {
+    return {
+      id: item.id,
+      title: item.line1 ?? "",
+      status: STATUS_MAP[item.status] ?? "open"
+    };
+  }
+  function adaptSnapshot(items) {
+    return items.map(adaptItem);
+  }
+  function subtree(items, rootId) {
+    const out = /* @__PURE__ */ new Set([rootId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const it of items) {
+        if (it.parentId && out.has(it.parentId) && !out.has(it.id)) {
+          out.add(it.id);
+          grew = true;
+        }
+      }
+    }
+    return out;
+  }
+  function adaptForReparent(items, movingId) {
+    const banned = subtree(items, movingId);
+    return adaptSnapshot(items.filter((it) => !banned.has(it.id)));
+  }
+
   // src/list-interpreter.js
-  var STATUS_VALUES = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause"]);
-  function clone(value) {
+  var STATUS_VALUES = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause", "Info"]);
+  var INBOX_ID = "inbox";
+  function clone2(value) {
     return JSON.parse(JSON.stringify(value));
   }
   function randomId(existingIds) {
@@ -908,8 +1698,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     if (!siblings.length) return 10;
     return Math.max(...siblings.map((item) => item.order || 0)) + 10;
   }
+  function noChange() {
+    return { patch: [], logEntryDraft: null };
+  }
   function buildLabel(command, payload = {}) {
     if (command === "addItem") return `\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
+    if (command === "addChild" && payload.status === "Info") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F: ${payload.line1}`;
     if (command === "addChild") return `\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
     if (command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441 \u0438\u0437\u043C\u0435\u043D\u0451\u043D: ${payload.status}`;
     if (command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
@@ -917,17 +1711,24 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     if (command === "setTags") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u044B \u0442\u0435\u0433\u0438: ${payload.tag}`;
     if (command === "toggleCollapse") return "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435";
     if (command === "reorderItems") return "\u0418\u0437\u043C\u0435\u043D\u0451\u043D \u043F\u043E\u0440\u044F\u0434\u043E\u043A \u0441\u043F\u0438\u0441\u043A\u0430";
+    if (command === "importWorkflowyTree") return `\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0434\u0435\u0440\u0435\u0432\u043E Workflowy: ${payload.tree?.title || "\u0431\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F"}`;
+    if (command === "logFallbackUtterance") return `\u041D\u0435\u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u043E: ${payload.text || "\u043F\u0443\u0441\u0442\u0430\u044F \u0444\u0440\u0430\u0437\u0430"}`;
     if (command === "undo") return "\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D undo";
     return command;
   }
-  function createLogEntry(input, patch) {
+  function createDefaultLogId() {
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8);
+  }
+  function createLogEntryDraft(input, patch, { createLogId = createDefaultLogId, now = () => /* @__PURE__ */ new Date() } = {}) {
     return {
-      id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
-      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-      command: clone(input),
+      id: createLogId(input, patch),
+      createdAt: now().toISOString(),
+      transcript: input.transcript ?? null,
+      command: clone2(input),
       patch,
       label: buildLabel(input.command, input.payload),
-      syncStatus: "pending"
+      syncStatus: "pending",
+      comments: []
     };
   }
   function descendants(items, rootId) {
@@ -944,26 +1745,72 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     }
     return blocked;
   }
-  function createInterpreter() {
+  function appendImportedTree({ createItemId, existingIds, input, nextItems, parentId, tree, order }) {
+    const title = String(tree?.title || "").trim();
+    if (!title) return null;
+    const id = createItemId(existingIds, input);
+    existingIds.add(id);
+    nextItems.push({
+      id,
+      parentId,
+      order,
+      status: "Open",
+      line1: title,
+      line2: "",
+      collapsed: false,
+      tags: []
+    });
+    let childOrder = 10;
+    for (const child of tree.children || []) {
+      appendImportedTree({
+        createItemId,
+        existingIds,
+        input,
+        nextItems,
+        parentId: id,
+        tree: child,
+        order: childOrder
+      });
+      childOrder += 10;
+    }
+    return id;
+  }
+  function createInterpreter({ createItemId = randomId, createLogId = createDefaultLogId, now = () => /* @__PURE__ */ new Date() } = {}) {
     return {
       execute(state, input) {
-        const currentItems = clone(state.snapshot.items);
-        const nextItems = clone(currentItems);
+        const currentItems = clone2(state.snapshot.items);
+        const nextItems = clone2(currentItems);
         const existingIds = new Set(nextItems.map((item) => item.id));
         let patch = [];
-        let actionLogEntry = null;
+        let logEntryDraft = null;
+        let logOnly = false;
+        let handledCommand = true;
         const payload = input.payload || {};
         if (input.command === "showActionLog" || input.command === "showList" || input.command === "showFrontier") {
           return {
             patch: [],
-            actionLogEntry: null,
+            logEntryDraft: null,
             viewMode: input.command === "showActionLog" ? "log" : input.command === "showFrontier" ? "frontier" : "list"
+          };
+        }
+        if (input.command === "showSearch") {
+          const query = String(payload.query || "").trim();
+          const rows = findCandidates(query, adaptSnapshot(currentItems));
+          return {
+            patch: [],
+            logEntryDraft: null,
+            viewMode: "search",
+            effect: {
+              type: "search",
+              query,
+              itemIds: rows.map((row) => row.id)
+            }
           };
         }
         if (input.command === "showAddModal" || input.command === "showEditModal" || input.command === "showNestModal" || input.command === "viewItem") {
           return {
             patch: [],
-            actionLogEntry: null,
+            logEntryDraft: null,
             effect: {
               type: "modal",
               mode: input.command === "showAddModal" ? "add" : input.command === "showEditModal" ? "edit" : input.command === "showNestModal" ? "nest" : "view",
@@ -971,9 +1818,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
             }
           };
         }
+        if ((input.command === "editItem" || input.command === "deleteItem" || input.command === "setParent") && input.actId === INBOX_ID) {
+          return noChange();
+        }
         if (input.command === "addItem") {
           nextItems.push({
-            id: randomId(existingIds),
+            id: createItemId(existingIds, input),
             parentId: null,
             order: nextOrder(nextItems, null),
             status: "Open",
@@ -984,10 +1834,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           });
         } else if (input.command === "addChild") {
           nextItems.push({
-            id: randomId(existingIds),
+            id: createItemId(existingIds, input),
             parentId: input.actId,
             order: nextOrder(nextItems, input.actId),
-            status: "Open",
+            status: STATUS_VALUES.has(payload.status) ? payload.status : "Open",
             line1: payload.line1,
             line2: payload.line2 || "",
             collapsed: false,
@@ -997,11 +1847,19 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           if (item) {
             item.line1 = payload.line1;
-            item.line2 = payload.line2 || "";
+            if ("line2" in payload) item.line2 = payload.line2 || "";
           }
         } else if (input.command === "setStatus") {
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           if (item && STATUS_VALUES.has(payload.status)) item.status = payload.status;
+        } else if (input.command === "setParent") {
+          const item = nextItems.find((candidate) => candidate.id === input.actId);
+          const parentId = payload.parentId ?? null;
+          if (!item || parentId === input.actId) return noChange();
+          if (parentId !== null && !nextItems.some((candidate) => candidate.id === parentId)) return noChange();
+          if (parentId !== null && descendants(nextItems, input.actId).has(parentId)) return noChange();
+          item.parentId = parentId;
+          item.order = nextOrder(nextItems.filter((candidate) => candidate.id !== input.actId), parentId);
         } else if (input.command === "setTags") {
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           if (item) {
@@ -1031,22 +1889,100 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
               value: nextItems.map((item) => arranged.has(item.id) ? { ...item, ...arranged.get(item.id) } : item).sort((left, right) => left.order - right.order)
             }
           ];
+        } else if (input.command === "importWorkflowyTree") {
+          const rootId = appendImportedTree({
+            createItemId,
+            existingIds,
+            input,
+            nextItems,
+            parentId: null,
+            tree: payload.tree,
+            order: nextOrder(nextItems, null)
+          });
+          if (!rootId) return noChange();
+        } else if (input.command === "logFallbackUtterance") {
+          logOnly = true;
         } else if (input.command === "undo") {
-          patch = [{ op: "replace", path: "/snapshot", value: clone(payload.snapshot) }];
+          patch = [{ op: "replace", path: "/snapshot", value: clone2(payload.snapshot) }];
+        } else {
+          handledCommand = false;
         }
-        if (!patch.length) {
+        if (!handledCommand) return noChange();
+        if (!patch.length && !logOnly) {
           patch = [{ op: "replace", path: "/snapshot/items", value: nextItems }];
         }
-        if (!String(input.command).startsWith("show") && input.command !== "viewItem") {
-          actionLogEntry = createLogEntry(input, patch);
+        if (!String(input.command).startsWith("show") && input.command !== "viewItem" && input.command !== "toggleCollapse") {
+          logEntryDraft = createLogEntryDraft(input, patch, { createLogId, now });
         }
-        return { patch, actionLogEntry };
+        return { patch, logEntryDraft };
       }
+    };
+  }
+
+  // src/list-log-store.js
+  function clone3(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+  function normalizeEntry(entry) {
+    return {
+      ...clone3(entry),
+      transcript: entry?.transcript ?? null,
+      comments: Array.isArray(entry?.comments) ? clone3(entry.comments) : []
+    };
+  }
+  function createLogStore({ storageKeyPrefix = "searchmydata.list-interface.log", storage = window.localStorage } = {}) {
+    const indexKey = `${storageKeyPrefix}:index`;
+    const entryKey = (id) => `${storageKeyPrefix}:entry:${id}`;
+    function readIndex() {
+      const raw = storage.getItem(indexKey);
+      return raw ? JSON.parse(raw) : [];
+    }
+    function writeIndex(ids) {
+      storage.setItem(indexKey, JSON.stringify(ids));
+    }
+    function getEntry(id) {
+      const raw = storage.getItem(entryKey(id));
+      return raw ? normalizeEntry(JSON.parse(raw)) : null;
+    }
+    function listEntries() {
+      return readIndex().map((id) => getEntry(id)).filter(Boolean);
+    }
+    function persistEntry(entry) {
+      const normalized = normalizeEntry(entry);
+      const ids = readIndex();
+      if (!ids.includes(normalized.id)) {
+        ids.push(normalized.id);
+        writeIndex(ids);
+      }
+      storage.setItem(entryKey(normalized.id), JSON.stringify(normalized));
+      return clone3(normalized);
+    }
+    function createEntry(entry) {
+      return persistEntry(entry);
+    }
+    function updateEntry(id, next) {
+      const current = getEntry(id);
+      if (!current) return null;
+      const value = typeof next === "function" ? next(clone3(current)) : next;
+      return persistEntry(value);
+    }
+    function importLegacyEntries(entries = []) {
+      if (readIndex().length || !entries.length) return listEntries();
+      for (const entry of entries) persistEntry(entry);
+      return listEntries();
+    }
+    return {
+      createEntry,
+      getEntry,
+      importLegacyEntries,
+      listEntries,
+      updateEntry
     };
   }
 
   // src/list-frontier.js
   var CLOSED_STATUSES = /* @__PURE__ */ new Set(["done", "archive"]);
+  var BLOCKED_BRANCH_STATUSES = /* @__PURE__ */ new Set(["archive"]);
   var FRONTIER_STATUSES = /* @__PURE__ */ new Set(["open", "focus"]);
   function normalizedStatus(task) {
     return String(task.status || "").toLowerCase();
@@ -1126,6 +2062,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     const focusHighlights = [];
     function visit(node, paused) {
       const status = normalizedStatus(node.task || {});
+      if (BLOCKED_BRANCH_STATUSES.has(status)) return false;
       if (CLOSED_STATUSES.has(status) && !node.hasFocusInSubtree) return false;
       if (status === "focus") focusHighlights.push(node.task);
       const focusInsidePause = paused && status === "focus";
@@ -1152,6 +2089,9 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-renderer.js
+  function isArchived(item) {
+    return String(item?.status || "").toLowerCase() === "archive";
+  }
   function escHtml(value) {
     return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -1172,7 +2112,14 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     if (status === "Focus") return "#ff9500";
     if (status === "Archive") return "#8e8e93";
     if (status === "Pause") return "#5856d6";
+    if (status === "Info") return "#0a84ff";
     return "#007aff";
+  }
+  function formatCommand(command) {
+    if (!command?.command) return "";
+    const payload = command.payload && Object.keys(command.payload).length ? ` ${JSON.stringify(command.payload)}` : "";
+    const act = command.actId ? ` @${command.actId}` : "";
+    return `${command.command}${act}${payload}`;
   }
   function createRenderer({ container, actionLogPanel, actionLogList, rootPanel, emptyStateLabel, bindRow, bindGlobal, onRendered } = {}) {
     const expandedFrontierParents = /* @__PURE__ */ new Set();
@@ -1183,11 +2130,15 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       for (const entry of [...actionLog].reverse()) {
         const row = document.createElement("div");
         row.className = "action-log-row";
+        row.dataset.logId = entry.id;
         row.innerHTML = `
         <div class="action-log-line">
           <span class="action-log-label">${escHtml(entry.label)}</span>
           <span class="action-log-status action-log-status-${escHtml(entry.syncStatus)}">${escHtml(entry.syncStatus)}</span>
         </div>
+        ${entry.transcript ? `<div class="action-log-transcript">${escHtml(entry.transcript)}</div>` : ""}
+        <div class="action-log-command">${escHtml(formatCommand(entry.command))}</div>
+        ${(entry.comments || []).length ? `<div class="action-log-comments">${entry.comments.map((comment) => `<div class="action-log-comment">${escHtml(comment.text)}</div>`).join("")}</div>` : ""}
         <div class="action-log-meta">${escHtml(entry.createdAt)}</div>
       `;
         actionLogList.appendChild(row);
@@ -1308,7 +2259,31 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       });
       container.appendChild(fragment);
     }
-    function render(state, viewMode = "list") {
+    function renderSearch(state, context = {}) {
+      const ids = new Set(context.itemIds || []);
+      const items = (state.snapshot.items || []).filter((item) => ids.has(item.id) && !isArchived(item)).sort((left, right) => left.order - right.order);
+      const summary = document.createElement("div");
+      summary.className = "search-summary";
+      summary.textContent = `\u041F\u043E\u0438\u0441\u043A: ${context.query || ""}`;
+      container.appendChild(summary);
+      if (!items.length) {
+        container.insertAdjacentHTML("beforeend", '<div class="empty-state"><div class="icon">\u2315</div><p>\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.</p></div>');
+        return;
+      }
+      const childIds = new Set((state.snapshot.items || []).map((item) => item.parentId).filter(Boolean));
+      const fragment = document.createDocumentFragment();
+      items.forEach((item, index) => {
+        renderRow({
+          fragment,
+          hasChildren: childIds.has(item.id),
+          index: index + 1,
+          item,
+          level: 0
+        });
+      });
+      container.appendChild(fragment);
+    }
+    function render(state, viewMode = "list", viewContext = {}) {
       if (!container) return;
       lastState = state;
       if (rootPanel) rootPanel.dataset.viewMode = viewMode;
@@ -1322,6 +2297,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         if (typeof onRendered === "function") onRendered(state, viewMode);
         return;
       }
+      if (viewMode === "search") {
+        renderSearch(state, viewContext);
+        if (typeof bindGlobal === "function") bindGlobal();
+        if (typeof onRendered === "function") onRendered(state, viewMode, viewContext);
+        return;
+      }
       const items = state.snapshot.items || [];
       if (!items.length) {
         container.innerHTML = `<div class="empty-state"><div class="icon">\u{1F4CB}</div><p>${escHtml(emptyStateLabel || "\u0421\u043F\u0438\u0441\u043E\u043A \u043F\u0443\u0441\u0442. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 + \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C.")}</p></div>`;
@@ -1332,8 +2313,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       const fragment = document.createDocumentFragment();
       function walk(parentId, level, hidden) {
         for (const item of byParent.get(parentId) || []) {
+          if (isArchived(item)) continue;
           index += 1;
-          const hasChildren = (byParent.get(item.id) || []).length > 0;
+          const visibleChildren = (byParent.get(item.id) || []).filter((child) => !isArchived(child));
+          const hasChildren = visibleChildren.length > 0;
           renderRow({ fragment, hasChildren, hidden, index, item, level });
           walk(item.id, level + 1, hidden || !!item.collapsed);
         }
@@ -1346,15 +2329,677 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     return { render };
   }
 
+  // src/realtime-voice-agent.js
+  var DIALOGUES_STORAGE_KEY = "voicelist.realtime-dialogues.v1";
+  var OPENAI_KEY_STATUS_ENDPOINT = "/api/realtime/key/status";
+  var OPENAI_KEY_SETUP_ENDPOINT = "/api/realtime/key";
+  var OPENAI_PROMPT_ENDPOINT = "/api/realtime/prompt";
+  var MAX_DIALOGUES = 30;
+  var MAX_MESSAGES_PER_DIALOGUE = 240;
+  var TOOL_RESULT_REPLY_INSTRUCTIONS = [
+    "The task operation result is now available in the function_call_output.",
+    "Do not continue any previous sentence.",
+    "Answer only from that result, in one short Russian sentence."
+  ].join(" ");
+  var ALLOWED_STATUSES = /* @__PURE__ */ new Set(["Open", "Focus", "Pause", "Done", "Archive", "Info"]);
+  function parseStoredDialogues(storage) {
+    try {
+      const value = JSON.parse(storage.getItem(DIALOGUES_STORAGE_KEY) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+  function isoNow(now) {
+    const value = now();
+    return (value instanceof Date ? value : new Date(value)).toISOString();
+  }
+  function persistDialogues(storage, dialogues) {
+    storage.setItem(DIALOGUES_STORAGE_KEY, JSON.stringify(dialogues.slice(0, MAX_DIALOGUES)));
+  }
+  function createDialogueRepository({
+    storage,
+    now = () => /* @__PURE__ */ new Date(),
+    createId = () => crypto.randomUUID()
+  }) {
+    let dialogues = parseStoredDialogues(storage);
+    function update(id, updater) {
+      dialogues = dialogues.map((dialogue) => dialogue.id === id ? updater(dialogue) : dialogue);
+      persistDialogues(storage, dialogues);
+    }
+    return {
+      start() {
+        const dialogue = {
+          id: createId(),
+          startedAt: isoNow(now),
+          endedAt: null,
+          messages: []
+        };
+        dialogues = [dialogue, ...dialogues].slice(0, MAX_DIALOGUES);
+        persistDialogues(storage, dialogues);
+        return dialogue.id;
+      },
+      append(dialogueId, { role, text, eventId = null }) {
+        const cleanText = String(text || "").trim();
+        if (!cleanText) return;
+        const messageAt = isoNow(now);
+        update(dialogueId, (dialogue) => {
+          if (eventId && dialogue.messages.some((message) => message.eventId === eventId)) return dialogue;
+          const lastMessage = dialogue.messages.at(-1);
+          if (lastMessage?.role === role && lastMessage.text === cleanText && Math.abs(new Date(lastMessage.at).getTime() - new Date(messageAt).getTime()) < 2e3) {
+            return dialogue;
+          }
+          return {
+            ...dialogue,
+            messages: [...dialogue.messages, {
+              id: createId(),
+              eventId,
+              at: messageAt,
+              role,
+              text: cleanText
+            }].slice(-MAX_MESSAGES_PER_DIALOGUE)
+          };
+        });
+      },
+      finish(dialogueId) {
+        update(dialogueId, (dialogue) => ({ ...dialogue, endedAt: dialogue.endedAt || isoNow(now) }));
+      },
+      list() {
+        return structuredClone(dialogues);
+      }
+    };
+  }
+  function taskTreeFromState(state) {
+    const items = state?.snapshot?.items;
+    if (!Array.isArray(items)) return [];
+    const nodes = /* @__PURE__ */ new Map();
+    for (const item of items) {
+      const id = String(item?.id || "");
+      if (!id) continue;
+      nodes.set(id, {
+        id,
+        title: String(item?.line1 || ""),
+        status: String(item?.status || "Open"),
+        children: []
+      });
+    }
+    const roots = [];
+    for (const item of items) {
+      const id = String(item?.id || "");
+      const node = nodes.get(id);
+      if (!node) continue;
+      const parent = item?.parentId == null ? null : nodes.get(String(item.parentId));
+      if (parent) parent.children.push(node);
+      else roots.push(node);
+    }
+    return roots;
+  }
+  function requireText(value, label) {
+    const text = String(value || "").trim();
+    if (!text) throw new Error(`${label} is required`);
+    return text;
+  }
+  function withTranscript(input, transcript) {
+    const cleanTranscript = String(transcript || "").trim();
+    return cleanTranscript ? { ...input, transcript: cleanTranscript } : input;
+  }
+  function taskInputFromToolCall(name, rawArguments, { transcript = "" } = {}) {
+    let args;
+    try {
+      args = typeof rawArguments === "string" ? JSON.parse(rawArguments || "{}") : rawArguments || {};
+    } catch {
+      throw new Error("Tool arguments are not valid JSON");
+    }
+    if (name === "addItem") {
+      return withTranscript({
+        actId: "list",
+        actType: "list",
+        command: "addItem",
+        payload: { line1: requireText(args.line1, "line1") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "addChild") {
+      return withTranscript({
+        actId: requireText(args.parentId, "parentId"),
+        actType: "task",
+        command: "addChild",
+        payload: { line1: requireText(args.line1, "line1") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "addInfo") {
+      return withTranscript({
+        actId: requireText(args.parentId, "parentId"),
+        actType: "task",
+        command: "addChild",
+        payload: { line1: requireText(args.line1, "line1"), status: "Info" },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "setStatus") {
+      const status = String(args.status || "");
+      if (!ALLOWED_STATUSES.has(status)) throw new Error("Unsupported task status");
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "setStatus",
+        payload: { status },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "editItem") {
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "editItem",
+        payload: { line1: requireText(args.line1, "line1") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    if (name === "setParent") {
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "setParent",
+        payload: { parentId: args.parentId == null ? null : requireText(args.parentId, "parentId") },
+        source: "openai-realtime"
+      }, transcript);
+    }
+    throw new Error(`Unsupported task operation: ${name}`);
+  }
+  function operationLabel(input) {
+    if (input.command === "addItem") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
+    if (input.command === "addChild" && input.payload.status === "Info") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F: ${input.payload.line1}`;
+    if (input.command === "addChild") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
+    if (input.command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441 ${input.actId}: ${input.payload.status}`;
+    if (input.command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}: ${input.payload.line1}`;
+    if (input.command === "setParent") return `\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}`;
+    return input.command;
+  }
+  function roleLabel(role) {
+    if (role === "user") return "\u0412\u044B";
+    if (role === "assistant") return "\u0410\u0433\u0435\u043D\u0442";
+    if (role === "tool") return "\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0435";
+    return "\u0421\u0438\u0441\u0442\u0435\u043C\u0430";
+  }
+  function formatStartedAt(value) {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(value));
+  }
+  function openAISetupTokenFromHash(hash) {
+    return new URLSearchParams(String(hash || "").replace(/^#/, "")).get("openai-setup") || "";
+  }
+  function createRealtimeVoiceAgent({
+    voiceButton,
+    voiceStatus,
+    dialoguesButton,
+    dialoguesPanel,
+    dialoguesList,
+    dialoguesClose,
+    openAIKeyInput,
+    openAIKeyField,
+    openAIKeySaveButton,
+    openAIKeyStatus,
+    openAIPromptInput,
+    openAIPromptSaveButton,
+    openAIPromptStatus,
+    settingsOverlay,
+    rootPanel,
+    navigationButtons = [],
+    getTaskState,
+    executeTaskCommand,
+    endpoint = "/api/realtime/session",
+    keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
+    keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
+    promptEndpoint = OPENAI_PROMPT_ENDPOINT,
+    fetchImpl = fetch,
+    mediaDevices = navigator.mediaDevices,
+    RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
+    documentLike = document,
+    windowLike = globalThis.window,
+    storage = localStorage,
+    locationLike = globalThis.location,
+    historyLike = globalThis.history,
+    now = () => /* @__PURE__ */ new Date(),
+    createId = () => crypto.randomUUID(),
+    AbortControllerCtor = globalThis.AbortController
+  }) {
+    const repository = createDialogueRepository({ storage, now, createId });
+    let active = null;
+    let keyConfigured = null;
+    let setupAvailable = false;
+    let setupToken = openAISetupTokenFromHash(locationLike?.hash);
+    let promptConfigured = false;
+    function setKeyStatus(message, tone = "") {
+      if (!openAIKeyStatus) return;
+      openAIKeyStatus.textContent = message;
+      openAIKeyStatus.classList.toggle("success", tone === "success");
+      openAIKeyStatus.classList.toggle("error", tone === "error");
+    }
+    function setPromptStatus(message, tone = "") {
+      if (!openAIPromptStatus) return;
+      openAIPromptStatus.textContent = message;
+      openAIPromptStatus.classList.toggle("success", tone === "success");
+      openAIPromptStatus.classList.toggle("error", tone === "error");
+    }
+    function renderKeySettings() {
+      if (!openAIKeyInput || !openAIKeySaveButton) return;
+      const locked = keyConfigured === true;
+      if (openAIKeyField) openAIKeyField.hidden = locked;
+      openAIKeySaveButton.hidden = locked;
+      openAIKeySaveButton.disabled = !setupToken || !setupAvailable;
+      if (locked) setKeyStatus("\u041A\u043B\u044E\u0447 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0438 \u0433\u043E\u0442\u043E\u0432 \u043A \u0440\u0430\u0431\u043E\u0442\u0435.", "success");
+      else if (setupToken && setupAvailable) setKeyStatus("\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u043B\u044E\u0447 OpenAI. \u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043E\u0434\u0438\u043D \u0440\u0430\u0437.");
+      else if (keyConfigured === false) setKeyStatus("\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043A\u043B\u044E\u0447\u0430.", "error");
+    }
+    function renderPromptSettings() {
+      if (!openAIPromptInput || !openAIPromptSaveButton) return;
+      openAIPromptSaveButton.disabled = false;
+      setPromptStatus(promptConfigured ? "\u041F\u0440\u043E\u043C\u043F\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435." : "\u0417\u0434\u0435\u0441\u044C \u043C\u043E\u0436\u043D\u043E \u0437\u0430\u0434\u0430\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0430\u0433\u0435\u043D\u0442\u0430.", promptConfigured ? "success" : "");
+    }
+    function openKeySettings() {
+      settingsOverlay?.classList.add("open");
+      settingsOverlay?.setAttribute("aria-hidden", "false");
+      renderKeySettings();
+      if (keyConfigured !== true) openAIKeyInput?.focus();
+    }
+    function removeSetupTokenFromAddress() {
+      if (!locationLike || !historyLike?.replaceState) return;
+      const params = new URLSearchParams(String(locationLike.hash || "").replace(/^#/, ""));
+      params.delete("openai-setup");
+      const hash = params.toString();
+      historyLike.replaceState(null, "", `${locationLike.pathname || "/"}${locationLike.search || ""}${hash ? `#${hash}` : ""}`);
+    }
+    async function refreshKeyStatus() {
+      try {
+        const response = await fetchImpl(keyStatusEndpoint, { headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const status = await response.json();
+        keyConfigured = Boolean(status.configured);
+        setupAvailable = Boolean(status.setupAvailable);
+        renderKeySettings();
+        if (setupToken && !keyConfigured) openKeySettings();
+      } catch {
+      }
+    }
+    async function refreshPrompt() {
+      try {
+        const response = await fetchImpl(promptEndpoint, { headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (openAIPromptInput) openAIPromptInput.value = String(data.prompt || "");
+        promptConfigured = true;
+        renderPromptSettings();
+      } catch {
+      }
+    }
+    async function saveOpenAIKey() {
+      const apiKey = String(openAIKeyInput?.value || "").trim();
+      if (!apiKey.startsWith("sk-") || apiKey.length < 20 || /\s/.test(apiKey)) {
+        setKeyStatus("\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043A\u043B\u044E\u0447: \u043E\u043D \u0434\u043E\u043B\u0436\u0435\u043D \u043D\u0430\u0447\u0438\u043D\u0430\u0442\u044C\u0441\u044F \u0441 sk-.", "error");
+        return;
+      }
+      if (!setupToken || !setupAvailable) {
+        setKeyStatus("\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0430.", "error");
+        return;
+      }
+      openAIKeySaveButton.disabled = true;
+      setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E \u043A\u043B\u044E\u0447 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435\u2026");
+      try {
+        const response = await fetchImpl(keySetupEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey, setupToken })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        openAIKeyInput.value = "";
+        keyConfigured = true;
+        setupAvailable = false;
+        setupToken = "";
+        removeSetupTokenFromAddress();
+        renderKeySettings();
+      } catch (error) {
+        setKeyStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u043B\u044E\u0447.", "error");
+        openAIKeySaveButton.disabled = false;
+      }
+    }
+    async function saveOpenAIPrompt() {
+      const prompt = String(openAIPromptInput?.value || "").trim();
+      openAIPromptSaveButton.disabled = true;
+      setPromptStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435\u2026");
+      try {
+        const response = await fetchImpl(promptEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        promptConfigured = true;
+        renderPromptSettings();
+      } catch (error) {
+        setPromptStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442.", "error");
+        openAIPromptSaveButton.disabled = false;
+      }
+    }
+    function renderDialogues() {
+      dialoguesList.replaceChildren();
+      const dialogues = repository.list();
+      if (!dialogues.length) {
+        const empty = documentLike.createElement("p");
+        empty.className = "dialogues-empty";
+        empty.textContent = "\u0417\u0434\u0435\u0441\u044C \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0440\u0430\u0441\u0448\u0438\u0444\u0440\u043E\u0432\u043A\u0438 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u044B\u0445 \u0441\u0435\u0441\u0441\u0438\u0439.";
+        dialoguesList.append(empty);
+        return;
+      }
+      for (const dialogue of dialogues) {
+        const card = documentLike.createElement("article");
+        card.className = "dialogue-card";
+        const heading = documentLike.createElement("h3");
+        heading.textContent = formatStartedAt(dialogue.startedAt);
+        card.append(heading);
+        if (!dialogue.messages.length) {
+          const empty = documentLike.createElement("p");
+          empty.className = "dialogue-message system";
+          empty.textContent = "\u041D\u0435\u0442 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u043D\u044B\u0445 \u0440\u0435\u043F\u043B\u0438\u043A.";
+          card.append(empty);
+        }
+        for (const message of dialogue.messages) {
+          const row = documentLike.createElement("p");
+          row.className = `dialogue-message ${message.role}`;
+          const label = documentLike.createElement("strong");
+          label.textContent = `${roleLabel(message.role)}: `;
+          row.append(label, documentLike.createTextNode(message.text));
+          card.append(row);
+        }
+        dialoguesList.append(card);
+      }
+    }
+    function setDialoguesOpen(open) {
+      rootPanel.dataset.dialoguesOpen = open ? "true" : "false";
+      dialoguesPanel.hidden = !open;
+      dialoguesButton.classList.toggle("active", open);
+      dialoguesButton.setAttribute("aria-pressed", String(open));
+      if (open) renderDialogues();
+    }
+    function setVoiceState(state, message) {
+      voiceButton.dataset.state = state;
+      voiceButton.setAttribute("aria-pressed", String(state === "active" || state === "connecting"));
+      voiceButton.setAttribute("aria-label", state === "idle" ? "\u041D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433" : "\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
+      voiceStatus.textContent = message || "";
+      voiceStatus.hidden = !message;
+    }
+    function append(role, text, eventId = null) {
+      if (!active) return;
+      repository.append(active.dialogueId, { role, text, eventId });
+      if (rootPanel.dataset.dialoguesOpen === "true") renderDialogues();
+    }
+    function clientEventId(prefix) {
+      return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    function sendRealtimeEvent(session, event, { ignoreError = false } = {}) {
+      if (session.channel?.readyState !== "open") return false;
+      if (ignoreError && event.event_id) session.ignoredErrorEventIds.add(event.event_id);
+      session.channel.send(JSON.stringify(event));
+      return true;
+    }
+    function cancelRealtimeSpeech(session) {
+      sendRealtimeEvent(session, { type: "response.cancel", event_id: clientEventId("cancel-tool") }, { ignoreError: true });
+      sendRealtimeEvent(session, { type: "output_audio_buffer.clear", event_id: clientEventId("clear-tool-audio") }, { ignoreError: true });
+    }
+    async function handleToolCall(item) {
+      const session = active;
+      if (!session || session.toolCalls.has(item.call_id)) return;
+      session.toolCalls.add(item.call_id);
+      let output;
+      let applied = false;
+      try {
+        const input = taskInputFromToolCall(item.name, item.arguments, {
+          transcript: session.latestUserTranscript
+        });
+        const ack = await executeTaskCommand(input);
+        if (ack?.status && ack.status !== "applied") throw new Error(ack.reason || "Task operation was rejected");
+        repository.append(session.dialogueId, {
+          role: "tool",
+          text: `Tool ${item.name}(${item.arguments || "{}"}): ${operationLabel(input)}`,
+          eventId: `tool-${item.call_id}`
+        });
+        output = { status: "applied", operation: input.command, target: ack?.newTarget || input.actId };
+        applied = true;
+      } catch (error) {
+        repository.append(session.dialogueId, {
+          role: "system",
+          text: `\u041E\u0448\u0438\u0431\u043A\u0430 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0434\u0430\u0447\u0438: ${error.message}`,
+          eventId: `tool-error-${item.call_id}`
+        });
+        output = { status: "rejected", reason: error.message };
+      }
+      if (rootPanel.dataset.dialoguesOpen === "true") renderDialogues();
+      if (active !== session || session.channel?.readyState !== "open") return;
+      if (applied) cancelRealtimeSpeech(session);
+      sendRealtimeEvent(session, {
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: item.call_id,
+          output: JSON.stringify(output)
+        }
+      });
+      sendRealtimeEvent(session, {
+        type: "response.create",
+        response: {
+          instructions: TOOL_RESULT_REPLY_INSTRUCTIONS
+        }
+      });
+    }
+    function transcriptFromAssistantItem(item) {
+      if (item?.type !== "message" || item?.role !== "assistant" || !Array.isArray(item.content)) return "";
+      return item.content.map((part) => part.transcript || part.text || "").filter(Boolean).join(" ").trim();
+    }
+    async function handleRealtimeEvent(event) {
+      if (!active || !event?.type) return;
+      if (event.type === "conversation.item.input_audio_transcription.completed") {
+        active.latestUserTranscript = String(event.transcript || "").trim();
+        append("user", event.transcript, event.event_id || `user-${event.item_id || event.content_index || ""}`);
+        return;
+      }
+      if (event.type === "response.output_audio_transcript.done" || event.type === "response.audio_transcript.done" || event.type === "response.output_text.done") {
+        append("assistant", event.transcript || event.text, event.event_id || `assistant-${event.response_id || ""}-${event.output_index || 0}`);
+        return;
+      }
+      if (event.type === "response.output_item.done") {
+        if (event.item?.type === "function_call") {
+          await handleToolCall(event.item);
+          return;
+        }
+        const transcript = transcriptFromAssistantItem(event.item);
+        append("assistant", transcript, event.event_id || `assistant-item-${event.item?.id || ""}`);
+        return;
+      }
+      if (event.type === "error") {
+        const clientEventId2 = event.error?.event_id || event.event_id || null;
+        if (clientEventId2 && active.ignoredErrorEventIds.delete(clientEventId2)) return;
+        append("system", event.error?.message || "\u041E\u0448\u0438\u0431\u043A\u0430 OpenAI Realtime", event.event_id || null);
+      }
+    }
+    function cleanupVoiceSession(session) {
+      session.abortController?.abort();
+      try {
+        session.channel?.close();
+      } catch {
+      }
+      try {
+        session.peerConnection?.close();
+      } catch {
+      }
+      for (const track of session.mediaStream?.getTracks?.() || []) track.stop();
+      if (session.audioElement) {
+        session.audioElement.srcObject = null;
+        session.audioElement.remove();
+      }
+    }
+    function stopVoice() {
+      const session = active;
+      if (!session) return;
+      active = null;
+      cleanupVoiceSession(session);
+      repository.finish(session.dialogueId);
+      renderDialogues();
+      setVoiceState("idle", "");
+    }
+    async function startVoice() {
+      const dialogueId = repository.start();
+      const session = {
+        dialogueId,
+        abortController: new AbortControllerCtor(),
+        peerConnection: null,
+        mediaStream: null,
+        audioElement: null,
+        channel: null,
+        ignoredErrorEventIds: /* @__PURE__ */ new Set(),
+        toolCalls: /* @__PURE__ */ new Set(),
+        latestUserTranscript: ""
+      };
+      active = session;
+      renderDialogues();
+      setVoiceState("connecting", "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u2026");
+      try {
+        if (!RTCPeerConnectionCtor || !mediaDevices?.getUserMedia) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
+        session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
+        if (active !== session) return cleanupVoiceSession(session);
+        const pc = new RTCPeerConnectionCtor();
+        session.peerConnection = pc;
+        const audio = documentLike.createElement("audio");
+        audio.autoplay = true;
+        audio.playsInline = true;
+        audio.hidden = true;
+        documentLike.body.append(audio);
+        session.audioElement = audio;
+        pc.ontrack = (event) => {
+          audio.srcObject = event.streams[0];
+        };
+        for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
+        const channel = pc.createDataChannel("oai-events");
+        session.channel = channel;
+        channel.addEventListener("open", () => {
+          if (active === session) setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
+        });
+        channel.addEventListener("message", (message) => {
+          try {
+            void handleRealtimeEvent(JSON.parse(message.data));
+          } catch {
+            append("system", "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \u043D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u043E\u0435 \u0441\u043E\u0431\u044B\u0442\u0438\u0435 Realtime");
+          }
+        });
+        channel.addEventListener("close", () => {
+          if (active === session) stopVoice();
+        });
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        const response = await fetchImpl(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sdp: offer.sdp,
+            taskTree: taskTreeFromState(getTaskState())
+          }),
+          signal: session.abortController.signal
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.error || `Realtime HTTP ${response.status}`);
+        }
+        await pc.setRemoteDescription({ type: "answer", sdp: await response.text() });
+        if (active === session && channel.readyState === "open") setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
+      } catch (error) {
+        if (active !== session || error.name === "AbortError") return;
+        append("system", error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
+        stopVoice();
+        setVoiceState("error", "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F");
+      }
+    }
+    voiceButton.addEventListener("click", () => {
+      if (active) stopVoice();
+      else if (keyConfigured === false) openKeySettings();
+      else void startVoice();
+    });
+    openAIKeySaveButton?.addEventListener("click", () => {
+      void saveOpenAIKey();
+    });
+    openAIPromptSaveButton?.addEventListener("click", () => {
+      void saveOpenAIPrompt();
+    });
+    openAIKeyInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void saveOpenAIKey();
+      }
+    });
+    dialoguesButton.addEventListener("click", () => {
+      setDialoguesOpen(rootPanel.dataset.dialoguesOpen !== "true");
+    });
+    dialoguesClose.addEventListener("click", () => setDialoguesOpen(false));
+    for (const button of navigationButtons) button?.addEventListener("click", () => setDialoguesOpen(false));
+    documentLike.addEventListener("visibilitychange", () => {
+      if (documentLike.visibilityState === "hidden") stopVoice();
+    });
+    windowLike?.addEventListener("pagehide", () => {
+      stopVoice();
+    });
+    setVoiceState("idle", "");
+    setDialoguesOpen(false);
+    renderDialogues();
+    void refreshKeyStatus();
+    void refreshPrompt();
+    return {
+      renderDialogues,
+      start: startVoice,
+      stop: stopVoice,
+      refreshKeyStatus,
+      openDialogues() {
+        setDialoguesOpen(true);
+      }
+    };
+  }
+
   // src/list-store.js
-  function clone2(value) {
+  function clone4(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+  var INBOX_ITEM = {
+    id: "inbox",
+    parentId: null,
+    order: 0,
+    status: "Open",
+    line1: "\u0412\u0445\u043E\u0434\u044F\u0449\u0438\u0435",
+    line2: "",
+    collapsed: false,
+    tags: []
+  };
+  function ensureInbox(nextState) {
+    const state = clone4(nextState);
+    const items = state.snapshot?.items || [];
+    if (!items.some((item) => item.id === INBOX_ITEM.id)) {
+      state.snapshot.items = [clone4(INBOX_ITEM), ...items];
+    }
+    return state;
+  }
+  function normalizeState(nextState) {
+    if (nextState?.snapshot?.items) return { snapshot: { items: clone4(nextState.snapshot.items) } };
+    if (Array.isArray(nextState?.items)) return { snapshot: { items: clone4(nextState.items) } };
+    return { snapshot: { items: [] } };
   }
   function decodePathSegment(segment) {
     return segment.replace(/~1/g, "/").replace(/~0/g, "~");
   }
   function applyJsonPatch(document2, patch) {
-    const nextDocument = clone2(document2);
+    const nextDocument = clone4(document2);
     for (const operation of patch) {
       const segments = operation.path.split("/").slice(1).map(decodePathSegment);
       const lastSegment = segments.pop();
@@ -1363,7 +3008,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         target = target[Array.isArray(target) ? Number(segment) : segment];
       }
       if (operation.op === "replace" || operation.op === "add") {
-        target[Array.isArray(target) ? Number(lastSegment) : lastSegment] = clone2(operation.value);
+        target[Array.isArray(target) ? Number(lastSegment) : lastSegment] = clone4(operation.value);
       } else if (operation.op === "remove") {
         if (Array.isArray(target)) target.splice(Number(lastSegment), 1);
         else delete target[lastSegment];
@@ -1373,36 +3018,32 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     }
     return nextDocument;
   }
-  function createStore({ storageKey = "voicelist.universal-list.state", storage = window.localStorage, seedState: seedState2 }) {
+  function createStore({ storageKey = "searchmydata.list.state", storage = window.localStorage, seedState: seedState2 }) {
     let state = null;
+    let legacyActionLog = null;
     function persist() {
       storage.setItem(storageKey, JSON.stringify(state));
     }
     function load() {
       const raw = storage.getItem(storageKey);
-      state = raw ? JSON.parse(raw) : clone2(seedState2);
-      if (!raw) persist();
-      return clone2(state);
+      const parsed = raw ? JSON.parse(raw) : seedState2;
+      legacyActionLog = Array.isArray(parsed?.actionLog) ? clone4(parsed.actionLog) : [];
+      state = ensureInbox(normalizeState(parsed));
+      persist();
+      return clone4(state);
     }
     function getState() {
       if (!state) return load();
-      return clone2(state);
+      return clone4(state);
     }
     function replaceState(nextState) {
-      state = clone2(nextState);
+      state = ensureInbox(normalizeState(nextState));
       persist();
       return getState();
     }
-    function applyMutation({ patch = [], actionLogEntry = null }) {
+    function applyMutation({ patch = [] }) {
       if (!state) load();
       state = applyJsonPatch(state, patch);
-      if (actionLogEntry) state.actionLog.push(actionLogEntry);
-      persist();
-      return getState();
-    }
-    function updateActionLogStatus(logId, syncStatus) {
-      if (!state) load();
-      state.actionLog = state.actionLog.map((entry) => entry.id === logId ? { ...entry, syncStatus } : entry);
       persist();
       return getState();
     }
@@ -1411,58 +3052,622 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       getState,
       load,
       replaceState,
-      updateActionLogStatus
+      takeLegacyActionLog() {
+        const entries = legacyActionLog || [];
+        legacyActionLog = [];
+        return clone4(entries);
+      }
     };
   }
 
   // src/list-sync.js
-  function createSync({ adapter, onStateChange, store, autoSaveMs = 6e4 }) {
+  function createSync({ transport, logStore, onLogEntriesChange }) {
     let queue = Promise.resolve();
-    let autoSaveTimer = null;
     function chain(task) {
       queue = queue.then(task);
       return queue;
     }
-    function enqueue(state, actionLogEntry) {
-      if (!actionLogEntry) return queue;
+    function finalize(id, syncStatus) {
+      logStore.updateEntry(id, (entry) => ({ ...entry, syncStatus }));
+      onLogEntriesChange?.(logStore.listEntries());
+    }
+    function enqueueCreate(entry) {
+      if (!entry) return queue;
       return chain(async () => {
         try {
-          await adapter.save(state, { reason: "mutation", createBackup: false });
-          const nextState = store.updateActionLogStatus(actionLogEntry.id, "synced");
-          onStateChange(nextState);
+          await transport.create(entry);
+          finalize(entry.id, "synced");
         } catch (error) {
-          const nextState = store.updateActionLogStatus(actionLogEntry.id, "failed");
-          onStateChange(nextState);
+          finalize(entry.id, "failed");
         }
       });
     }
-    function start(getState) {
-      if (autoSaveTimer) return;
-      autoSaveTimer = setInterval(() => {
-        const state = getState();
-        if (!state) return;
-        chain(async () => {
-          try {
-            await adapter.save(state, { reason: "autosave", createBackup: true });
-          } catch (error) {
-            console.warn("Autosave failed", error);
+    function enqueueUpdate(entry) {
+      if (!entry) return queue;
+      return chain(async () => {
+        try {
+          await transport.update(entry);
+          finalize(entry.id, "synced");
+        } catch (error) {
+          finalize(entry.id, "failed");
+        }
+      });
+    }
+    return { enqueueCreate, enqueueUpdate };
+  }
+
+  // src/asr-browser.js
+  var BrowserASR = class {
+    constructor({ recognitionFactory = null, finalTimeoutMs = 1500 } = {}) {
+      this.recognitionFactory = recognitionFactory;
+      this.finalTimeoutMs = finalTimeoutMs;
+      this.finalText = "";
+      this.interimText = "";
+      this.started = false;
+    }
+    createRecognition() {
+      if (this.recognitionFactory) return this.recognitionFactory();
+      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      return Recognition ? new Recognition() : null;
+    }
+    start(handlers) {
+      this.handlers = handlers;
+      const recognition = this.createRecognition();
+      if (!recognition) {
+        handlers.onError("denied");
+        return false;
+      }
+      this.recognition = recognition;
+      recognition.lang = "ru-RU";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        let interim = "";
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const text = event.results[index][0]?.transcript?.trim() || "";
+          if (!text) continue;
+          if (event.results[index].isFinal) {
+            this.finalText = `${this.finalText} ${text}`.trim();
+            handlers.onFinal(this.finalText);
+          } else {
+            interim = `${interim} ${text}`.trim();
           }
-        });
-      }, autoSaveMs);
+        }
+        if (interim) {
+          this.interimText = interim;
+          handlers.onInterim(interim);
+        }
+      };
+      recognition.onerror = (event) => {
+        const code = event.error === "not-allowed" || event.error === "service-not-allowed" ? "denied" : "aborted";
+        handlers.onError(code);
+      };
+      try {
+        recognition.start();
+        this.started = true;
+        return true;
+      } catch {
+        handlers.onError("denied");
+        return false;
+      }
     }
-    function stop() {
-      if (!autoSaveTimer) return;
-      clearInterval(autoSaveTimer);
-      autoSaveTimer = null;
+    stop() {
+      if (!this.started) return Promise.resolve();
+      this.started = false;
+      return new Promise((resolve2) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve2();
+        };
+        const timer = setTimeout(() => {
+          if (!this.finalText) this.handlers.onError("timeout");
+          finish();
+        }, this.finalTimeoutMs);
+        this.recognition.onend = finish;
+        try {
+          this.recognition.stop();
+        } catch {
+          finish();
+        }
+      });
     }
-    return { enqueue, start, stop };
+    hasInterim() {
+      return true;
+    }
+  };
+
+  // src/asr-mock.js
+  var MockASR = class {
+    constructor({ phrase = "", failure = null, interim = true } = {}) {
+      this.phrase = phrase;
+      this.failure = failure;
+      this.interim = interim;
+      this.started = false;
+    }
+    // handlers: { onInterim(text), onFinal(text), onError(code) }
+    start(handlers) {
+      this.handlers = handlers;
+      if (this.failure === "denied") {
+        handlers.onError("denied");
+        return false;
+      }
+      this.started = true;
+      return true;
+    }
+    // Проиграть речь: слово за словом, как отдаёт живой движок.
+    speak() {
+      if (!this.started) return;
+      if (this.failure === "aborted") {
+        this.handlers.onError("aborted");
+        this.started = false;
+        return;
+      }
+      if (!this.interim) return;
+      const words = this.phrase.split(" ").filter(Boolean);
+      const acc = [];
+      for (const w of words) {
+        acc.push(w);
+        this.handlers.onInterim(acc.join(" "));
+      }
+    }
+    // Отпускание пальца: движок отдаёт финал либо молчит до таймаута.
+    stop() {
+      if (!this.started) return;
+      this.started = false;
+      if (this.failure === "timeout") {
+        this.handlers.onError("timeout");
+        return;
+      }
+      this.handlers.onFinal(this.phrase);
+    }
+    hasInterim() {
+      return this.interim;
+    }
+  };
+
+  // src/gesture.js
+  var C = {
+    LONGPRESS_MS: 400,
+    ARM_SLOP_PX: 10,
+    CONTEXT_DX_PX: -40,
+    CONTEXT_RATIO: 2,
+    CONTEXT_WINDOW_MS: 250,
+    DEADZONE_PX: 16,
+    ROW_H_PX: 48,
+    CANCEL_ZONE_PX: 56,
+    FREEZE_DY_PX: 24,
+    MIN_HOLD_MS: 150,
+    FINAL_TIMEOUT_MS: 1500
+  };
+  function selectAt(dy, n, c = C) {
+    if (dy <= -c.CANCEL_ZONE_PX) return { zone: "cancel", index: null };
+    if (dy < c.DEADZONE_PX) return { zone: "as-is", index: null };
+    if (n === 0) return { zone: "as-is", index: null };
+    const raw = Math.floor((dy - c.DEADZONE_PX) / c.ROW_H_PX);
+    return { zone: "candidate", index: Math.min(raw, n - 1) };
+  }
+
+  // src/command-resolver.js
+  var STEM_PREFIX2 = 4;
+  var STEM_MAX_DELTA = 3;
+  var TYPO_DIST2 = 1;
+  var TYPO_MINLEN2 = 6;
+  var W_EXACT2 = 3;
+  var W_STEM2 = 2;
+  var W_TYPO2 = 1;
+  var EXACT_ONLY = /* @__PURE__ */ new Set(["\u044D\u0442\u043E", "\u0432", "\u0432\u043E", "\u043D\u0430", "\u043A", "\u043A\u043E", "\u0442\u0443\u0442", "\u043C\u043D\u0435", "\u043A\u0430\u043A", "\u0433\u0434\u0435"]);
+  var LEAD_PREP = /* @__PURE__ */ new Set(["\u0432", "\u0432\u043E", "\u043D\u0430", "\u043A", "\u043A\u043E"]);
+  var FRAMES = [
+    // --- со слотом ---
+    {
+      command: "addChild",
+      slot: "required",
+      ctx: "optional",
+      target: false,
+      forms: [
+        "\u0434\u043E\u0431\u0430\u0432\u044C",
+        "\u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C",
+        "\u0437\u0430\u043F\u0438\u0448\u0438",
+        "\u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C",
+        "\u0441\u043E\u0437\u0434\u0430\u0439",
+        "\u0441\u043E\u0437\u0434\u0430\u0442\u044C",
+        "\u043D\u043E\u0432\u0430\u044F",
+        "\u043D\u043E\u0432\u044B\u0439",
+        "\u043D\u043E\u0432\u043E\u0435",
+        "\u043D\u0443\u0436\u043D\u043E",
+        "\u043D\u0430\u0434\u043E",
+        "\u043C\u043D\u0435 \u043D\u0443\u0436\u043D\u043E",
+        "\u043D\u0443\u0436\u043D\u043E \u0441\u0434\u0435\u043B\u0430\u0442\u044C",
+        "\u043D\u0430\u0434\u043E \u0441\u0434\u0435\u043B\u0430\u0442\u044C"
+      ]
+    },
+    {
+      command: "addChild",
+      slot: "required",
+      ctx: "required",
+      target: false,
+      forms: [
+        "\u0434\u043E\u0431\u0430\u0432\u044C \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0443",
+        "\u0434\u043E\u0431\u0430\u0432\u044C \u0431\u043B\u043E\u043A\u0435\u0440",
+        "\u0441\u043D\u0430\u0447\u0430\u043B\u0430",
+        "\u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u043D\u0443\u0436\u043D\u043E",
+        "\u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u043D\u0430\u0434\u043E",
+        "\u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u0441\u0434\u0435\u043B\u0430\u0442\u044C",
+        "\u0442\u0443\u0442 \u0441\u043D\u0430\u0447\u0430\u043B\u0430",
+        "\u0442\u0443\u0442 \u0441\u043D\u0430\u0447\u0430\u043B\u0430 \u043D\u0443\u0436\u043D\u043E"
+      ]
+    },
+    {
+      command: "setParent",
+      slot: "required",
+      ctx: "required",
+      target: true,
+      forms: [
+        "\u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0438",
+        "\u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438",
+        "\u043F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438",
+        "\u043F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C",
+        "\u0432\u043B\u043E\u0436\u0438",
+        "\u0441\u0434\u0435\u043B\u0430\u0439 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0435\u0439",
+        "\u044D\u0442\u043E \u0432",
+        "\u044D\u0442\u043E"
+      ]
+    },
+    {
+      command: "editItem",
+      slot: "required",
+      ctx: "required",
+      target: false,
+      forms: [
+        "\u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u0443\u0439",
+        "\u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C",
+        "\u043D\u0430\u0437\u043E\u0432\u0438",
+        "\u043D\u0430\u0437\u0432\u0430\u0442\u044C",
+        "\u0438\u0441\u043F\u0440\u0430\u0432\u044C",
+        "\u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C"
+      ]
+    },
+    {
+      command: "showSearch",
+      slot: "required",
+      ctx: "ignored",
+      target: true,
+      forms: ["\u043D\u0430\u0439\u0434\u0438", "\u043D\u0430\u0439\u0442\u0438", "\u0438\u0449\u0438", "\u0438\u0441\u043A\u0430\u0442\u044C", "\u043F\u043E\u043A\u0430\u0436\u0438", "\u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C", "\u043F\u043E\u0438\u0441\u043A", "\u0433\u0434\u0435"]
+    },
+    // --- без слота ---
+    {
+      command: "setStatus",
+      status: "Done",
+      slot: "none",
+      ctx: "required",
+      target: false,
+      forms: [
+        "\u0433\u043E\u0442\u043E\u0432\u043E",
+        "\u0433\u043E\u0442\u043E\u0432\u0430",
+        "\u0441\u0434\u0435\u043B\u0430\u043D\u043E",
+        "\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E",
+        "\u0437\u0430\u043A\u0440\u043E\u0439",
+        "\u0437\u0430\u043A\u0440\u044B\u0442\u044C",
+        "\u0437\u0430\u0432\u0435\u0440\u0448\u0438",
+        "\u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C",
+        "\u044D\u0442\u043E \u0433\u043E\u0442\u043E\u0432\u043E",
+        "\u044D\u0442\u043E \u0441\u0434\u0435\u043B\u0430\u043D\u043E"
+      ]
+    },
+    {
+      command: "setStatus",
+      status: "Focus",
+      slot: "none",
+      ctx: "required",
+      target: false,
+      forms: ["\u0441\u0444\u043E\u043A\u0443\u0441\u0438\u0440\u0443\u0439", "\u0444\u043E\u043A\u0443\u0441\u0438\u0440\u0443\u0439", "\u044D\u0442\u043E \u0432 \u0444\u043E\u043A\u0443\u0441", "\u044D\u0442\u043E \u0444\u043E\u043A\u0443\u0441"]
+    },
+    {
+      command: "setStatus",
+      status: "Pause",
+      slot: "none",
+      ctx: "required",
+      target: false,
+      forms: ["\u043E\u0442\u043B\u043E\u0436\u0438", "\u043E\u0442\u043B\u043E\u0436\u0438\u0442\u044C", "\u044D\u0442\u043E \u043D\u0430 \u043F\u0430\u0443\u0437\u0443", "\u044D\u0442\u043E \u043F\u0430\u0443\u0437\u0443", "\u044D\u0442\u043E \u043F\u043E\u0442\u043E\u043C"]
+    },
+    {
+      command: "setStatus",
+      status: "Archive",
+      slot: "none",
+      ctx: "required",
+      target: false,
+      forms: [
+        "\u0443\u0434\u0430\u043B\u0438",
+        "\u0443\u0434\u0430\u043B\u0438\u0442\u044C",
+        "\u0443\u0431\u0435\u0440\u0438",
+        "\u0443\u0431\u0440\u0430\u0442\u044C",
+        "\u0437\u0430\u0430\u0440\u0445\u0438\u0432\u0438\u0440\u0443\u0439",
+        "\u044D\u0442\u043E \u0432 \u0430\u0440\u0445\u0438\u0432",
+        "\u044D\u0442\u043E \u0430\u0440\u0445\u0438\u0432"
+      ]
+    },
+    {
+      command: "setStatus",
+      status: "Open",
+      slot: "none",
+      ctx: "required",
+      target: false,
+      forms: [
+        "\u0441\u043D\u0438\u043C\u0438",
+        "\u0441\u043D\u0438\u043C\u0438 \u0444\u043E\u043A\u0443\u0441",
+        "\u0441\u043D\u0438\u043C\u0438 \u043F\u0430\u0443\u0437\u0443",
+        "\u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438",
+        "\u044D\u0442\u043E \u0432 \u0440\u0430\u0431\u043E\u0442\u0443",
+        "\u044D\u0442\u043E \u0440\u0430\u0431\u043E\u0442\u0443"
+      ]
+    },
+    {
+      command: "undo",
+      slot: "none",
+      ctx: "forbidden",
+      target: false,
+      forms: ["\u043E\u0442\u043C\u0435\u043D\u0438", "\u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C", "\u043E\u0442\u043A\u0430\u0442\u0438", "\u043E\u0442\u043A\u0430\u0442\u0438\u0442\u044C", "\u0432\u0435\u0440\u043D\u0438 \u043A\u0430\u043A \u0431\u044B\u043B\u043E"]
+    }
+  ];
+  var RULES = [];
+  for (const f of FRAMES) {
+    for (const form of f.forms) {
+      const tokens = form.split(" ");
+      RULES.push({ ...f, form, tokens, len: tokens.length });
+    }
+  }
+  var MAX_FORM_LEN = RULES.reduce((m, r) => Math.max(m, r.len), 1);
+  function tier(spoken, formToken) {
+    if (spoken === formToken) return W_EXACT2;
+    if (EXACT_ONLY.has(formToken)) return 0;
+    const minLen = Math.min(spoken.length, formToken.length);
+    let c = 0;
+    while (c < minLen && spoken[c] === formToken[c]) c++;
+    if (c >= STEM_PREFIX2 && c === minLen && Math.abs(spoken.length - formToken.length) <= STEM_MAX_DELTA) return W_STEM2;
+    if (TYPO_DIST2 > 0 && spoken.length >= TYPO_MINLEN2 && formToken.length >= TYPO_MINLEN2 && damerauLevenshtein(spoken, formToken) <= TYPO_DIST2) return W_TYPO2;
+    return 0;
+  }
+  function matchForm(tokens, rule) {
+    let w = 0;
+    for (let i = 0; i < rule.len; i++) {
+      const t = tier(tokens[i], rule.tokens[i]);
+      if (t === 0) return null;
+      w += t;
+    }
+    return w;
+  }
+  function stripLeadPrep(tokens) {
+    return tokens.length && LEAD_PREP.has(tokens[0]) ? tokens.slice(1) : tokens;
+  }
+  function ctxOk(rule, context) {
+    if (rule.ctx === "required") return context != null;
+    if (rule.ctx === "forbidden") return context == null;
+    return true;
+  }
+  function sameCommand(a, b) {
+    return a.command === b.command && (a.status ?? null) === (b.status ?? null);
+  }
+  function parseCommand(text, context) {
+    const T = tokenize(normalize(text));
+    if (T.length === 0) return { kind: "empty", why: "no-input" };
+    for (let len = Math.min(MAX_FORM_LEN, T.length); len >= 1; len--) {
+      const H = [];
+      let matchedAtThisLen = false;
+      for (const rule of RULES) {
+        if (rule.len !== len) continue;
+        const w = matchForm(T, rule);
+        if (w === null) continue;
+        matchedAtThisLen = true;
+        const tail = stripLeadPrep(T.slice(len));
+        if (rule.slot === "required" && tail.length === 0) continue;
+        if (rule.slot === "none" && tail.length > 0) continue;
+        if (!ctxOk(rule, context)) continue;
+        H.push({ rule, n: len, w, tail: tail.join(" ") });
+      }
+      if (H.length === 0) {
+        if (matchedAtThisLen) return { kind: "empty", why: "shape" };
+        continue;
+      }
+      H.sort((a, b) => b.n - a.n || b.w - a.w);
+      const best = H[0], second = H[1];
+      const tie = !!second && best.n === second.n && best.w === second.w && !sameCommand(best.rule, second.rule);
+      if (tie) return { kind: "vector", why: "tie", hypotheses: H };
+      return { kind: "one", hypothesis: best };
+    }
+    return { kind: "empty", why: "no-verb" };
+  }
+  function toCommand(h, context) {
+    const r = h.rule;
+    switch (r.command) {
+      case "addChild":
+        return { command: "addChild", actId: context ?? "inbox", payload: { line1: h.tail } };
+      case "editItem":
+        return { command: "editItem", actId: context, payload: { line1: h.tail } };
+      case "setParent":
+        return { command: "setParent", actId: context, payload: { parentId: null } };
+      case "showSearch":
+        return { command: "showSearch", actId: null, payload: { query: h.tail } };
+      case "setStatus":
+        return { command: "setStatus", actId: context, payload: { status: r.status } };
+      case "undo":
+        return { command: "undo", actId: null, payload: {} };
+      default:
+        return null;
+    }
+  }
+  var THETA = {
+    STEM_PREFIX: STEM_PREFIX2,
+    STEM_MAX_DELTA,
+    TYPO_DIST: TYPO_DIST2,
+    TYPO_MINLEN: TYPO_MINLEN2,
+    W_EXACT: W_EXACT2,
+    W_STEM: W_STEM2,
+    W_TYPO: W_TYPO2
+  };
+
+  // src/voice-session.js
+  var MESSAGES = {
+    denied: "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443",
+    aborted: "\u0420\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u0432\u0430\u043D\u0438\u0435 \u043F\u0440\u0435\u0440\u0432\u0430\u043D\u043E",
+    timeout: "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B, \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435",
+    stale: "\u0417\u0430\u0434\u0430\u0447\u0430 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0430\u0441\u044C, \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435",
+    notFound: "\u041D\u0435 \u043D\u0430\u0448\u0451\u043B",
+    degraded: "\u0412\u044B\u0431\u043E\u0440 \u043A\u043E\u043C\u0430\u043D\u0434\u044B \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D"
+  };
+  function buildOverlay(text, context, tasks) {
+    const p = parseCommand(text, context);
+    if (p.kind !== "one") return { finger: { kind: "fallback" }, stack: [], parse: p };
+    const h = p.hypothesis;
+    const cmd = toCommand(h, context);
+    if (h.rule.command === "setParent") {
+      const rows = adaptForReparent(tasks, context);
+      const r = resolve(h.tail, findCandidates(h.tail, rows));
+      if (r.kind === "empty") return { finger: { kind: "blocked", why: "notFound" }, stack: [], parse: p };
+      const ids = r.kind === "one" ? [r.id] : r.candidates.map((c) => c.id);
+      const stack = ids.map((id) => ({
+        label: labelOf(tasks, id),
+        command: { ...cmd, payload: { parentId: id } }
+      }));
+      return { finger: stack[0], stack: stack.slice(1), parse: p };
+    }
+    if (h.rule.command === "showSearch" || h.rule.command === "addChild") {
+      const rows = adaptSnapshot(tasks);
+      const r = resolve(h.tail, findCandidates(h.tail, rows));
+      const ids = r.kind === "one" ? [r.id] : r.kind === "vector" ? r.candidates.map((c) => c.id) : [];
+      return {
+        finger: { kind: "command", command: cmd },
+        stack: ids.map((id) => ({
+          label: labelOf(tasks, id),
+          command: { command: "viewItem", actId: id, payload: {} }
+        })),
+        parse: p
+      };
+    }
+    return { finger: { kind: "command", command: cmd }, stack: [], parse: p };
+  }
+  function labelOf(tasks, id) {
+    const t = tasks.find((x) => x.id === id);
+    return t ? t.line1 : id;
+  }
+  var VoiceSession = class {
+    constructor({ tasks, asr, constants = C, onUpdate = null }) {
+      this.tasks = tasks;
+      this.asr = asr;
+      this.c = constants;
+      this.onUpdate = onUpdate;
+      this.messages = [];
+      this.log = [];
+      this.overlay = { finger: { kind: "fallback" }, stack: [] };
+      this.recomputes = 0;
+      this.tokenCount = 0;
+      this.text = "";
+      this.finalText = null;
+      this.context = null;
+      this.armed = false;
+      this.frozenStack = null;
+    }
+    emitUpdate() {
+      this.onUpdate?.(this);
+    }
+    message(code) {
+      this.messages.push(MESSAGES[code] ?? code);
+      this.log.push({ event: code });
+      this.emitUpdate();
+    }
+    arm(context) {
+      const ok = this.asr.start({
+        onInterim: (t) => this.onInterim(t),
+        onFinal: (t) => {
+          this.finalText = t;
+        },
+        onError: (code) => {
+          this.error = code;
+          this.message(code);
+        }
+      });
+      if (!ok) return false;
+      this.armed = true;
+      this.context = context;
+      this.log.push({ event: "overlay-shown", constants: this.c, theta: THETA });
+      if (!this.asr.hasInterim()) this.message("degraded");
+      this.emitUpdate();
+      return true;
+    }
+    // Пересчёт только при появлении нового слова.
+    onInterim(text) {
+      const n = tokenize(normalize(text)).length;
+      if (n <= this.tokenCount) return;
+      this.tokenCount = n;
+      this.text = text;
+      this.recompute();
+    }
+    recompute() {
+      const next = buildOverlay(this.text, this.context, this.tasks);
+      if (this.frozenStack) next.stack = this.frozenStack;
+      this.overlay = next;
+      this.recomputes++;
+      this.emitUpdate();
+    }
+    move(dy) {
+      this.dy = dy;
+      if (dy >= this.c.FREEZE_DY_PX && !this.frozenStack) this.frozenStack = this.overlay.stack;
+      this.emitUpdate();
+    }
+    // Отпускание: сначала финал, потом решение.
+    release(dy) {
+      this.dy = dy;
+      const stopped = this.asr.stop();
+      if (stopped && typeof stopped.then === "function") {
+        return stopped.then(() => this.resolveRelease(dy));
+      }
+      return this.resolveRelease(dy);
+    }
+    resolveRelease(dy) {
+      if (this.error) return { action: "cancel", why: this.error };
+      if (this.finalText !== null && this.finalText !== this.text) {
+        this.text = this.finalText;
+        this.tokenCount = tokenize(normalize(this.finalText)).length;
+        this.recompute();
+      }
+      if (!this.asr.hasInterim()) this.overlay = { finger: { kind: "fallback" }, stack: [] };
+      const sel = selectAt(dy, this.overlay.stack.length, this.c);
+      if (sel.zone === "cancel") {
+        this.log.push({ event: "cancelled" });
+        return { action: "cancel" };
+      }
+      if (sel.zone === "candidate") {
+        const pick = this.overlay.stack[sel.index];
+        return { action: "command", command: pick.command, label: pick.label };
+      }
+      const f = this.overlay.finger;
+      if (f.kind === "fallback") return { action: "fallback", text: this.text };
+      if (f.kind === "blocked") {
+        this.message(f.why);
+        return { action: "cancel", why: f.why };
+      }
+      return { action: "command", command: f.command, label: f.label };
+    }
+  };
+  function validate(command, tasks) {
+    const ids = [command.actId, command.payload && command.payload.parentId].filter(
+      (v) => v != null && v !== "inbox"
+    );
+    return ids.every((id) => tasks.some((t) => t.id === id));
   }
 
   // src/list-ui.js
   var AVAILABLE_TAGS = ["\u0412\u0430\u0436\u043D\u043E\u0435", "\u0421\u0440\u043E\u0447\u043D\u043E", "\u041A\u0443\u043F\u0438\u0442\u044C", "\u0414\u043E\u043C", "\u0420\u0430\u0431\u043E\u0442\u0430", "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"];
-  var STATUS_ACTIONS = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause"]);
+  var STATUS_ACTIONS = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause", "Info"]);
   var PANEL_ITEM_HEIGHT = 72;
-  function clone3(value) {
+  var VOICE_LONGPRESS_MS = 400;
+  var TAP_TOLERANCE_PX = 10;
+  var LONGPRESS_CANCEL_PX = 8;
+  var HORIZONTAL_SWIPE_LOCK_PX = 6;
+  var VERTICAL_SCROLL_CANCEL_PX = 15;
+  function clone5(value) {
     return JSON.parse(JSON.stringify(value));
   }
   function escHtml2(value) {
@@ -1486,7 +3691,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       return { id, parentId, order: currentOrder };
     });
   }
-  function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+  function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
     let dispatchUserInput = () => {
     };
     let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
@@ -1504,12 +3709,294 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     let tagAction = null;
     let taskPageOpen = false;
     let taskPageTargetId = null;
+    let settingsOpen = false;
+    let voiceState = null;
+    let voicePressTimer = null;
+    let voicePress = null;
     function showToast(message) {
       if (!toastEl) return;
       toastEl.textContent = message;
       toastEl.classList.add("show");
       clearTimeout(showToast.timer);
       showToast.timer = setTimeout(() => toastEl.classList.remove("show"), 1800);
+    }
+    function itemLabel(id) {
+      return findItem(getState(), id)?.line1 || "";
+    }
+    function logEntryLabel(id) {
+      return getState().actionLog?.find((entry) => entry.id === id)?.label || "\u0417\u0430\u043F\u0438\u0441\u044C \u0436\u0443\u0440\u043D\u0430\u043B\u0430";
+    }
+    function createVoiceAsr() {
+      const testConfig = window.__voiceTest;
+      if (testConfig) return new MockASR(testConfig);
+      return new BrowserASR({ finalTimeoutMs: C.FINAL_TIMEOUT_MS });
+    }
+    function renderVoiceOverlay(session = voiceState?.session) {
+      if (!voiceOverlay || !voiceState) return;
+      if (voiceState.kind === "log-comment") {
+        renderLogCommentOverlay();
+        return;
+      }
+      const activeSession = voiceState?.session;
+      if (!voiceOverlay || !activeSession) return;
+      if (session && session !== activeSession) return;
+      session = activeSession;
+      const selection = selectAt(voiceState?.dy || 0, session.overlay.stack.length, C);
+      const fingerLabel = labelVoiceFinger(session);
+      const candidateRows = session.overlay.stack.map((candidate, index) => ({
+        label: candidate.label,
+        selected: selection.zone === "candidate" && selection.index === index,
+        overlayIndex: index
+      })).reverse();
+      const fingerSelected = selection.zone !== "cancel" && selection.zone !== "candidate";
+      const cancelSelected = selection.zone === "cancel";
+      voiceOverlay.innerHTML = `
+      <div class="voice-transcript">${escHtml2(session.text || "\u0421\u043B\u0443\u0448\u0430\u044E...")}</div>
+      ${session.context ? `<div class="voice-context">${escHtml2(itemLabel(session.context))}</div>` : ""}
+      <div class="voice-stack">
+        ${candidateRows.map((row) => `<div class="voice-candidate${row.selected ? " selected" : ""}" data-voice-index="${row.overlayIndex}">${escHtml2(row.label)}</div>`).join("")}
+        <div class="voice-candidate voice-finger${fingerSelected ? " selected" : ""}" data-voice-index="-1">${escHtml2(fingerLabel)}</div>
+        <div class="voice-cancel${cancelSelected ? " selected" : ""}">\u041E\u0442\u043C\u0435\u043D\u0430</div>
+      </div>
+    `;
+      voiceOverlay.classList.add("open");
+      positionVoiceOverlay();
+    }
+    function renderLogCommentOverlay() {
+      const selection = selectAt(voiceState?.dy || 0, 0, C);
+      const fingerSelected = selection.zone !== "cancel";
+      const cancelSelected = selection.zone === "cancel";
+      const transcript = voiceState.finalText || voiceState.transcript || "\u0421\u043B\u0443\u0448\u0430\u044E \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439...";
+      voiceOverlay.innerHTML = `
+      <div class="voice-transcript">${escHtml2("\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439")}</div>
+      <div class="voice-context">${escHtml2(logEntryLabel(voiceState.logEntryId))}</div>
+      <div class="voice-stack">
+        <div class="voice-candidate voice-finger${fingerSelected ? " selected" : ""}" data-voice-index="-1">${escHtml2(transcript)}</div>
+        <div class="voice-cancel${cancelSelected ? " selected" : ""}">\u041E\u0442\u043C\u0435\u043D\u0430</div>
+      </div>
+    `;
+      voiceOverlay.classList.add("open");
+      positionVoiceOverlay();
+    }
+    function labelVoiceCommand(command) {
+      if (!command) return "";
+      if (command.command === "addChild") return `\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C: \u0437\u0430\u0434\u0430\u0447\u0443 ${command.payload.line1}`;
+      if (command.command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441: ${command.payload.status}`;
+      if (command.command === "setParent") return "\u041F\u0435\u0440\u0435\u043D\u0435\u0441\u0442\u0438";
+      if (command.command === "editItem") return `\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C: ${command.payload.line1}`;
+      if (command.command === "showSearch") return `\u041F\u043E\u0438\u0441\u043A: ${command.payload.query}`;
+      if (command.command === "undo") return "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C";
+      return command.command;
+    }
+    function labelVoiceFinger(session) {
+      const selected = session.overlay.finger;
+      if (selected?.kind === "command") return labelVoiceCommand(selected.command);
+      if (selected?.kind === "blocked") return "\u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
+      return session.text || "\u0421\u043B\u0443\u0448\u0430\u044E...";
+    }
+    function positionVoiceOverlay() {
+      if (!voiceOverlay || !voiceState) return;
+      const fingerRow = voiceOverlay.querySelector(".voice-finger");
+      if (!fingerRow) return;
+      const overlayRect = voiceOverlay.getBoundingClientRect();
+      const fingerRect = fingerRow.getBoundingClientRect();
+      const fingerCenter = fingerRect.top + fingerRect.height / 2;
+      const unclampedTop = overlayRect.top + (voiceState.anchorY - fingerCenter);
+      const maxTop = Math.max(12, window.innerHeight - overlayRect.height - 12);
+      const nextTop = Math.min(Math.max(12, unclampedTop), maxTop);
+      voiceOverlay.style.top = `${Math.round(nextTop)}px`;
+    }
+    function isFrontierView() {
+      return rootPanel.dataset.viewMode === "frontier";
+    }
+    function startVoice(contextId, anchorY) {
+      if (!isFrontierView()) return false;
+      if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
+      hideDrop();
+      hideTagPanel();
+      const asr = createVoiceAsr();
+      const session = new VoiceSession({
+        tasks: getState().snapshot.items,
+        asr,
+        onUpdate: renderVoiceOverlay
+      });
+      voiceState = { session, anchorY, dy: 0 };
+      const armed = session.arm(contextId);
+      if (!armed) {
+        const message = session.messages.at(-1) || "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443";
+        showToast(message);
+        voiceState = null;
+        return false;
+      }
+      renderVoiceOverlay(session);
+      asr.speak?.();
+      renderVoiceOverlay(session);
+      return true;
+    }
+    function startLogCommentVoice(logEntryId, anchorY) {
+      if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
+      const asr = createVoiceAsr();
+      const nextVoiceState = {
+        kind: "log-comment",
+        asr,
+        logEntryId,
+        anchorY,
+        dy: 0,
+        transcript: "",
+        finalText: "",
+        error: null
+      };
+      voiceState = nextVoiceState;
+      const armed = asr.start({
+        onInterim(text) {
+          if (voiceState !== nextVoiceState) return;
+          nextVoiceState.transcript = text;
+          renderVoiceOverlay();
+        },
+        onFinal(text) {
+          if (voiceState !== nextVoiceState) return;
+          nextVoiceState.finalText = text;
+          nextVoiceState.transcript = text;
+          renderVoiceOverlay();
+        },
+        onError(code) {
+          if (voiceState !== nextVoiceState) return;
+          nextVoiceState.error = code;
+        }
+      });
+      if (!armed) {
+        voiceState = null;
+        showToast("\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443");
+        return false;
+      }
+      renderVoiceOverlay();
+      asr.speak?.();
+      renderVoiceOverlay();
+      return true;
+    }
+    function resetRowGesture(row, actionBg) {
+      row.classList.remove("pressing");
+      row.style.transition = "transform 0.3s cubic-bezier(.4,0,.2,1)";
+      row.style.transform = "";
+      actionBg.style.opacity = "0";
+      hideDrop();
+      hideTagPanel();
+    }
+    function updateVoice(clientY) {
+      if (!voiceState) return;
+      voiceState.dy = voiceState.anchorY - clientY;
+      if (voiceState.session) voiceState.session.move(voiceState.dy);
+      renderVoiceOverlay();
+    }
+    async function finishLogCommentVoice(current) {
+      const stopped = current.asr.stop();
+      if (stopped && typeof stopped.then === "function") await stopped;
+      if (current.error === "aborted") {
+        showToast("\u0420\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u0432\u0430\u043D\u0438\u0435 \u043F\u0440\u0435\u0440\u0432\u0430\u043D\u043E");
+        return;
+      }
+      if (current.error === "timeout") {
+        showToast("\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B");
+        return;
+      }
+      if (selectAt(current.dy || 0, 0, C).zone === "cancel") return;
+      const text = String(current.finalText || current.transcript || "").trim();
+      if (!text) {
+        showToast("\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B");
+        return;
+      }
+      dispatchUserInput({
+        actId: current.logEntryId,
+        actType: "log-entry",
+        command: "commentLogEntry",
+        payload: { text },
+        source: "voice-log-comment"
+      });
+    }
+    async function finishVoice() {
+      if (!voiceState) return;
+      const current = voiceState;
+      voiceState = null;
+      voiceOverlay?.classList.remove("open");
+      if (current.kind === "log-comment") {
+        await finishLogCommentVoice(current);
+        return;
+      }
+      const transcript = String(current.session.finalText || current.session.text || "").trim() || null;
+      const result = await current.session.release(current.dy || 0);
+      handleVoiceResult(result, { transcript, contextId: current.session.context });
+    }
+    async function finishVoiceAtDy(dy) {
+      if (!voiceState) return;
+      const current = voiceState;
+      voiceState = null;
+      voiceOverlay?.classList.remove("open");
+      current.dy = dy;
+      if (current.kind === "log-comment") {
+        await finishLogCommentVoice(current);
+        return;
+      }
+      const transcript = String(current.session.finalText || current.session.text || "").trim() || null;
+      const result = await current.session.release(dy);
+      handleVoiceResult(result, { transcript, contextId: current.session.context });
+    }
+    function cancelVoice() {
+      if (!voiceState) return;
+      if (voiceState.kind === "log-comment") voiceState.asr.stop();
+      else voiceState.session.asr.stop();
+      voiceState = null;
+      voiceOverlay?.classList.remove("open");
+    }
+    function handleVoiceResult(result, meta = {}) {
+      if (!result || result.action === "cancel") {
+        if (result?.why) showToast(result.why);
+        return;
+      }
+      if (result.action === "fallback") {
+        const text = String(result.text || meta.transcript || "").trim();
+        showToast(text ? `\u041D\u0435 \u043F\u043E\u043D\u044F\u043B: ${text}` : "\u041D\u0435 \u0440\u0430\u0441\u0441\u043B\u044B\u0448\u0430\u043B");
+        if (text) {
+          dispatchUserInput({
+            actId: meta.contextId || "list",
+            actType: meta.contextId ? "task" : "list",
+            command: "logFallbackUtterance",
+            payload: { text },
+            source: "voice-fallback",
+            transcript: text
+          });
+        }
+        return;
+      }
+      const command = result.command;
+      if (!command) return;
+      const state = getState();
+      if (!validate(command, state.snapshot.items)) {
+        showToast("\u0417\u0430\u0434\u0430\u0447\u0430 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0430\u0441\u044C, \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435");
+        return;
+      }
+      if (command.command === "undo") {
+        if (!undoSnapshot) {
+          showToast("\u041D\u0435\u0447\u0435\u0433\u043E \u043E\u0442\u043C\u0435\u043D\u044F\u0442\u044C");
+          return;
+        }
+        dispatchUserInput({ ...command, payload: { snapshot: clone5(undoSnapshot) }, source: "voice", transcript: meta.transcript });
+        undoSnapshot = null;
+        undoButton.disabled = true;
+        return;
+      }
+      if (!String(command.command).startsWith("show") && command.command !== "viewItem") saveUndoSnapshot();
+      dispatchUserInput({ ...command, actType: command.actId ? "task" : "list", source: "voice", transcript: meta.transcript });
+    }
+    function queueVoicePress(nextPress) {
+      voicePress = nextPress;
+      if (voicePressTimer) clearTimeout(voicePressTimer);
+      voicePressTimer = setTimeout(() => {
+        const currentPress = voicePress;
+        voicePressTimer = null;
+        if (!currentPress) return;
+        if (currentPress.kind === "log-comment") startLogCommentVoice(currentPress.logEntryId, currentPress.y);
+        else startVoice(currentPress.contextId ?? null, currentPress.y);
+      }, VOICE_LONGPRESS_MS);
     }
     function setDispatch(nextDispatch) {
       dispatchUserInput = nextDispatch;
@@ -1523,6 +4010,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         { id: "done", label: "Done", icon: "\u2713", color: "#34c759", kind: "status", status: "Done" },
         { id: "pause-toggle", label: status === "Pause" ? "Open" : "Pause", icon: status === "Pause" ? "\u25EF" : "\u2161", color: "#5856d6", kind: "status", status: status === "Pause" ? "Open" : "Pause" },
         { id: "focus-toggle", label: status === "Focus" ? "Open" : "Focus", icon: status === "Focus" ? "\u25EF" : "\u25CE", color: "#ff9500", kind: "status", status: status === "Focus" ? "Open" : "Focus" },
+        { id: "info-toggle", label: status === "Info" ? "Open" : "Info", icon: status === "Info" ? "\u25EF" : "i", color: "#0a84ff", kind: "status", status: status === "Info" ? "Open" : "Info" },
         { id: "archive", label: "Archive", icon: "\u25A3", color: "#8e8e93", kind: "status", status: "Archive", default: true },
         { id: "edit-page", label: "Edit", icon: "\u270E", color: "#007aff", kind: "editPage" }
       ];
@@ -1663,6 +4151,45 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       overlay.classList.remove("open");
       modalOpen = false;
     }
+    function openSettings() {
+      if (!settingsOverlay) return;
+      settingsOpen = true;
+      settingsOverlay.classList.add("open");
+      settingsOverlay.setAttribute("aria-hidden", "false");
+      if (workflowyImportStatus) workflowyImportStatus.textContent = "";
+      workflowyUrlInput?.focus();
+    }
+    function closeSettings() {
+      if (!settingsOverlay) return;
+      settingsOpen = false;
+      settingsOverlay.classList.remove("open");
+      settingsOverlay.setAttribute("aria-hidden", "true");
+    }
+    async function importWorkflowyFromSettings() {
+      const url = workflowyUrlInput?.value.trim() || "";
+      if (!url) {
+        if (workflowyImportStatus) workflowyImportStatus.textContent = "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 Workflowy";
+        return;
+      }
+      if (workflowyImportButton) workflowyImportButton.disabled = true;
+      if (workflowyImportStatus) workflowyImportStatus.textContent = "\u0418\u043C\u043F\u043E\u0440\u0442...";
+      try {
+        await dispatchUserInput({
+          actId: "workflowy-import",
+          actType: "settings",
+          command: "importWorkflowy",
+          payload: { url },
+          source: "settings-import"
+        });
+        if (workflowyImportStatus) workflowyImportStatus.textContent = "\u0418\u043C\u043F\u043E\u0440\u0442 \u0437\u0430\u043F\u0443\u0449\u0435\u043D";
+        showToast("\u0418\u043C\u043F\u043E\u0440\u0442 Workflowy \u0437\u0430\u043F\u0443\u0449\u0435\u043D");
+      } catch (error) {
+        if (workflowyImportStatus) workflowyImportStatus.textContent = error.message || "\u0418\u043C\u043F\u043E\u0440\u0442 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D";
+        showToast("\u0418\u043C\u043F\u043E\u0440\u0442 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D");
+      } finally {
+        if (workflowyImportButton) workflowyImportButton.disabled = false;
+      }
+    }
     function confirmModal() {
       const line1 = input1.value.trim();
       const line2 = input2.value.trim();
@@ -1745,6 +4272,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         taskPageLine1.focus();
         return;
       }
+      saveUndoSnapshot();
       dispatchUserInput({
         actId: taskPageTargetId,
         actType: "task",
@@ -1786,9 +4314,40 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       addButton.addEventListener("click", () => {
         dispatchUserInput({ actId: "list", actType: "list", command: "showAddModal", payload: {}, source: "add-button" });
       });
+      settingsButton?.addEventListener("click", openSettings);
+      settingsClose?.addEventListener("click", closeSettings);
+      settingsOverlay?.addEventListener("click", (event) => {
+        if (event.target === settingsOverlay) closeSettings();
+      });
+      workflowyImportButton?.addEventListener("click", () => {
+        importWorkflowyFromSettings();
+      });
+      workflowyUrlInput?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") importWorkflowyFromSettings();
+      });
       btnCancel.addEventListener("click", closeModal);
       overlay.addEventListener("click", (event) => {
         if (event.target === overlay) closeModal();
+      });
+      voiceOverlay?.addEventListener("click", (event) => {
+        if (!voiceState) return;
+        const cancelEl = event.target.closest(".voice-cancel");
+        if (cancelEl) {
+          finishVoiceAtDy(-C.CANCEL_ZONE_PX);
+          return;
+        }
+        const candidateEl = event.target.closest(".voice-candidate");
+        if (!candidateEl) return;
+        if (voiceState.kind === "log-comment") {
+          finishVoiceAtDy(0);
+          return;
+        }
+        const overlayIndex = Number(candidateEl.dataset.voiceIndex || "-1");
+        if (overlayIndex < 0) {
+          finishVoiceAtDy(0);
+          return;
+        }
+        finishVoiceAtDy(C.DEADZONE_PX + overlayIndex * C.ROW_H_PX + 1);
       });
       btnConfirm.addEventListener("click", confirmModal);
       [input1, input2].forEach((input) => input.addEventListener("keydown", (event) => {
@@ -1806,7 +4365,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           actId: "list",
           actType: "list",
           command: "undo",
-          payload: { snapshot: clone3(undoSnapshot) },
+          payload: { snapshot: clone5(undoSnapshot) },
           source: "undo-button"
         });
         undoSnapshot = null;
@@ -1814,7 +4373,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         showToast("\u041E\u0442\u043C\u0435\u043D\u0435\u043D\u043E");
       });
       viewToggleButton.addEventListener("click", () => {
-        const wantsLog = rootPanel.dataset.viewMode !== "log";
+        const wantsLog = rootPanel.dataset.viewMode !== "log" && rootPanel.dataset.viewMode !== "search";
         dispatchUserInput({
           actId: wantsLog ? "actionLog" : "list",
           actType: wantsLog ? "panel" : "list",
@@ -1824,7 +4383,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         });
       });
       frontierButton?.addEventListener("click", () => {
-        const wantsFrontier = rootPanel.dataset.viewMode !== "frontier";
+        const wantsFrontier = rootPanel.dataset.viewMode !== "frontier" && rootPanel.dataset.viewMode !== "search";
         dispatchUserInput({
           actId: wantsFrontier ? "frontier" : "list",
           actType: wantsFrontier ? "tab" : "list",
@@ -1833,18 +4392,75 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           source: "frontier-tab"
         });
       });
+      container.addEventListener("mousedown", (event) => {
+        if (event.button !== 0 || event.target.closest(".list-item,button,input,select,textarea")) return;
+        queueVoicePress({ kind: "command", contextId: null, x: event.clientX, y: event.clientY });
+      });
+      container.addEventListener("touchstart", (event) => {
+        if (event.target.closest(".list-item,button,input,select,textarea")) return;
+        const touch = event.touches[0];
+        queueVoicePress({ kind: "command", contextId: null, x: touch.clientX, y: touch.clientY });
+      }, { passive: true });
+      actionLogPanel?.addEventListener("mousedown", (event) => {
+        if (event.button !== 0) return;
+        const row = event.target.closest(".action-log-row");
+        if (!row?.dataset.logId) return;
+        queueVoicePress({ kind: "log-comment", logEntryId: row.dataset.logId, x: event.clientX, y: event.clientY });
+      });
+      actionLogPanel?.addEventListener("touchstart", (event) => {
+        const row = event.target.closest(".action-log-row");
+        if (!row?.dataset.logId) return;
+        const touch = event.touches[0];
+        queueVoicePress({ kind: "log-comment", logEntryId: row.dataset.logId, x: touch.clientX, y: touch.clientY });
+      }, { passive: true });
       document.addEventListener("touchmove", (event) => {
+        if (voicePressTimer) {
+          const touch = event.touches[0];
+          if (Math.abs(touch.clientX - voicePress.x) > 10 || Math.abs(touch.clientY - voicePress.y) > 10) {
+            clearTimeout(voicePressTimer);
+            voicePressTimer = null;
+          }
+        }
+        if (voiceState) {
+          event.preventDefault();
+          updateVoice(event.touches[0].clientY);
+          return;
+        }
         if (!dragState) return;
         event.preventDefault();
         updateDrag(event.touches[0].clientY, event.touches[0].clientX);
       }, { passive: false });
       document.addEventListener("touchend", () => {
+        if (voicePressTimer) {
+          clearTimeout(voicePressTimer);
+          voicePressTimer = null;
+        }
+        if (voiceState) {
+          finishVoice();
+          return;
+        }
         if (dragState) finalizeDrag();
       }, { passive: true });
       document.addEventListener("touchcancel", () => {
-        if (dragState) finalizeDrag();
+        if (voicePressTimer) {
+          clearTimeout(voicePressTimer);
+          voicePressTimer = null;
+        }
+        if (voiceState) {
+          cancelVoice();
+          return;
+        }
+        if (dragState) cancelActiveDrag();
       }, { passive: true });
       document.addEventListener("mousemove", (event) => {
+        if (voicePressTimer && (Math.abs(event.clientX - voicePress.x) > 10 || Math.abs(event.clientY - voicePress.y) > 10)) {
+          clearTimeout(voicePressTimer);
+          voicePressTimer = null;
+        }
+        if (voiceState) {
+          updateVoice(event.clientY);
+          return;
+        }
         if (dragState) {
           updateDrag(event.clientY, event.clientX);
           return;
@@ -1852,19 +4468,39 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         currentMouseGesture?.move(event.clientX, event.clientY);
       });
       document.addEventListener("mouseup", () => {
+        if (voicePressTimer) {
+          clearTimeout(voicePressTimer);
+          voicePressTimer = null;
+        }
+        if (voiceState) {
+          finishVoice();
+          return;
+        }
         if (dragState) {
-          finalizeDrag();
-          wasDragging = true;
-          setTimeout(() => {
-            wasDragging = false;
-          }, 300);
+          const handledAsTap = currentMouseGesture?.end(true) === true;
+          if (!handledAsTap && dragState) {
+            finalizeDrag();
+            wasDragging = true;
+            setTimeout(() => {
+              wasDragging = false;
+            }, 300);
+          }
+          currentMouseGesture = null;
         } else {
           currentMouseGesture?.end();
         }
       });
+      const cancelInterruptedDrag = () => {
+        if (dragState) cancelActiveDrag();
+      };
+      window.addEventListener("blur", cancelInterruptedDrag);
+      window.addEventListener("pagehide", cancelInterruptedDrag);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") cancelInterruptedDrag();
+      });
     }
     function saveUndoSnapshot() {
-      undoSnapshot = clone3(getState().snapshot);
+      undoSnapshot = clone5(getState().snapshot);
       undoButton.disabled = false;
     }
     function startAutoScroll() {
@@ -1881,6 +4517,23 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       if (!dragState?.children?.length) return;
       const transform = `translateY(${dragState.offsetY}px)`;
       for (const child of dragState.children) child.style.transform = transform;
+    }
+    function visibleDragWrappers(wrappers) {
+      return wrappers.filter((wrapper) => wrapper === dragState.wrapper || wrapper.offsetParent !== null);
+    }
+    function groupEndIndex(wrappers, startIndex) {
+      const baseLevel = Number(wrappers[startIndex]?.dataset.level || 0);
+      let endIndex = startIndex;
+      for (let index = startIndex + 1; index < wrappers.length; index += 1) {
+        if (Number(wrappers[index].dataset.level || 0) <= baseLevel) break;
+        endIndex = index;
+      }
+      return endIndex;
+    }
+    function moveDraggedGroupBefore(reference) {
+      const { wrapper, children } = dragState;
+      container.insertBefore(wrapper, reference);
+      for (const child of children) container.insertBefore(child, reference);
     }
     function clampToBoundary() {
       if (!dragState) return;
@@ -1908,38 +4561,58 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     function updateDraggedLevel() {
       const all = [...container.querySelectorAll(".list-item-wrapper")];
       const index = all.indexOf(dragState.wrapper);
-      let nextLevel = 0;
-      if (index > 0) {
+      let nextLevel = dragState.originalLevel;
+      if (dragState.rightShifted && index > 0) {
         const aboveLevel = Number(all[index - 1].dataset.level || 0);
-        nextLevel = dragState.rightShifted ? aboveLevel + 1 : aboveLevel;
+        nextLevel = aboveLevel + 1;
       }
       dragState.pendingLevel = nextLevel;
       dragState.wrapper.dataset.level = String(nextLevel);
       dragState.wrapper.style.marginLeft = `${nextLevel * 24}px`;
     }
+    function snapUnshiftedDragOutOfDeeperRows() {
+      const { wrapper, children, originalLevel, offsetY } = dragState;
+      if (offsetY >= 0) return;
+      const all = [...container.querySelectorAll(".list-item-wrapper")];
+      const index = all.indexOf(wrapper);
+      const groupEnd = index + children.length;
+      const aboveLevel = index > 0 ? Number(all[index - 1].dataset.level || 0) : originalLevel;
+      const belowLevel = groupEnd < all.length - 1 ? Number(all[groupEnd + 1].dataset.level || 0) : originalLevel;
+      if (aboveLevel <= originalLevel && belowLevel <= originalLevel) return;
+      let ancestor = null;
+      for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+        if (Number(all[cursor].dataset.level || 0) <= originalLevel) {
+          ancestor = all[cursor];
+          break;
+        }
+      }
+      if (!ancestor) return;
+      container.insertBefore(wrapper, ancestor);
+      for (const child of children) container.insertBefore(child, ancestor);
+    }
     function checkSwap() {
       const { wrapper, children } = dragState;
       const all = [...container.querySelectorAll(".list-item-wrapper")];
-      const index = all.indexOf(wrapper);
+      const visible = visibleDragWrappers(all);
+      const index = visible.indexOf(wrapper);
       const rect = wrapper.getBoundingClientRect();
       const midpoint = rect.top + rect.height / 2;
       if (index > 0) {
-        const previous = all[index - 1];
+        const previous = visible[index - 1];
         const previousRect = previous.getBoundingClientRect();
         if (midpoint < previousRect.top + previousRect.height / 2) {
-          container.insertBefore(wrapper, previous);
-          for (const child of children) container.insertBefore(child, previous);
+          moveDraggedGroupBefore(previous);
           dragState.offsetY += previousRect.height + 1;
           wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
           return;
         }
       }
-      const groupEnd = index + children.length;
-      if (groupEnd < all.length - 1) {
-        const next = all[groupEnd + 1];
+      if (index < visible.length - 1) {
+        const next = visible[index + 1];
         const nextRect = next.getBoundingClientRect();
         if (midpoint > nextRect.top + nextRect.height / 2) {
-          container.insertBefore(next, wrapper);
+          const nextEnd = groupEndIndex(all, all.indexOf(next));
+          moveDraggedGroupBefore(all[nextEnd + 1] || null);
           dragState.offsetY -= nextRect.height + 1;
           wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
         }
@@ -1956,6 +4629,37 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         detectRightShift(clientX);
         updateDraggedLevel();
       }
+    }
+    function restoreUndoSnapshot(snapshot, disabled) {
+      undoSnapshot = snapshot ? clone5(snapshot) : null;
+      undoButton.disabled = disabled;
+    }
+    function restoreDragChildren(children, childDisplayBeforeDrag) {
+      for (const child of children) {
+        child.style.display = childDisplayBeforeDrag?.get(child) ?? "";
+        child.style.transition = "";
+        child.style.transform = "";
+      }
+    }
+    function cancelActiveDrag({ restoreUndo = true } = {}) {
+      if (!dragState) return;
+      stopAutoScroll();
+      const { wrapper, children, childDisplayBeforeDrag, previousUndoSnapshot, previousUndoDisabled } = dragState;
+      dragState = null;
+      const row = wrapper.querySelector(".list-item");
+      row?.classList.remove("pressing");
+      if (row) {
+        row.style.transition = "";
+        row.style.transform = "";
+      }
+      wrapper.classList.remove("is-dragging");
+      wrapper.style.transition = "";
+      wrapper.style.transform = "";
+      restoreDragChildren(children, childDisplayBeforeDrag);
+      if (restoreUndo) restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+    }
+    function cancelDragAsTap() {
+      cancelActiveDrag();
     }
     function autoScrollStep() {
       if (!dragState) {
@@ -1991,6 +4695,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       autoScrollRAF = requestAnimationFrame(autoScrollStep);
     }
     function startDrag(wrapper, clientY, clientX) {
+      const previousUndoSnapshot = undoSnapshot ? clone5(undoSnapshot) : null;
+      const previousUndoDisabled = undoButton.disabled;
       saveUndoSnapshot();
       const row = wrapper.querySelector(".list-item");
       row.classList.remove("pressing");
@@ -2004,28 +4710,18 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         if (Number(allWrappers[index].dataset.level || 0) <= baseLevel) break;
         children.push(allWrappers[index]);
       }
-      dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, originalLevel: baseLevel };
+      const childDisplayBeforeDrag = new Map(children.map((child) => [child, child.style.display]));
+      dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, childDisplayBeforeDrag, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
       for (const child of children) child.style.display = "none";
       startAutoScroll();
     }
     function finalizeDrag() {
       stopAutoScroll();
-      const { wrapper, pendingLevel, rightShifted, children, originalLevel } = dragState;
-      dragState = null;
+      const { wrapper, pendingLevel, rightShifted, children, childDisplayBeforeDrag, originalLevel } = dragState;
       if (!rightShifted) {
-        const all = [...container.querySelectorAll(".list-item-wrapper")];
-        const index = all.indexOf(wrapper);
-        const groupEnd = index + children.length;
-        if (index > 0 && groupEnd < all.length - 1) {
-          const aboveLevel = Number(all[index - 1].dataset.level || 0);
-          const belowLevel = Number(all[groupEnd + 1].dataset.level || 0);
-          if (belowLevel > aboveLevel) {
-            const aboveWrapper = all[index - 1];
-            container.insertBefore(wrapper, aboveWrapper);
-            for (const child of children) container.insertBefore(child, aboveWrapper);
-          }
-        }
+        snapUnshiftedDragOutOfDeeperRows();
       }
+      dragState = null;
       if (pendingLevel !== void 0) {
         const delta = pendingLevel - originalLevel;
         wrapper.dataset.level = String(pendingLevel);
@@ -2043,10 +4739,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       for (const child of children) {
         child.style.transition = "transform 0.22s cubic-bezier(.4,0,.2,1)";
         child.style.transform = "";
+        child.style.display = childDisplayBeforeDrag?.get(child) ?? "";
       }
       setTimeout(() => {
         wrapper.style.transition = "";
         wrapper.classList.remove("is-dragging");
+        for (const child of children) child.style.transition = "";
         const wrappers = [...container.querySelectorAll(".list-item-wrapper")];
         const arranged = deriveArrangedFromWrappers(wrappers);
         dispatchUserInput({
@@ -2065,6 +4763,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         return;
       }
       if (action.kind === "status" && STATUS_ACTIONS.has(action.status)) {
+        saveUndoSnapshot();
         dispatchUserInput({ actId: itemId, actType: "task", command: "setStatus", payload: { status: action.status }, source });
         showToast(`\u0421\u0442\u0430\u0442\u0443\u0441: ${action.status}`);
         return;
@@ -2086,20 +4785,20 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       let ldAnchor = null;
       let mouseSwipeDone = false;
       const handleMoveXY = (clientX, clientY) => {
-        if (dragState || !active) return;
         curX = clientX;
         curY = clientY;
+        if (dragState || !active) return;
         const dx = curX - startX;
         const dy = curY - startY;
-        if (longTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        if (longTimer && (Math.abs(dx) > LONGPRESS_CANCEL_PX || Math.abs(dy) > LONGPRESS_CANCEL_PX)) {
           clearTimeout(longTimer);
           longTimer = null;
           row.classList.remove("pressing");
         }
         if (!lockedH) {
-          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > HORIZONTAL_SWIPE_LOCK_PX) {
             lockedH = true;
-          } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+          } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= VERTICAL_SCROLL_CANCEL_PX) {
             row.style.transform = "";
             actionBg.style.opacity = "0";
             actionBg.className = "action-bg del";
@@ -2129,6 +4828,15 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           return;
         }
         if (ldAnchor !== null || dx < -threshold) {
+          if (isFrontierView()) {
+            ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
+            active = false;
+            if (startVoice(itemId, curY)) {
+              if (isFinite(curY)) updateVoice(curY);
+            }
+            resetRowGesture(row, actionBg);
+            return;
+          }
           if (ldAnchor !== null && dx > -threshold) {
             hideTagPanel();
             ldAnchor = null;
@@ -2152,33 +4860,46 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         longTimer = null;
         row.classList.remove("pressing");
         if (isMouse) currentMouseGesture = null;
-        const action = dropAction;
+        const rightAction = dropAction;
+        const leftAction = tagAction;
         const wasRight = !!rdAnchor;
         const wasLeft = !!ldAnchor;
-        const savedTagAction = tagAction;
         rdAnchor = null;
         ldAnchor = null;
         hideDrop();
         hideTagPanel();
-        if (dragState || !active) return;
-        active = false;
         const dx = curX - startX;
         const dy = curY - startY;
+        const stayedWithinTap = Math.abs(dx) <= TAP_TOLERANCE_PX && Math.abs(dy) <= TAP_TOLERANCE_PX;
+        if (dragState) {
+          if (stayedWithinTap && rootPanel.dataset.viewMode !== "frontier") {
+            cancelDragAsTap();
+            active = false;
+            if (!isMouse) {
+              dispatchUserInput({ actId: itemId, actType: "task", command: "toggleCollapse", payload: {}, source: "tap" });
+            }
+            return true;
+          }
+          return false;
+        }
+        if (!active) return false;
+        active = false;
         row.style.transition = "transform 0.3s cubic-bezier(.4,0,.2,1)";
         row.style.transform = "";
         actionBg.style.opacity = "0";
-        if (wasRight && dx > 30 && action) {
+        if (wasRight && dx > 30 && rightAction) {
           if (isMouse) mouseSwipeDone = true;
-          execPanelAction(action, itemId, "right-swipe-panel");
-        } else if (wasLeft && dx < -30 && savedTagAction) {
+          execPanelAction(rightAction, itemId, "right-swipe-panel");
+        } else if (wasLeft && dx < -30 && leftAction) {
           if (isMouse) mouseSwipeDone = true;
-          execPanelAction(savedTagAction, itemId, "left-swipe-panel");
-        } else if (!isMouse && Math.abs(dx) < 10 && Math.abs(dy) < 10 && rootPanel.dataset.viewMode !== "frontier") {
+          execPanelAction(leftAction, itemId, "left-swipe-panel");
+        } else if (!isMouse && stayedWithinTap && rootPanel.dataset.viewMode !== "frontier") {
           dispatchUserInput({ actId: itemId, actType: "task", command: "toggleCollapse", payload: {}, source: "tap" });
         }
+        return true;
       };
       row.addEventListener("touchstart", (event) => {
-        if (dragState || modalOpen || taskPageOpen) return;
+        if (dragState || modalOpen || settingsOpen || taskPageOpen) return;
         const touch = event.touches[0];
         startX = curX = touch.clientX;
         startY = curY = touch.clientY;
@@ -2190,15 +4911,23 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         row.classList.add("pressing");
         longTimer = setTimeout(() => {
           longTimer = null;
-          active = false;
           rdAnchor = null;
+          ldAnchor = null;
+          if (document.visibilityState === "hidden") {
+            active = false;
+            resetRowGesture(row, actionBg);
+            return;
+          }
+          if (isFrontierView()) {
+            startVoice(null, curY);
+            resetRowGesture(row, actionBg);
+            return;
+          }
+          actionBg.style.opacity = "0";
           hideDrop();
           hideTagPanel();
-          row.style.transform = "";
-          actionBg.style.opacity = "0";
-          if (rootPanel.dataset.viewMode === "frontier") return;
           startDrag(wrapper, curY, curX);
-        }, 370);
+        }, VOICE_LONGPRESS_MS);
       }, { passive: true });
       row.addEventListener("touchmove", (event) => {
         handleMoveXY(event.touches[0].clientX, event.touches[0].clientY);
@@ -2211,7 +4940,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       row.addEventListener("touchcancel", () => handleEnd(false));
       row.addEventListener("mousedown", (event) => {
         if (Date.now() - lastTouchEndTime < 500) return;
-        if (dragState || modalOpen || taskPageOpen || event.button !== 0) return;
+        if (dragState || modalOpen || settingsOpen || taskPageOpen || event.button !== 0) return;
         startX = curX = event.clientX;
         startY = curY = event.clientY;
         active = true;
@@ -2223,15 +4952,23 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
         currentMouseGesture = { move: handleMoveXY, end: () => handleEnd(true) };
         longTimer = setTimeout(() => {
           longTimer = null;
-          active = false;
           rdAnchor = null;
+          ldAnchor = null;
+          if (document.visibilityState === "hidden") {
+            active = false;
+            resetRowGesture(row, actionBg);
+            return;
+          }
+          if (isFrontierView()) {
+            startVoice(null, curY);
+            resetRowGesture(row, actionBg);
+            return;
+          }
+          actionBg.style.opacity = "0";
           hideDrop();
           hideTagPanel();
-          row.style.transform = "";
-          actionBg.style.opacity = "0";
-          if (rootPanel.dataset.viewMode === "frontier") return;
           startDrag(wrapper, curY, curX);
-        }, 370);
+        }, VOICE_LONGPRESS_MS);
       });
       row.addEventListener("click", () => {
         if (Date.now() - lastTouchEndTime < 500) return;
@@ -2240,7 +4977,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
           mouseSwipeDone = false;
           return;
         }
-        if (rootPanel.dataset.viewMode === "frontier") return;
+        if (isFrontierView()) return;
         dispatchUserInput({ actId: itemId, actType: "task", command: "toggleCollapse", payload: {}, source: "click" });
       });
     }
@@ -2251,11 +4988,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
     }
     function onRendered(state, viewMode) {
       rootPanel.dataset.viewMode = viewMode;
-      viewToggleButton.textContent = viewMode === "log" ? "\u0421\u043F\u0438\u0441\u043E\u043A" : "\u0416\u0443\u0440\u043D\u0430\u043B";
+      viewToggleButton.textContent = viewMode === "log" || viewMode === "search" ? "\u0421\u043F\u0438\u0441\u043E\u043A" : "\u0416\u0443\u0440\u043D\u0430\u043B";
       if (frontierButton) {
-        frontierButton.textContent = viewMode === "frontier" ? "\u0421\u043F\u0438\u0441\u043E\u043A" : "\u0424\u0440\u043E\u043D\u0442\u0438\u0440";
+        frontierButton.textContent = viewMode === "frontier" || viewMode === "search" ? "\u0421\u043F\u0438\u0441\u043E\u043A" : "\u0424\u0440\u043E\u043D\u0442\u0438\u0440";
         frontierButton.classList.toggle("active", viewMode === "frontier");
       }
+      if (taskPageOpen && taskPageTargetId) renderTaskPageSubtasks(taskPageTargetId, state);
     }
     return {
       bindGlobal,
@@ -2268,13 +5006,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
   }
 
   // src/list-preview-entry.js
-  var PREVIEW_BUILD_HASH = "mrfy24y0-y3psju";
+  var PREVIEW_BUILD_HASH = "gapfix-20260806154849";
   async function bootstrapListManagerPreview() {
     document.documentElement.dataset.previewBuildHash = PREVIEW_BUILD_HASH;
     const store = createStore({
-      storageKey: "voicelist.universal-interface.state",
+      storageKey: "searchmydata.list-interface.state",
       storage: window.localStorage,
       seedState
+    });
+    const logStore = createLogStore({
+      storageKeyPrefix: "searchmydata.list-interface.log",
+      storage: window.localStorage
     });
     let app = null;
     const ui = createUI({
@@ -2282,12 +5024,14 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       header: document.querySelector("header"),
       viewToggleButton: document.getElementById("view-toggle-btn"),
       frontierButton: document.getElementById("frontier-tab-btn"),
+      settingsButton: document.getElementById("settings-btn"),
       undoButton: document.getElementById("undo-btn"),
       addButton: document.getElementById("add-btn"),
       container: document.getElementById("list-container"),
       toastEl: document.getElementById("toast"),
       dropPanel: document.getElementById("drop-zone-panel"),
       tagPanel: document.getElementById("tag-panel"),
+      voiceOverlay: document.getElementById("voice-overlay"),
       overlay: document.getElementById("modal-overlay"),
       input1: document.getElementById("input-line1"),
       input2: document.getElementById("input-line2"),
@@ -2308,7 +5052,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       taskPageStatus: document.getElementById("task-page-status"),
       taskPageSubtasks: document.getElementById("task-page-subtasks"),
       taskPageChildInput: document.getElementById("task-page-child-input"),
-      taskPageAddChild: document.getElementById("task-page-add-child")
+      taskPageAddChild: document.getElementById("task-page-add-child"),
+      settingsOverlay: document.getElementById("settings-overlay"),
+      settingsClose: document.getElementById("settings-close"),
+      workflowyUrlInput: document.getElementById("workflowy-url-input"),
+      workflowyImportButton: document.getElementById("workflowy-import-btn"),
+      workflowyImportStatus: document.getElementById("workflowy-import-status")
     });
     const renderer = createRenderer({
       rootPanel: document.getElementById("app-root"),
@@ -2318,28 +5067,77 @@ window.__LIST_MANAGER_BUILD_HASH__ = "mrfy24y0-y3psju";
       bindRow: ui.bindRow,
       onRendered: ui.onRendered
     });
-    const adapter = createBackendAdapter();
+    const adapter = {
+      async load() {
+        return null;
+      },
+      async save(state) {
+        return state;
+      }
+    };
+    const transport = {
+      async create(entry) {
+        return entry;
+      },
+      async update(entry) {
+        return entry;
+      }
+    };
     let sync = null;
+    const useCloudflareBackend = !window.location.hash.includes("v=local-dev") && window.location.port !== "4511";
+    const documentClient = useCloudflareBackend ? createCloudflareDocumentClient() : null;
     app = createApp({
       adapter,
+      documentClient,
       interpreter: createInterpreter(),
       renderer,
       store,
+      logStore,
       sync: {
-        enqueue(state, actionLogEntry) {
-          return sync.enqueue(state, actionLogEntry);
+        enqueueCreate(entry) {
+          return sync.enqueueCreate(entry);
+        },
+        enqueueUpdate(entry) {
+          return sync.enqueueUpdate(entry);
         }
       },
       ui
     });
     sync = createSync({
-      adapter,
-      store,
-      onStateChange(nextState) {
-        app.onSyncedState(nextState);
+      transport,
+      logStore,
+      onLogEntriesChange(nextEntries) {
+        app.onLogEntriesChange(nextEntries);
       }
     });
     await app.init();
+    const executeTaskCommand = documentClient?.sendCommandAndWait ? (input) => documentClient.sendCommandAndWait(input) : async (input) => {
+      await app.dispatchUserInput(input);
+      return { status: "applied", newTarget: input.actId };
+    };
+    window.__realtimeVoiceAgent = createRealtimeVoiceAgent({
+      voiceButton: document.getElementById("realtime-voice-btn"),
+      voiceStatus: document.getElementById("realtime-voice-status"),
+      dialoguesButton: document.getElementById("dialogues-tab-btn"),
+      dialoguesPanel: document.getElementById("dialogues-panel"),
+      dialoguesList: document.getElementById("dialogues-list"),
+      dialoguesClose: document.getElementById("dialogues-close"),
+      openAIKeyInput: document.getElementById("openai-key-input"),
+      openAIKeyField: document.getElementById("openai-key-field"),
+      openAIKeySaveButton: document.getElementById("openai-key-save"),
+      openAIKeyStatus: document.getElementById("openai-key-status"),
+      openAIPromptInput: document.getElementById("openai-prompt-input"),
+      openAIPromptSaveButton: document.getElementById("openai-prompt-save"),
+      openAIPromptStatus: document.getElementById("openai-prompt-status"),
+      settingsOverlay: document.getElementById("settings-overlay"),
+      rootPanel: document.getElementById("app-root"),
+      navigationButtons: [
+        document.getElementById("frontier-tab-btn"),
+        document.getElementById("view-toggle-btn")
+      ],
+      getTaskState: () => app.getState(),
+      executeTaskCommand
+    });
   }
   bootstrapListManagerPreview().catch((error) => {
     console.error("Failed to bootstrap list manager", error);

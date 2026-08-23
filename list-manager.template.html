@@ -12,10 +12,12 @@ __INLINE_CSS__
 <body>
 <div id="app-root" data-view-mode="list">
   <header>
-    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
-    <h1>Мой список</h1>
-    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
-    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
+	    <button id="undo-btn" disabled title="Отменить последнее перетаскивание">↩</button>
+	    <h1>Мой список</h1>
+	    <button id="settings-btn" class="icon-header-btn" type="button" aria-label="Настройки" title="Настройки">⚙</button>
+	    <button id="dialogues-tab-btn" class="header-tab-btn" type="button" aria-pressed="false">Диалоги</button>
+	    <button id="frontier-tab-btn" class="header-tab-btn" data-act-id="frontier" data-act-type="tab" title="Показать фронтир задач">Фронтир</button>
+	    <button id="view-toggle-btn" title="Переключить вид">Журнал</button>
   </header>
 
   <div id="list-container"></div>
@@ -27,14 +29,65 @@ __INLINE_CSS__
     <div id="action-log-list"></div>
   </section>
 
+  <section id="dialogues-panel" class="dialogues-panel" hidden aria-label="Диалоги">
+    <div class="dialogues-header">
+      <div>
+        <h2>Диалоги</h2>
+        <p>Текст голосовых сессий хранится только в этом браузере.</p>
+      </div>
+      <button id="dialogues-close" class="dialogues-close" type="button" aria-label="Закрыть диалоги">×</button>
+    </div>
+    <div id="dialogues-list" class="dialogues-list"></div>
+  </section>
+
   <div class="toast" id="toast"></div>
   <button class="add-btn" id="add-btn" aria-label="Добавить задачу">+</button>
+  <div id="realtime-voice-status" class="realtime-voice-status" hidden aria-live="polite"></div>
+  <button id="realtime-voice-btn" class="realtime-voice-btn" type="button" aria-label="Начать голосовой диалог" aria-pressed="false" data-state="idle">
+    <span aria-hidden="true">🎙</span>
+  </button>
 
   <div id="tag-panel" class="swipe-panel"></div>
 
   <div id="drop-zone-panel" class="swipe-panel"></div>
 
-  <section class="task-page" id="task-page" aria-hidden="true">
+	  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
+
+	  <div class="settings-overlay" id="settings-overlay" aria-hidden="true">
+	    <section class="settings-panel" aria-label="Настройки">
+	      <div class="settings-header">
+	        <h2>Настройки</h2>
+	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
+	      </div>
+	      <section class="settings-section" aria-labelledby="openai-key-heading">
+	        <h3 id="openai-key-heading">OpenAI Realtime</h3>
+	        <p class="settings-help">Ключ сохраняется на сервере для голосового агента и никогда не показывается после сохранения.</p>
+	        <label class="settings-field" id="openai-key-field">
+	          <span>OpenAI API key</span>
+	          <input type="password" id="openai-key-input" placeholder="sk-…" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="openai-key-save" class="settings-primary" type="button">Сохранить ключ на сервере</button>
+	        <div id="openai-key-status" class="settings-status" aria-live="polite"></div>
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Системный промпт голосового агента</span>
+	          <textarea id="openai-prompt-input" placeholder="Введите новый системный промпт для realtime-сессии"></textarea>
+	        </label>
+	        <button id="openai-prompt-save" class="settings-primary" type="button">Сохранить промпт на сервере</button>
+	        <div id="openai-prompt-status" class="settings-status" aria-live="polite"></div>
+	      </section>
+	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
+	        <h3 id="workflowy-heading">Workflowy</h3>
+	      <label class="settings-field">
+	        <span>Ссылка для импорта</span>
+	        <input type="url" id="workflowy-url-input" placeholder="https://workflowy.com/s/task-tree/..." inputmode="url">
+	      </label>
+	      <button id="workflowy-import-btn" class="settings-primary" type="button">Импорт</button>
+	      <div id="workflowy-import-status" class="settings-status" aria-live="polite"></div>
+	      </section>
+	    </section>
+	  </div>
+
+	  <section class="task-page" id="task-page" aria-hidden="true">
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
       <h2 id="task-page-title">Задача</h2>
@@ -57,6 +110,7 @@ __INLINE_CSS__
           <option>Focus</option>
           <option>Archive</option>
           <option>Pause</option>
+          <option>Info</option>
         </select>
       </label>
       <section class="task-page-subtasks">

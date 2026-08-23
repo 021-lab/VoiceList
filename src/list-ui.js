@@ -1,6 +1,16 @@
+import { BrowserASR } from './asr-browser.js';
+import { MockASR } from './asr-mock.js';
+import { C as VOICE_C, selectAt as selectVoiceAt } from './gesture.js';
+import { VoiceSession, validate as validateVoiceCommand } from './voice-session.js';
+
 const AVAILABLE_TAGS = ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'];
-const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause']);
+const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'Info']);
 const PANEL_ITEM_HEIGHT = 72;
+const VOICE_LONGPRESS_MS = 400;
+const TAP_TOLERANCE_PX = 10;
+const LONGPRESS_CANCEL_PX = 8;
+const HORIZONTAL_SWIPE_LOCK_PX = 6;
+const VERTICAL_SCROLL_CANCEL_PX = 15;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -37,7 +47,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -54,6 +64,10 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   let tagAction = null;
   let taskPageOpen = false;
   let taskPageTargetId = null;
+  let settingsOpen = false;
+  let voiceState = null;
+  let voicePressTimer = null;
+  let voicePress = null;
 
   function showToast(message) {
     if (!toastEl) return;
@@ -61,6 +75,307 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     toastEl.classList.add('show');
     clearTimeout(showToast.timer);
     showToast.timer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  function itemLabel(id) {
+    return findItem(getState(), id)?.line1 || '';
+  }
+
+  function logEntryLabel(id) {
+    return getState().actionLog?.find((entry) => entry.id === id)?.label || 'Запись журнала';
+  }
+
+  function createVoiceAsr() {
+    const testConfig = window.__voiceTest;
+    if (testConfig) return new MockASR(testConfig);
+    return new BrowserASR({ finalTimeoutMs: VOICE_C.FINAL_TIMEOUT_MS });
+  }
+
+  function renderVoiceOverlay(session = voiceState?.session) {
+    if (!voiceOverlay || !voiceState) return;
+    if (voiceState.kind === 'log-comment') {
+      renderLogCommentOverlay();
+      return;
+    }
+    const activeSession = voiceState?.session;
+    if (!voiceOverlay || !activeSession) return;
+    if (session && session !== activeSession) return;
+    session = activeSession;
+    const selection = selectVoiceAt(voiceState?.dy || 0, session.overlay.stack.length, VOICE_C);
+    const fingerLabel = labelVoiceFinger(session);
+    const candidateRows = session.overlay.stack
+      .map((candidate, index) => ({
+        label: candidate.label,
+        selected: selection.zone === 'candidate' && selection.index === index,
+        overlayIndex: index
+      }))
+      .reverse();
+    const fingerSelected = selection.zone !== 'cancel' && selection.zone !== 'candidate';
+    const cancelSelected = selection.zone === 'cancel';
+
+    voiceOverlay.innerHTML = `
+      <div class="voice-transcript">${escHtml(session.text || 'Слушаю...')}</div>
+      ${session.context ? `<div class="voice-context">${escHtml(itemLabel(session.context))}</div>` : ''}
+      <div class="voice-stack">
+        ${candidateRows.map((row) => `<div class="voice-candidate${row.selected ? ' selected' : ''}" data-voice-index="${row.overlayIndex}">${escHtml(row.label)}</div>`).join('')}
+        <div class="voice-candidate voice-finger${fingerSelected ? ' selected' : ''}" data-voice-index="-1">${escHtml(fingerLabel)}</div>
+        <div class="voice-cancel${cancelSelected ? ' selected' : ''}">Отмена</div>
+      </div>
+    `;
+    voiceOverlay.classList.add('open');
+    positionVoiceOverlay();
+  }
+
+  function renderLogCommentOverlay() {
+    const selection = selectVoiceAt(voiceState?.dy || 0, 0, VOICE_C);
+    const fingerSelected = selection.zone !== 'cancel';
+    const cancelSelected = selection.zone === 'cancel';
+    const transcript = voiceState.finalText || voiceState.transcript || 'Слушаю комментарий...';
+
+    voiceOverlay.innerHTML = `
+      <div class="voice-transcript">${escHtml('Комментарий')}</div>
+      <div class="voice-context">${escHtml(logEntryLabel(voiceState.logEntryId))}</div>
+      <div class="voice-stack">
+        <div class="voice-candidate voice-finger${fingerSelected ? ' selected' : ''}" data-voice-index="-1">${escHtml(transcript)}</div>
+        <div class="voice-cancel${cancelSelected ? ' selected' : ''}">Отмена</div>
+      </div>
+    `;
+    voiceOverlay.classList.add('open');
+    positionVoiceOverlay();
+  }
+
+  function labelVoiceCommand(command) {
+    if (!command) return '';
+    if (command.command === 'addChild') return `Добавить: задачу ${command.payload.line1}`;
+    if (command.command === 'setStatus') return `Статус: ${command.payload.status}`;
+    if (command.command === 'setParent') return 'Перенести';
+    if (command.command === 'editItem') return `Переименовать: ${command.payload.line1}`;
+    if (command.command === 'showSearch') return `Поиск: ${command.payload.query}`;
+    if (command.command === 'undo') return 'Отменить';
+    return command.command;
+  }
+
+  function labelVoiceFinger(session) {
+    const selected = session.overlay.finger;
+    if (selected?.kind === 'command') return labelVoiceCommand(selected.command);
+    if (selected?.kind === 'blocked') return 'Не найдено';
+    return session.text || 'Слушаю...';
+  }
+
+  function positionVoiceOverlay() {
+    if (!voiceOverlay || !voiceState) return;
+    const fingerRow = voiceOverlay.querySelector('.voice-finger');
+    if (!fingerRow) return;
+    const overlayRect = voiceOverlay.getBoundingClientRect();
+    const fingerRect = fingerRow.getBoundingClientRect();
+    const fingerCenter = fingerRect.top + (fingerRect.height / 2);
+    const unclampedTop = overlayRect.top + (voiceState.anchorY - fingerCenter);
+    const maxTop = Math.max(12, window.innerHeight - overlayRect.height - 12);
+    const nextTop = Math.min(Math.max(12, unclampedTop), maxTop);
+    voiceOverlay.style.top = `${Math.round(nextTop)}px`;
+  }
+
+  function isFrontierView() {
+    return rootPanel.dataset.viewMode === 'frontier';
+  }
+
+  function startVoice(contextId, anchorY) {
+    if (!isFrontierView()) return false;
+    if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
+    hideDrop();
+    hideTagPanel();
+    const asr = createVoiceAsr();
+    const session = new VoiceSession({
+      tasks: getState().snapshot.items,
+      asr,
+      onUpdate: renderVoiceOverlay
+    });
+    voiceState = { session, anchorY, dy: 0 };
+    const armed = session.arm(contextId);
+    if (!armed) {
+      const message = session.messages.at(-1) || 'Нет доступа к микрофону';
+      showToast(message);
+      voiceState = null;
+      return false;
+    }
+    renderVoiceOverlay(session);
+    asr.speak?.();
+    renderVoiceOverlay(session);
+    return true;
+  }
+
+  function startLogCommentVoice(logEntryId, anchorY) {
+    if (voiceState || modalOpen || settingsOpen || taskPageOpen) return false;
+    const asr = createVoiceAsr();
+    const nextVoiceState = {
+      kind: 'log-comment',
+      asr,
+      logEntryId,
+      anchorY,
+      dy: 0,
+      transcript: '',
+      finalText: '',
+      error: null
+    };
+    voiceState = nextVoiceState;
+    const armed = asr.start({
+      onInterim(text) {
+        if (voiceState !== nextVoiceState) return;
+        nextVoiceState.transcript = text;
+        renderVoiceOverlay();
+      },
+      onFinal(text) {
+        if (voiceState !== nextVoiceState) return;
+        nextVoiceState.finalText = text;
+        nextVoiceState.transcript = text;
+        renderVoiceOverlay();
+      },
+      onError(code) {
+        if (voiceState !== nextVoiceState) return;
+        nextVoiceState.error = code;
+      }
+    });
+    if (!armed) {
+      voiceState = null;
+      showToast('Нет доступа к микрофону');
+      return false;
+    }
+    renderVoiceOverlay();
+    asr.speak?.();
+    renderVoiceOverlay();
+    return true;
+  }
+
+  function resetRowGesture(row, actionBg) {
+    row.classList.remove('pressing');
+    row.style.transition = 'transform 0.3s cubic-bezier(.4,0,.2,1)';
+    row.style.transform = '';
+    actionBg.style.opacity = '0';
+    hideDrop();
+    hideTagPanel();
+  }
+
+  function updateVoice(clientY) {
+    if (!voiceState) return;
+    voiceState.dy = voiceState.anchorY - clientY;
+    if (voiceState.session) voiceState.session.move(voiceState.dy);
+    renderVoiceOverlay();
+  }
+
+  async function finishLogCommentVoice(current) {
+    const stopped = current.asr.stop();
+    if (stopped && typeof stopped.then === 'function') await stopped;
+    if (current.error === 'aborted') {
+      showToast('Распознавание прервано');
+      return;
+    }
+    if (current.error === 'timeout') {
+      showToast('Не расслышал');
+      return;
+    }
+    if (selectVoiceAt(current.dy || 0, 0, VOICE_C).zone === 'cancel') return;
+    const text = String(current.finalText || current.transcript || '').trim();
+    if (!text) {
+      showToast('Не расслышал');
+      return;
+    }
+    dispatchUserInput({
+      actId: current.logEntryId,
+      actType: 'log-entry',
+      command: 'commentLogEntry',
+      payload: { text },
+      source: 'voice-log-comment'
+    });
+  }
+
+  async function finishVoice() {
+    if (!voiceState) return;
+    const current = voiceState;
+    voiceState = null;
+    voiceOverlay?.classList.remove('open');
+    if (current.kind === 'log-comment') {
+      await finishLogCommentVoice(current);
+      return;
+    }
+    const transcript = String(current.session.finalText || current.session.text || '').trim() || null;
+    const result = await current.session.release(current.dy || 0);
+    handleVoiceResult(result, { transcript, contextId: current.session.context });
+  }
+
+  async function finishVoiceAtDy(dy) {
+    if (!voiceState) return;
+    const current = voiceState;
+    voiceState = null;
+    voiceOverlay?.classList.remove('open');
+    current.dy = dy;
+    if (current.kind === 'log-comment') {
+      await finishLogCommentVoice(current);
+      return;
+    }
+    const transcript = String(current.session.finalText || current.session.text || '').trim() || null;
+    const result = await current.session.release(dy);
+    handleVoiceResult(result, { transcript, contextId: current.session.context });
+  }
+
+  function cancelVoice() {
+    if (!voiceState) return;
+    if (voiceState.kind === 'log-comment') voiceState.asr.stop();
+    else voiceState.session.asr.stop();
+    voiceState = null;
+    voiceOverlay?.classList.remove('open');
+  }
+
+  function handleVoiceResult(result, meta = {}) {
+    if (!result || result.action === 'cancel') {
+      if (result?.why) showToast(result.why);
+      return;
+    }
+    if (result.action === 'fallback') {
+      const text = String(result.text || meta.transcript || '').trim();
+      showToast(text ? `Не понял: ${text}` : 'Не расслышал');
+      if (text) {
+        dispatchUserInput({
+          actId: meta.contextId || 'list',
+          actType: meta.contextId ? 'task' : 'list',
+          command: 'logFallbackUtterance',
+          payload: { text },
+          source: 'voice-fallback',
+          transcript: text
+        });
+      }
+      return;
+    }
+    const command = result.command;
+    if (!command) return;
+    const state = getState();
+    if (!validateVoiceCommand(command, state.snapshot.items)) {
+      showToast('Задача изменилась, повторите');
+      return;
+    }
+    if (command.command === 'undo') {
+      if (!undoSnapshot) {
+        showToast('Нечего отменять');
+        return;
+      }
+      dispatchUserInput({ ...command, payload: { snapshot: clone(undoSnapshot) }, source: 'voice', transcript: meta.transcript });
+      undoSnapshot = null;
+      undoButton.disabled = true;
+      return;
+    }
+    if (!String(command.command).startsWith('show') && command.command !== 'viewItem') saveUndoSnapshot();
+    dispatchUserInput({ ...command, actType: command.actId ? 'task' : 'list', source: 'voice', transcript: meta.transcript });
+  }
+
+  function queueVoicePress(nextPress) {
+    voicePress = nextPress;
+    if (voicePressTimer) clearTimeout(voicePressTimer);
+    voicePressTimer = setTimeout(() => {
+      const currentPress = voicePress;
+      voicePressTimer = null;
+      if (!currentPress) return;
+      if (currentPress.kind === 'log-comment') startLogCommentVoice(currentPress.logEntryId, currentPress.y);
+      else startVoice(currentPress.contextId ?? null, currentPress.y);
+    }, VOICE_LONGPRESS_MS);
   }
 
   function setDispatch(nextDispatch) {
@@ -77,6 +392,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       { id: 'done', label: 'Done', icon: '✓', color: '#34c759', kind: 'status', status: 'Done' },
       { id: 'pause-toggle', label: status === 'Pause' ? 'Open' : 'Pause', icon: status === 'Pause' ? '◯' : 'Ⅱ', color: '#5856d6', kind: 'status', status: status === 'Pause' ? 'Open' : 'Pause' },
       { id: 'focus-toggle', label: status === 'Focus' ? 'Open' : 'Focus', icon: status === 'Focus' ? '◯' : '◎', color: '#ff9500', kind: 'status', status: status === 'Focus' ? 'Open' : 'Focus' },
+      { id: 'info-toggle', label: status === 'Info' ? 'Open' : 'Info', icon: status === 'Info' ? '◯' : 'i', color: '#0a84ff', kind: 'status', status: status === 'Info' ? 'Open' : 'Info' },
       { id: 'archive', label: 'Archive', icon: '▣', color: '#8e8e93', kind: 'status', status: 'Archive', default: true },
       { id: 'edit-page', label: 'Edit', icon: '✎', color: '#007aff', kind: 'editPage' }
     ];
@@ -237,6 +553,49 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     modalOpen = false;
   }
 
+  function openSettings() {
+    if (!settingsOverlay) return;
+    settingsOpen = true;
+    settingsOverlay.classList.add('open');
+    settingsOverlay.setAttribute('aria-hidden', 'false');
+    if (workflowyImportStatus) workflowyImportStatus.textContent = '';
+    workflowyUrlInput?.focus();
+  }
+
+  function closeSettings() {
+    if (!settingsOverlay) return;
+    settingsOpen = false;
+    settingsOverlay.classList.remove('open');
+    settingsOverlay.setAttribute('aria-hidden', 'true');
+  }
+
+  async function importWorkflowyFromSettings() {
+    const url = workflowyUrlInput?.value.trim() || '';
+    if (!url) {
+      if (workflowyImportStatus) workflowyImportStatus.textContent = 'Введите ссылку Workflowy';
+      return;
+    }
+
+    if (workflowyImportButton) workflowyImportButton.disabled = true;
+    if (workflowyImportStatus) workflowyImportStatus.textContent = 'Импорт...';
+    try {
+      await dispatchUserInput({
+        actId: 'workflowy-import',
+        actType: 'settings',
+        command: 'importWorkflowy',
+        payload: { url },
+        source: 'settings-import'
+      });
+      if (workflowyImportStatus) workflowyImportStatus.textContent = 'Импорт запущен';
+      showToast('Импорт Workflowy запущен');
+    } catch (error) {
+      if (workflowyImportStatus) workflowyImportStatus.textContent = error.message || 'Импорт не выполнен';
+      showToast('Импорт не выполнен');
+    } finally {
+      if (workflowyImportButton) workflowyImportButton.disabled = false;
+    }
+  }
+
   function confirmModal() {
     const line1 = input1.value.trim();
     const line2 = input2.value.trim();
@@ -333,6 +692,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       return;
     }
 
+    saveUndoSnapshot();
+
     dispatchUserInput({
       actId: taskPageTargetId,
       actType: 'task',
@@ -378,10 +739,45 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     addButton.addEventListener('click', () => {
       dispatchUserInput({ actId: 'list', actType: 'list', command: 'showAddModal', payload: {}, source: 'add-button' });
     });
+    settingsButton?.addEventListener('click', openSettings);
+    settingsClose?.addEventListener('click', closeSettings);
+    settingsOverlay?.addEventListener('click', (event) => {
+      if (event.target === settingsOverlay) closeSettings();
+    });
+    workflowyImportButton?.addEventListener('click', () => {
+      importWorkflowyFromSettings();
+    });
+    workflowyUrlInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') importWorkflowyFromSettings();
+    });
 
     btnCancel.addEventListener('click', closeModal);
     overlay.addEventListener('click', (event) => {
       if (event.target === overlay) closeModal();
+    });
+    voiceOverlay?.addEventListener('click', (event) => {
+      if (!voiceState) return;
+      const cancelEl = event.target.closest('.voice-cancel');
+      if (cancelEl) {
+        finishVoiceAtDy(-VOICE_C.CANCEL_ZONE_PX);
+        return;
+      }
+
+      const candidateEl = event.target.closest('.voice-candidate');
+      if (!candidateEl) return;
+
+      if (voiceState.kind === 'log-comment') {
+        finishVoiceAtDy(0);
+        return;
+      }
+
+      const overlayIndex = Number(candidateEl.dataset.voiceIndex || '-1');
+      if (overlayIndex < 0) {
+        finishVoiceAtDy(0);
+        return;
+      }
+
+      finishVoiceAtDy(VOICE_C.DEADZONE_PX + (overlayIndex * VOICE_C.ROW_H_PX) + 1);
     });
     btnConfirm.addEventListener('click', confirmModal);
     [input1, input2].forEach((input) => input.addEventListener('keydown', (event) => {
@@ -409,7 +805,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
 
     viewToggleButton.addEventListener('click', () => {
-      const wantsLog = rootPanel.dataset.viewMode !== 'log';
+      const wantsLog = rootPanel.dataset.viewMode !== 'log' && rootPanel.dataset.viewMode !== 'search';
       dispatchUserInput({
         actId: wantsLog ? 'actionLog' : 'list',
         actType: wantsLog ? 'panel' : 'list',
@@ -420,7 +816,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
 
     frontierButton?.addEventListener('click', () => {
-      const wantsFrontier = rootPanel.dataset.viewMode !== 'frontier';
+      const wantsFrontier = rootPanel.dataset.viewMode !== 'frontier' && rootPanel.dataset.viewMode !== 'search';
       dispatchUserInput({
         actId: wantsFrontier ? 'frontier' : 'list',
         actType: wantsFrontier ? 'tab' : 'list',
@@ -430,21 +826,82 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       });
     });
 
+    container.addEventListener('mousedown', (event) => {
+      if (event.button !== 0 || event.target.closest('.list-item,button,input,select,textarea')) return;
+      queueVoicePress({ kind: 'command', contextId: null, x: event.clientX, y: event.clientY });
+    });
+
+    container.addEventListener('touchstart', (event) => {
+      if (event.target.closest('.list-item,button,input,select,textarea')) return;
+      const touch = event.touches[0];
+      queueVoicePress({ kind: 'command', contextId: null, x: touch.clientX, y: touch.clientY });
+    }, { passive: true });
+
+    actionLogPanel?.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
+      const row = event.target.closest('.action-log-row');
+      if (!row?.dataset.logId) return;
+      queueVoicePress({ kind: 'log-comment', logEntryId: row.dataset.logId, x: event.clientX, y: event.clientY });
+    });
+
+    actionLogPanel?.addEventListener('touchstart', (event) => {
+      const row = event.target.closest('.action-log-row');
+      if (!row?.dataset.logId) return;
+      const touch = event.touches[0];
+      queueVoicePress({ kind: 'log-comment', logEntryId: row.dataset.logId, x: touch.clientX, y: touch.clientY });
+    }, { passive: true });
+
     document.addEventListener('touchmove', (event) => {
+      if (voicePressTimer) {
+        const touch = event.touches[0];
+        if (Math.abs(touch.clientX - voicePress.x) > 10 || Math.abs(touch.clientY - voicePress.y) > 10) {
+          clearTimeout(voicePressTimer);
+          voicePressTimer = null;
+        }
+      }
+      if (voiceState) {
+        event.preventDefault();
+        updateVoice(event.touches[0].clientY);
+        return;
+      }
       if (!dragState) return;
       event.preventDefault();
       updateDrag(event.touches[0].clientY, event.touches[0].clientX);
     }, { passive: false });
 
     document.addEventListener('touchend', () => {
+      if (voicePressTimer) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        finishVoice();
+        return;
+      }
       if (dragState) finalizeDrag();
     }, { passive: true });
 
     document.addEventListener('touchcancel', () => {
-      if (dragState) finalizeDrag();
+      if (voicePressTimer) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        cancelVoice();
+        return;
+      }
+      if (dragState) cancelActiveDrag();
     }, { passive: true });
 
     document.addEventListener('mousemove', (event) => {
+      if (voicePressTimer && (Math.abs(event.clientX - voicePress.x) > 10 || Math.abs(event.clientY - voicePress.y) > 10)) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        updateVoice(event.clientY);
+        return;
+      }
       if (dragState) {
         updateDrag(event.clientY, event.clientX);
         return;
@@ -453,13 +910,34 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
 
     document.addEventListener('mouseup', () => {
+      if (voicePressTimer) {
+        clearTimeout(voicePressTimer);
+        voicePressTimer = null;
+      }
+      if (voiceState) {
+        finishVoice();
+        return;
+      }
       if (dragState) {
-        finalizeDrag();
-        wasDragging = true;
-        setTimeout(() => { wasDragging = false; }, 300);
+        const handledAsTap = currentMouseGesture?.end(true) === true;
+        if (!handledAsTap && dragState) {
+          finalizeDrag();
+          wasDragging = true;
+          setTimeout(() => { wasDragging = false; }, 300);
+        }
+        currentMouseGesture = null;
       } else {
         currentMouseGesture?.end();
       }
+    });
+
+    const cancelInterruptedDrag = () => {
+      if (dragState) cancelActiveDrag();
+    };
+    window.addEventListener('blur', cancelInterruptedDrag);
+    window.addEventListener('pagehide', cancelInterruptedDrag);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') cancelInterruptedDrag();
     });
   }
 
@@ -484,6 +962,26 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     if (!dragState?.children?.length) return;
     const transform = `translateY(${dragState.offsetY}px)`;
     for (const child of dragState.children) child.style.transform = transform;
+  }
+
+  function visibleDragWrappers(wrappers) {
+    return wrappers.filter((wrapper) => wrapper === dragState.wrapper || wrapper.offsetParent !== null);
+  }
+
+  function groupEndIndex(wrappers, startIndex) {
+    const baseLevel = Number(wrappers[startIndex]?.dataset.level || 0);
+    let endIndex = startIndex;
+    for (let index = startIndex + 1; index < wrappers.length; index += 1) {
+      if (Number(wrappers[index].dataset.level || 0) <= baseLevel) break;
+      endIndex = index;
+    }
+    return endIndex;
+  }
+
+  function moveDraggedGroupBefore(reference) {
+    const { wrapper, children } = dragState;
+    container.insertBefore(wrapper, reference);
+    for (const child of children) container.insertBefore(child, reference);
   }
 
   function clampToBoundary() {
@@ -515,11 +1013,11 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   function updateDraggedLevel() {
     const all = [...container.querySelectorAll('.list-item-wrapper')];
     const index = all.indexOf(dragState.wrapper);
-    let nextLevel = 0;
+    let nextLevel = dragState.originalLevel;
 
-    if (index > 0) {
+    if (dragState.rightShifted && index > 0) {
       const aboveLevel = Number(all[index - 1].dataset.level || 0);
-      nextLevel = dragState.rightShifted ? aboveLevel + 1 : aboveLevel;
+      nextLevel = aboveLevel + 1;
     }
 
     dragState.pendingLevel = nextLevel;
@@ -527,31 +1025,54 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     dragState.wrapper.style.marginLeft = `${nextLevel * 24}px`;
   }
 
+  function snapUnshiftedDragOutOfDeeperRows() {
+    const { wrapper, children, originalLevel, offsetY } = dragState;
+    if (offsetY >= 0) return;
+
+    const all = [...container.querySelectorAll('.list-item-wrapper')];
+    const index = all.indexOf(wrapper);
+    const groupEnd = index + children.length;
+    const aboveLevel = index > 0 ? Number(all[index - 1].dataset.level || 0) : originalLevel;
+    const belowLevel = groupEnd < all.length - 1 ? Number(all[groupEnd + 1].dataset.level || 0) : originalLevel;
+    if (aboveLevel <= originalLevel && belowLevel <= originalLevel) return;
+
+    let ancestor = null;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (Number(all[cursor].dataset.level || 0) <= originalLevel) {
+        ancestor = all[cursor];
+        break;
+      }
+    }
+    if (!ancestor) return;
+    container.insertBefore(wrapper, ancestor);
+    for (const child of children) container.insertBefore(child, ancestor);
+  }
+
   function checkSwap() {
     const { wrapper, children } = dragState;
     const all = [...container.querySelectorAll('.list-item-wrapper')];
-    const index = all.indexOf(wrapper);
+    const visible = visibleDragWrappers(all);
+    const index = visible.indexOf(wrapper);
     const rect = wrapper.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
 
     if (index > 0) {
-      const previous = all[index - 1];
+      const previous = visible[index - 1];
       const previousRect = previous.getBoundingClientRect();
       if (midpoint < previousRect.top + previousRect.height / 2) {
-        container.insertBefore(wrapper, previous);
-        for (const child of children) container.insertBefore(child, previous);
+        moveDraggedGroupBefore(previous);
         dragState.offsetY += previousRect.height + 1;
         wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
         return;
       }
     }
 
-    const groupEnd = index + children.length;
-    if (groupEnd < all.length - 1) {
-      const next = all[groupEnd + 1];
+    if (index < visible.length - 1) {
+      const next = visible[index + 1];
       const nextRect = next.getBoundingClientRect();
       if (midpoint > nextRect.top + nextRect.height / 2) {
-        container.insertBefore(next, wrapper);
+        const nextEnd = groupEndIndex(all, all.indexOf(next));
+        moveDraggedGroupBefore(all[nextEnd + 1] || null);
         dragState.offsetY -= nextRect.height + 1;
         wrapper.style.transform = `translateY(${dragState.offsetY}px)`;
       }
@@ -569,6 +1090,42 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       detectRightShift(clientX);
       updateDraggedLevel();
     }
+  }
+
+  function restoreUndoSnapshot(snapshot, disabled) {
+    undoSnapshot = snapshot ? clone(snapshot) : null;
+    undoButton.disabled = disabled;
+  }
+
+  function restoreDragChildren(children, childDisplayBeforeDrag) {
+    for (const child of children) {
+      child.style.display = childDisplayBeforeDrag?.get(child) ?? '';
+      child.style.transition = '';
+      child.style.transform = '';
+    }
+  }
+
+  function cancelActiveDrag({ restoreUndo = true } = {}) {
+    if (!dragState) return;
+    stopAutoScroll();
+    const { wrapper, children, childDisplayBeforeDrag, previousUndoSnapshot, previousUndoDisabled } = dragState;
+    dragState = null;
+
+    const row = wrapper.querySelector('.list-item');
+    row?.classList.remove('pressing');
+    if (row) {
+      row.style.transition = '';
+      row.style.transform = '';
+    }
+    wrapper.classList.remove('is-dragging');
+    wrapper.style.transition = '';
+    wrapper.style.transform = '';
+    restoreDragChildren(children, childDisplayBeforeDrag);
+    if (restoreUndo) restoreUndoSnapshot(previousUndoSnapshot, previousUndoDisabled);
+  }
+
+  function cancelDragAsTap() {
+    cancelActiveDrag();
   }
 
   function autoScrollStep() {
@@ -609,6 +1166,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function startDrag(wrapper, clientY, clientX) {
+    const previousUndoSnapshot = undoSnapshot ? clone(undoSnapshot) : null;
+    const previousUndoDisabled = undoButton.disabled;
     saveUndoSnapshot();
     const row = wrapper.querySelector('.list-item');
     row.classList.remove('pressing');
@@ -624,30 +1183,21 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       children.push(allWrappers[index]);
     }
 
-    dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, originalLevel: baseLevel };
+    const childDisplayBeforeDrag = new Map(children.map((child) => [child, child.style.display]));
+    dragState = { wrapper, lastClientY: clientY, offsetY: 0, nestBaseX: clientX, children, childDisplayBeforeDrag, originalLevel: baseLevel, previousUndoSnapshot, previousUndoDisabled };
     for (const child of children) child.style.display = 'none';
     startAutoScroll();
   }
 
   function finalizeDrag() {
     stopAutoScroll();
-    const { wrapper, pendingLevel, rightShifted, children, originalLevel } = dragState;
-    dragState = null;
+    const { wrapper, pendingLevel, rightShifted, children, childDisplayBeforeDrag, originalLevel } = dragState;
 
     if (!rightShifted) {
-      const all = [...container.querySelectorAll('.list-item-wrapper')];
-      const index = all.indexOf(wrapper);
-      const groupEnd = index + children.length;
-      if (index > 0 && groupEnd < all.length - 1) {
-        const aboveLevel = Number(all[index - 1].dataset.level || 0);
-        const belowLevel = Number(all[groupEnd + 1].dataset.level || 0);
-        if (belowLevel > aboveLevel) {
-          const aboveWrapper = all[index - 1];
-          container.insertBefore(wrapper, aboveWrapper);
-          for (const child of children) container.insertBefore(child, aboveWrapper);
-        }
-      }
+      snapUnshiftedDragOutOfDeeperRows();
     }
+
+    dragState = null;
 
     if (pendingLevel !== undefined) {
       const delta = pendingLevel - originalLevel;
@@ -667,11 +1217,13 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     for (const child of children) {
       child.style.transition = 'transform 0.22s cubic-bezier(.4,0,.2,1)';
       child.style.transform = '';
+      child.style.display = childDisplayBeforeDrag?.get(child) ?? '';
     }
 
     setTimeout(() => {
       wrapper.style.transition = '';
       wrapper.classList.remove('is-dragging');
+      for (const child of children) child.style.transition = '';
       const wrappers = [...container.querySelectorAll('.list-item-wrapper')];
       const arranged = deriveArrangedFromWrappers(wrappers);
       dispatchUserInput({
@@ -691,6 +1243,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       return;
     }
     if (action.kind === 'status' && STATUS_ACTIONS.has(action.status)) {
+      saveUndoSnapshot();
       dispatchUserInput({ actId: itemId, actType: 'task', command: 'setStatus', payload: { status: action.status }, source });
       showToast(`Статус: ${action.status}`);
       return;
@@ -714,22 +1267,22 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     let mouseSwipeDone = false;
 
     const handleMoveXY = (clientX, clientY) => {
-      if (dragState || !active) return;
       curX = clientX;
       curY = clientY;
+      if (dragState || !active) return;
       const dx = curX - startX;
       const dy = curY - startY;
 
-      if (longTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      if (longTimer && (Math.abs(dx) > LONGPRESS_CANCEL_PX || Math.abs(dy) > LONGPRESS_CANCEL_PX)) {
         clearTimeout(longTimer);
         longTimer = null;
         row.classList.remove('pressing');
       }
 
       if (!lockedH) {
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > HORIZONTAL_SWIPE_LOCK_PX) {
           lockedH = true;
-        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= VERTICAL_SCROLL_CANCEL_PX) {
           row.style.transform = '';
           actionBg.style.opacity = '0';
           actionBg.className = 'action-bg del';
@@ -762,6 +1315,15 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       }
 
       if (ldAnchor !== null || dx < -threshold) {
+        if (isFrontierView()) {
+          ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
+          active = false;
+          if (startVoice(itemId, curY)) {
+            if (isFinite(curY)) updateVoice(curY);
+          }
+          resetRowGesture(row, actionBg);
+          return;
+        }
         if (ldAnchor !== null && dx > -threshold) {
           hideTagPanel();
           ldAnchor = null;
@@ -788,38 +1350,51 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       row.classList.remove('pressing');
       if (isMouse) currentMouseGesture = null;
 
-      const action = dropAction;
+      const rightAction = dropAction;
+      const leftAction = tagAction;
       const wasRight = !!rdAnchor;
       const wasLeft = !!ldAnchor;
-      const savedTagAction = tagAction;
       rdAnchor = null;
       ldAnchor = null;
       hideDrop();
       hideTagPanel();
 
-      if (dragState || !active) return;
-      active = false;
-
       const dx = curX - startX;
       const dy = curY - startY;
+      const stayedWithinTap = Math.abs(dx) <= TAP_TOLERANCE_PX && Math.abs(dy) <= TAP_TOLERANCE_PX;
+
+      if (dragState) {
+        if (stayedWithinTap && rootPanel.dataset.viewMode !== 'frontier') {
+          cancelDragAsTap();
+          active = false;
+          if (!isMouse) {
+            dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
+          }
+          return true;
+        }
+        return false;
+      }
+      if (!active) return false;
+      active = false;
 
       row.style.transition = 'transform 0.3s cubic-bezier(.4,0,.2,1)';
       row.style.transform = '';
       actionBg.style.opacity = '0';
 
-      if (wasRight && dx > 30 && action) {
+      if (wasRight && dx > 30 && rightAction) {
         if (isMouse) mouseSwipeDone = true;
-        execPanelAction(action, itemId, 'right-swipe-panel');
-      } else if (wasLeft && dx < -30 && savedTagAction) {
+        execPanelAction(rightAction, itemId, 'right-swipe-panel');
+      } else if (wasLeft && dx < -30 && leftAction) {
         if (isMouse) mouseSwipeDone = true;
-        execPanelAction(savedTagAction, itemId, 'left-swipe-panel');
-      } else if (!isMouse && Math.abs(dx) < 10 && Math.abs(dy) < 10 && rootPanel.dataset.viewMode !== 'frontier') {
+        execPanelAction(leftAction, itemId, 'left-swipe-panel');
+      } else if (!isMouse && stayedWithinTap && rootPanel.dataset.viewMode !== 'frontier') {
         dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'tap' });
       }
+      return true;
     };
 
     row.addEventListener('touchstart', (event) => {
-      if (dragState || modalOpen || taskPageOpen) return;
+      if (dragState || modalOpen || settingsOpen || taskPageOpen) return;
       const touch = event.touches[0];
       startX = curX = touch.clientX;
       startY = curY = touch.clientY;
@@ -831,15 +1406,23 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       row.classList.add('pressing');
       longTimer = setTimeout(() => {
         longTimer = null;
-        active = false;
         rdAnchor = null;
+        ldAnchor = null;
+        if (document.visibilityState === 'hidden') {
+          active = false;
+          resetRowGesture(row, actionBg);
+          return;
+        }
+        if (isFrontierView()) {
+          startVoice(null, curY);
+          resetRowGesture(row, actionBg);
+          return;
+        }
+        actionBg.style.opacity = '0';
         hideDrop();
         hideTagPanel();
-        row.style.transform = '';
-        actionBg.style.opacity = '0';
-        if (rootPanel.dataset.viewMode === 'frontier') return;
         startDrag(wrapper, curY, curX);
-      }, 370);
+      }, VOICE_LONGPRESS_MS);
     }, { passive: true });
 
     row.addEventListener('touchmove', (event) => {
@@ -855,7 +1438,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     row.addEventListener('mousedown', (event) => {
       if (Date.now() - lastTouchEndTime < 500) return;
-      if (dragState || modalOpen || taskPageOpen || event.button !== 0) return;
+      if (dragState || modalOpen || settingsOpen || taskPageOpen || event.button !== 0) return;
       startX = curX = event.clientX;
       startY = curY = event.clientY;
       active = true;
@@ -867,15 +1450,23 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       currentMouseGesture = { move: handleMoveXY, end: () => handleEnd(true) };
       longTimer = setTimeout(() => {
         longTimer = null;
-        active = false;
         rdAnchor = null;
+        ldAnchor = null;
+        if (document.visibilityState === 'hidden') {
+          active = false;
+          resetRowGesture(row, actionBg);
+          return;
+        }
+        if (isFrontierView()) {
+          startVoice(null, curY);
+          resetRowGesture(row, actionBg);
+          return;
+        }
+        actionBg.style.opacity = '0';
         hideDrop();
         hideTagPanel();
-        row.style.transform = '';
-        actionBg.style.opacity = '0';
-        if (rootPanel.dataset.viewMode === 'frontier') return;
         startDrag(wrapper, curY, curX);
-      }, 370);
+      }, VOICE_LONGPRESS_MS);
     });
 
     row.addEventListener('click', () => {
@@ -885,7 +1476,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         mouseSwipeDone = false;
         return;
       }
-      if (rootPanel.dataset.viewMode === 'frontier') return;
+      if (isFrontierView()) return;
       dispatchUserInput({ actId: itemId, actType: 'task', command: 'toggleCollapse', payload: {}, source: 'click' });
     });
   }
@@ -898,11 +1489,12 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function onRendered(state, viewMode) {
     rootPanel.dataset.viewMode = viewMode;
-    viewToggleButton.textContent = viewMode === 'log' ? 'Список' : 'Журнал';
+    viewToggleButton.textContent = viewMode === 'log' || viewMode === 'search' ? 'Список' : 'Журнал';
     if (frontierButton) {
-      frontierButton.textContent = viewMode === 'frontier' ? 'Список' : 'Фронтир';
+      frontierButton.textContent = viewMode === 'frontier' || viewMode === 'search' ? 'Список' : 'Фронтир';
       frontierButton.classList.toggle('active', viewMode === 'frontier');
     }
+    if (taskPageOpen && taskPageTargetId) renderTaskPageSubtasks(taskPageTargetId, state);
   }
 
   return {

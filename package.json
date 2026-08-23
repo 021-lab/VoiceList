@@ -1,18 +1,24 @@
 {
-  "name": "voicelist-universal-interface",
+  "name": "searchmydata-list-interface",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "npm run test:unit",
     "test:unit": "vitest run",
+    "test:voice": "node tests/voice/test_resolver.js && node tests/voice/test_e2e.js",
+    "test:gestures": "playwright test tests/e2e/gestures.spec.js",
     "test:e2e": "playwright test",
+    "docs:realtime": "node scripts/generate-realtime-agent-instructions.mjs",
     "prepare-preview": "node scripts/prepare-preview.mjs",
+    "build:cloudflare": "npm run prepare-preview && node scripts/prepare-cloudflare-assets.mjs",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "serve:test": "node scripts/static-server.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "esbuild": "^0.25.10",
     "jsdom": "^26.1.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.118.0"
   }
 }

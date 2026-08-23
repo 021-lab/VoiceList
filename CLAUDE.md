@@ -1,4 +1,4 @@
-# VoiceList — Project Rules
+# SearchMyData — Project Rules
 
 ## Before reporting work done
 1. Verify the current page loads and shows expected content (fetch the live URL or validate locally).
@@ -7,12 +7,11 @@
 ## Live page link format
 Generate the link with these commands and include it at the end of every message:
 ```bash
-SHA=$(git rev-parse HEAD)
-ORIGIN=$(git remote get-url origin)
-OWNER_REPO=$(printf '%s\n' "$ORIGIN" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')
-echo "https://htmlpreview.github.io/?https://raw.githubusercontent.com/${OWNER_REPO}/${SHA}/list-manager.html"
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+COMMIT=$(git rev-parse --short HEAD)
+echo "https://htmlpreview.github.io/?https://raw.githubusercontent.com/021-lab/searchmydata/${BRANCH}/list-manager.html?v=${COMMIT}"
 ```
 
 ## Development branch
-- Work in `codex-` branches.
-- Keep the repo fork-friendly: avoid hardcoded owner/repo names in preview or CI paths.
+- Feature branch: `claude/nested-list-structure-8hrDx`
+- Remote: `021-lab/SearchMyData`

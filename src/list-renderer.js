@@ -1,5 +1,9 @@
 import { calculateFrontier } from './list-frontier.js';
 
+function isArchived(item) {
+  return String(item?.status || '').toLowerCase() === 'archive';
+}
+
 function escHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -28,7 +32,15 @@ function statusColor(status) {
   if (status === 'Focus') return '#ff9500';
   if (status === 'Archive') return '#8e8e93';
   if (status === 'Pause') return '#5856d6';
+  if (status === 'Info') return '#0a84ff';
   return '#007aff';
+}
+
+function formatCommand(command) {
+  if (!command?.command) return '';
+  const payload = command.payload && Object.keys(command.payload).length ? ` ${JSON.stringify(command.payload)}` : '';
+  const act = command.actId ? ` @${command.actId}` : '';
+  return `${command.command}${act}${payload}`;
 }
 
 export function createRenderer({ container, actionLogPanel, actionLogList, rootPanel, emptyStateLabel, bindRow, bindGlobal, onRendered } = {}) {
@@ -42,11 +54,15 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
     for (const entry of [...actionLog].reverse()) {
       const row = document.createElement('div');
       row.className = 'action-log-row';
+      row.dataset.logId = entry.id;
       row.innerHTML = `
         <div class="action-log-line">
           <span class="action-log-label">${escHtml(entry.label)}</span>
           <span class="action-log-status action-log-status-${escHtml(entry.syncStatus)}">${escHtml(entry.syncStatus)}</span>
         </div>
+        ${entry.transcript ? `<div class="action-log-transcript">${escHtml(entry.transcript)}</div>` : ''}
+        <div class="action-log-command">${escHtml(formatCommand(entry.command))}</div>
+        ${(entry.comments || []).length ? `<div class="action-log-comments">${entry.comments.map((comment) => `<div class="action-log-comment">${escHtml(comment.text)}</div>`).join('')}</div>` : ''}
         <div class="action-log-meta">${escHtml(entry.createdAt)}</div>
       `;
       actionLogList.appendChild(row);
@@ -185,7 +201,37 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
     container.appendChild(fragment);
   }
 
-  function render(state, viewMode = 'list') {
+  function renderSearch(state, context = {}) {
+    const ids = new Set(context.itemIds || []);
+    const items = (state.snapshot.items || [])
+      .filter((item) => ids.has(item.id) && !isArchived(item))
+      .sort((left, right) => left.order - right.order);
+
+    const summary = document.createElement('div');
+    summary.className = 'search-summary';
+    summary.textContent = `Поиск: ${context.query || ''}`;
+    container.appendChild(summary);
+
+    if (!items.length) {
+      container.insertAdjacentHTML('beforeend', '<div class="empty-state"><div class="icon">⌕</div><p>Ничего не найдено.</p></div>');
+      return;
+    }
+
+    const childIds = new Set((state.snapshot.items || []).map((item) => item.parentId).filter(Boolean));
+    const fragment = document.createDocumentFragment();
+    items.forEach((item, index) => {
+      renderRow({
+        fragment,
+        hasChildren: childIds.has(item.id),
+        index: index + 1,
+        item,
+        level: 0
+      });
+    });
+    container.appendChild(fragment);
+  }
+
+  function render(state, viewMode = 'list', viewContext = {}) {
     if (!container) return;
     lastState = state;
 
@@ -203,6 +249,13 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
       return;
     }
 
+    if (viewMode === 'search') {
+      renderSearch(state, viewContext);
+      if (typeof bindGlobal === 'function') bindGlobal();
+      if (typeof onRendered === 'function') onRendered(state, viewMode, viewContext);
+      return;
+    }
+
     const items = state.snapshot.items || [];
     if (!items.length) {
       container.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>${escHtml(emptyStateLabel || 'Список пуст. Нажмите + чтобы добавить.')}</p></div>`;
@@ -216,8 +269,10 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
 
     function walk(parentId, level, hidden) {
       for (const item of byParent.get(parentId) || []) {
+        if (isArchived(item)) continue;
         index += 1;
-        const hasChildren = (byParent.get(item.id) || []).length > 0;
+        const visibleChildren = (byParent.get(item.id) || []).filter((child) => !isArchived(child));
+        const hasChildren = visibleChildren.length > 0;
         renderRow({ fragment, hasChildren, hidden, index, item, level });
 
         walk(item.id, level + 1, hidden || !!item.collapsed);

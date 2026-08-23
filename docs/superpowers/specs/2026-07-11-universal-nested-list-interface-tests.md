@@ -17,7 +17,7 @@ https://htmlpreview.github.io/?https://raw.githubusercontent.com/<owner>/<repo>/
 Example:
 
 ```text
-https://htmlpreview.github.io/?https://raw.githubusercontent.com/<owner>/<repo>/<commit-sha>/list-manager.html#v=<preview-hash>
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/021-lab/SearchMyData/<commit-sha>/list-manager.html#v=mrfxmgv6-cbwbiy
 ```
 
 For this branch the entrypoint is:

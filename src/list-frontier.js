@@ -1,4 +1,5 @@
 const CLOSED_STATUSES = new Set(['done', 'archive']);
+const BLOCKED_BRANCH_STATUSES = new Set(['archive']);
 const FRONTIER_STATUSES = new Set(['open', 'focus']);
 
 function normalizedStatus(task) {
@@ -100,6 +101,7 @@ export function calculateFrontier(tasks = []) {
   function visit(node, paused) {
     const status = normalizedStatus(node.task || {});
 
+    if (BLOCKED_BRANCH_STATUSES.has(status)) return false;
     if (CLOSED_STATUSES.has(status) && !node.hasFocusInSubtree) return false;
     if (status === 'focus') focusHighlights.push(node.task);
 

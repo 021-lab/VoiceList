@@ -1,49 +1,39 @@
-export function createSync({ adapter, onStateChange, store, autoSaveMs = 60_000 }) {
+export function createSync({ transport, logStore, onLogEntriesChange }) {
   let queue = Promise.resolve();
-  let autoSaveTimer = null;
 
   function chain(task) {
     queue = queue.then(task);
     return queue;
   }
 
-  function enqueue(state, actionLogEntry) {
-    if (!actionLogEntry) return queue;
+  function finalize(id, syncStatus) {
+    logStore.updateEntry(id, (entry) => ({ ...entry, syncStatus }));
+    onLogEntriesChange?.(logStore.listEntries());
+  }
 
+  function enqueueCreate(entry) {
+    if (!entry) return queue;
     return chain(async () => {
       try {
-        await adapter.save(state, { reason: 'mutation', createBackup: false });
-        const nextState = store.updateActionLogStatus(actionLogEntry.id, 'synced');
-        onStateChange(nextState);
+        await transport.create(entry);
+        finalize(entry.id, 'synced');
       } catch (error) {
-        const nextState = store.updateActionLogStatus(actionLogEntry.id, 'failed');
-        onStateChange(nextState);
+        finalize(entry.id, 'failed');
       }
     });
   }
 
-  function start(getState) {
-    if (autoSaveTimer) return;
-
-    autoSaveTimer = setInterval(() => {
-      const state = getState();
-      if (!state) return;
-
-      chain(async () => {
-        try {
-          await adapter.save(state, { reason: 'autosave', createBackup: true });
-        } catch (error) {
-          console.warn('Autosave failed', error);
-        }
-      });
-    }, autoSaveMs);
+  function enqueueUpdate(entry) {
+    if (!entry) return queue;
+    return chain(async () => {
+      try {
+        await transport.update(entry);
+        finalize(entry.id, 'synced');
+      } catch (error) {
+        finalize(entry.id, 'failed');
+      }
+    });
   }
 
-  function stop() {
-    if (!autoSaveTimer) return;
-    clearInterval(autoSaveTimer);
-    autoSaveTimer = null;
-  }
-
-  return { enqueue, start, stop };
+  return { enqueueCreate, enqueueUpdate };
 }

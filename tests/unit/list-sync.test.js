@@ -3,50 +3,46 @@ import { describe, expect, test, vi } from 'vitest';
 import { createSync } from '../../src/list-sync.js';
 
 describe('list sync', () => {
-  test('marks action log entry synced after mutation save', async () => {
-    const adapter = {
-      save: vi.fn(async () => {})
+  test('marks log entry synced after create transport succeeds', async () => {
+    const transport = {
+      create: vi.fn(async () => {}),
+      update: vi.fn(async () => {})
     };
-    const store = {
-      updateActionLogStatus: vi.fn(() => ({ ok: true }))
+    const logStore = {
+      updateEntry: vi.fn((id, next) => next({ id, syncStatus: 'pending', comments: [] })),
+      listEntries: vi.fn(() => [{ id: 'log1', syncStatus: 'synced', comments: [] }])
     };
-    const onStateChange = vi.fn();
+    const onLogEntriesChange = vi.fn();
 
-    const sync = createSync({ adapter, onStateChange, store });
-    const state = { snapshot: { items: [] }, actionLog: [] };
-    const actionLogEntry = { id: 'log1' };
+    const sync = createSync({ transport, logStore, onLogEntriesChange });
+    const actionLogEntry = { id: 'log1', syncStatus: 'pending', comments: [] };
 
-    await sync.enqueue(state, actionLogEntry);
+    await sync.enqueueCreate(actionLogEntry);
 
-    expect(adapter.save).toHaveBeenCalledWith(state, { reason: 'mutation', createBackup: false });
-    expect(store.updateActionLogStatus).toHaveBeenCalledWith('log1', 'synced');
-    expect(onStateChange).toHaveBeenCalledWith({ ok: true });
+    expect(transport.create).toHaveBeenCalledWith(actionLogEntry);
+    expect(logStore.updateEntry).toHaveBeenCalledWith('log1', expect.any(Function));
+    expect(onLogEntriesChange).toHaveBeenCalledWith([{ id: 'log1', syncStatus: 'synced', comments: [] }]);
   });
 
-  test('runs autosave every minute with backup snapshots', async () => {
-    vi.useFakeTimers();
-
-    const adapter = {
-      save: vi.fn(async () => {})
+  test('marks log entry failed after comment update transport rejects', async () => {
+    const transport = {
+      create: vi.fn(async () => {}),
+      update: vi.fn(async () => {
+        throw new Error('boom');
+      })
     };
-    const store = {
-      updateActionLogStatus: vi.fn()
+    const logStore = {
+      updateEntry: vi.fn((id, next) => next({ id, syncStatus: 'pending', comments: [{ id: 'c1', text: 'коммент' }] })),
+      listEntries: vi.fn(() => [{ id: 'log1', syncStatus: 'failed', comments: [{ id: 'c1', text: 'коммент' }] }])
     };
-    const onStateChange = vi.fn();
-    const getState = vi.fn(() => ({ snapshot: { items: [{ id: 'x' }] }, actionLog: [] }));
+    const onLogEntriesChange = vi.fn();
 
-    const sync = createSync({ adapter, onStateChange, store, autoSaveMs: 60_000 });
-    sync.start(getState);
+    const sync = createSync({ transport, logStore, onLogEntriesChange });
+    const entry = { id: 'log1', syncStatus: 'pending', comments: [{ id: 'c1', text: 'коммент' }] };
 
-    await vi.advanceTimersByTimeAsync(60_000);
+    await sync.enqueueUpdate(entry);
 
-    expect(getState).toHaveBeenCalled();
-    expect(adapter.save).toHaveBeenCalledWith(
-      { snapshot: { items: [{ id: 'x' }] }, actionLog: [] },
-      { reason: 'autosave', createBackup: true }
-    );
-
-    sync.stop();
-    vi.useRealTimers();
+    expect(transport.update).toHaveBeenCalledWith(entry);
+    expect(onLogEntriesChange).toHaveBeenCalledWith([{ id: 'log1', syncStatus: 'failed', comments: [{ id: 'c1', text: 'коммент' }] }]);
   });
 });

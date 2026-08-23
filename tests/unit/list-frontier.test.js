@@ -64,6 +64,29 @@ describe('task frontier', () => {
     expect(result.focusHighlights.map((item) => item.id)).toEqual(['first-backlog']);
   });
 
+  test('blocks archived branches from frontier entirely', () => {
+    const result = calculateFrontier([
+      task('archived-root', null, 'Archive', 10),
+      task('archived-focus', 'archived-root', 'Focus', 10),
+      task('visible-root', null, 'Open', 20)
+    ]);
+
+    expect(result.frontier.map((item) => item.id)).toEqual(['visible-root']);
+    expect(result.focusHighlights).toEqual([]);
+  });
+
+  test('keeps Info tasks out of frontier while allowing active descendants', () => {
+    const result = calculateFrontier([
+      task('info-root', null, 'Info', 10),
+      task('info-child', 'info-root', 'Open', 10),
+      task('info-leaf', null, 'Info', 20),
+      task('visible-root', null, 'Open', 30)
+    ]);
+
+    expect(result.frontier.map((item) => item.id)).toEqual(['info-child', 'visible-root']);
+    expect(result.focusHighlights).toEqual([]);
+  });
+
   test('throws on missing parent and duplicate task ids', () => {
     expect(() => calculateFrontier([task('A', 'missing', 'Open')])).toThrow(/parent/i);
     expect(() => calculateFrontier([
