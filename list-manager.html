@@ -2531,9 +2531,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       minute: "2-digit"
     }).format(new Date(value));
   }
-  function openAISetupTokenFromHash(hash) {
-    return new URLSearchParams(String(hash || "").replace(/^#/, "")).get("openai-setup") || "";
-  }
   function createRealtimeVoiceAgent({
     voiceButton,
     voiceStatus,
@@ -2563,8 +2560,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     documentLike = document,
     windowLike = globalThis.window,
     storage = localStorage,
-    locationLike = globalThis.location,
-    historyLike = globalThis.history,
     now = () => /* @__PURE__ */ new Date(),
     createId = () => crypto.randomUUID(),
     AbortControllerCtor = globalThis.AbortController
@@ -2572,8 +2567,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     const repository = createDialogueRepository({ storage, now, createId });
     let active = null;
     let keyConfigured = null;
-    let setupAvailable = false;
-    let setupToken = openAISetupTokenFromHash(locationLike?.hash);
+    let keySetupAvailable = false;
     let promptConfigured = false;
     function setKeyStatus(message, tone = "") {
       if (!openAIKeyStatus) return;
@@ -2592,10 +2586,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       const locked = keyConfigured === true;
       if (openAIKeyField) openAIKeyField.hidden = locked;
       openAIKeySaveButton.hidden = locked;
-      openAIKeySaveButton.disabled = !setupToken || !setupAvailable;
+      openAIKeySaveButton.disabled = !keySetupAvailable;
       if (locked) setKeyStatus("\u041A\u043B\u044E\u0447 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0438 \u0433\u043E\u0442\u043E\u0432 \u043A \u0440\u0430\u0431\u043E\u0442\u0435.", "success");
-      else if (setupToken && setupAvailable) setKeyStatus("\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u043B\u044E\u0447 OpenAI. \u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043E\u0434\u0438\u043D \u0440\u0430\u0437.");
-      else if (keyConfigured === false) setKeyStatus("\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043A\u043B\u044E\u0447\u0430.", "error");
+      else if (keySetupAvailable) setKeyStatus("\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u043B\u044E\u0447 OpenAI. \u041E\u043D \u0431\u0443\u0434\u0435\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.");
+      else if (keyConfigured === false) setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043A\u043B\u044E\u0447\u0430 \u0441\u0435\u0439\u0447\u0430\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443.", "error");
     }
     function renderPromptSettings() {
       if (!openAIPromptInput || !openAIPromptSaveButton) return;
@@ -2608,22 +2602,14 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       renderKeySettings();
       if (keyConfigured !== true) openAIKeyInput?.focus();
     }
-    function removeSetupTokenFromAddress() {
-      if (!locationLike || !historyLike?.replaceState) return;
-      const params = new URLSearchParams(String(locationLike.hash || "").replace(/^#/, ""));
-      params.delete("openai-setup");
-      const hash = params.toString();
-      historyLike.replaceState(null, "", `${locationLike.pathname || "/"}${locationLike.search || ""}${hash ? `#${hash}` : ""}`);
-    }
     async function refreshKeyStatus() {
       try {
         const response = await fetchImpl(keyStatusEndpoint, { headers: { Accept: "application/json" } });
         if (!response.ok) return;
         const status = await response.json();
         keyConfigured = Boolean(status.configured);
-        setupAvailable = Boolean(status.setupAvailable);
+        keySetupAvailable = Boolean(status.setupAvailable);
         renderKeySettings();
-        if (setupToken && !keyConfigured) openKeySettings();
       } catch {
       }
     }
@@ -2644,8 +2630,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         setKeyStatus("\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043A\u043B\u044E\u0447: \u043E\u043D \u0434\u043E\u043B\u0436\u0435\u043D \u043D\u0430\u0447\u0438\u043D\u0430\u0442\u044C\u0441\u044F \u0441 sk-.", "error");
         return;
       }
-      if (!setupToken || !setupAvailable) {
-        setKeyStatus("\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0430.", "error");
+      if (!keySetupAvailable) {
+        setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043A\u043B\u044E\u0447\u0430 \u0441\u0435\u0439\u0447\u0430\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443.", "error");
         return;
       }
       openAIKeySaveButton.disabled = true;
@@ -2654,15 +2640,13 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         const response = await fetchImpl(keySetupEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey, setupToken })
+          body: JSON.stringify({ apiKey })
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
         openAIKeyInput.value = "";
         keyConfigured = true;
-        setupAvailable = false;
-        setupToken = "";
-        removeSetupTokenFromAddress();
+        keySetupAvailable = false;
         renderKeySettings();
       } catch (error) {
         setKeyStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u043B\u044E\u0447.", "error");

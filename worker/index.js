@@ -195,13 +195,12 @@ export default {
       const configured = Boolean(env.OPENAI_API_KEY) || await documentStub(env).isOpenAIKeyConfigured();
       return handleOpenAIKeyStatus({
         configured,
-        setupAvailable: Boolean(env.OPENAI_SETUP_TOKEN_HASH) && !configured
+        setupAvailable: !configured
       });
     }
 
     if (url.pathname === '/api/realtime/key') {
       return handleOpenAIKeySetup(request, {
-        setupTokenHash: env.OPENAI_SETUP_TOKEN_HASH || '',
         configureKey: (apiKey) => documentStub(env).configureOpenAIApiKey(apiKey)
       });
     }

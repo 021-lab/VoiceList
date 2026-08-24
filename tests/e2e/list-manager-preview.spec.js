@@ -317,20 +317,23 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
     await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ configured: true }) });
   });
 
-  await page.goto('#openai-setup=test-mobile-setup-token-12345678901234567890');
+  await page.goto('');
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
   await expect(page.locator('#realtime-voice-btn')).toBeVisible();
+  await page.locator('#settings-btn').click();
   await expect(page.locator('#settings-overlay')).toHaveClass(/open/);
   await page.locator('#openai-key-input').fill('sk-example-mobile-key-1234567890');
   await page.locator('#openai-key-save').click();
   await expect(page.locator('#openai-key-status')).toContainText('Ключ сохранён на сервере');
   expect(keySetupRequest).toEqual({
-    apiKey: 'sk-example-mobile-key-1234567890',
-    setupToken: 'test-mobile-setup-token-12345678901234567890'
+    apiKey: 'sk-example-mobile-key-1234567890'
   });
-  expect(new URL(page.url()).hash).toBe('');
   expect(await page.evaluate(() => `${JSON.stringify(localStorage)}${JSON.stringify(sessionStorage)}`)).not.toContain('sk-example');
+  await page.reload();
+  await page.locator('#settings-btn').click();
+  await expect(page.locator('#openai-key-field')).toBeHidden();
+  await expect(page.locator('#openai-key-status')).toContainText('Ключ сохранён на сервере');
   await page.locator('#settings-close').click();
 
   const box = await page.locator('#realtime-voice-btn').boundingBox();

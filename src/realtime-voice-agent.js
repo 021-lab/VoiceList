@@ -232,10 +232,6 @@ function formatStartedAt(value) {
   }).format(new Date(value));
 }
 
-export function openAISetupTokenFromHash(hash) {
-  return new URLSearchParams(String(hash || '').replace(/^#/, '')).get('openai-setup') || '';
-}
-
 export function createRealtimeVoiceAgent({
   voiceButton,
   voiceStatus,
@@ -265,8 +261,6 @@ export function createRealtimeVoiceAgent({
   documentLike = document,
   windowLike = globalThis.window,
   storage = localStorage,
-  locationLike = globalThis.location,
-  historyLike = globalThis.history,
   now = () => new Date(),
   createId = () => crypto.randomUUID(),
   AbortControllerCtor = globalThis.AbortController
@@ -274,8 +268,7 @@ export function createRealtimeVoiceAgent({
   const repository = createDialogueRepository({ storage, now, createId });
   let active = null;
   let keyConfigured = null;
-  let setupAvailable = false;
-  let setupToken = openAISetupTokenFromHash(locationLike?.hash);
+  let keySetupAvailable = false;
   let promptConfigured = false;
 
   function setKeyStatus(message, tone = '') {
@@ -297,10 +290,10 @@ export function createRealtimeVoiceAgent({
     const locked = keyConfigured === true;
     if (openAIKeyField) openAIKeyField.hidden = locked;
     openAIKeySaveButton.hidden = locked;
-    openAIKeySaveButton.disabled = !setupToken || !setupAvailable;
+    openAIKeySaveButton.disabled = !keySetupAvailable;
     if (locked) setKeyStatus('Ключ сохранён на сервере и готов к работе.', 'success');
-    else if (setupToken && setupAvailable) setKeyStatus('Вставьте ключ OpenAI. Ссылка настройки сработает один раз.');
-    else if (keyConfigured === false) setKeyStatus('Откройте одноразовую ссылку настройки ключа.', 'error');
+    else if (keySetupAvailable) setKeyStatus('Вставьте ключ OpenAI. Он будет сохранён на сервере.');
+    else if (keyConfigured === false) setKeyStatus('Сохранение ключа сейчас недоступно. Обновите страницу.', 'error');
   }
 
   function renderPromptSettings() {
@@ -316,23 +309,14 @@ export function createRealtimeVoiceAgent({
     if (keyConfigured !== true) openAIKeyInput?.focus();
   }
 
-  function removeSetupTokenFromAddress() {
-    if (!locationLike || !historyLike?.replaceState) return;
-    const params = new URLSearchParams(String(locationLike.hash || '').replace(/^#/, ''));
-    params.delete('openai-setup');
-    const hash = params.toString();
-    historyLike.replaceState(null, '', `${locationLike.pathname || '/'}${locationLike.search || ''}${hash ? `#${hash}` : ''}`);
-  }
-
   async function refreshKeyStatus() {
     try {
       const response = await fetchImpl(keyStatusEndpoint, { headers: { Accept: 'application/json' } });
       if (!response.ok) return;
       const status = await response.json();
       keyConfigured = Boolean(status.configured);
-      setupAvailable = Boolean(status.setupAvailable);
+      keySetupAvailable = Boolean(status.setupAvailable);
       renderKeySettings();
-      if (setupToken && !keyConfigured) openKeySettings();
     } catch {
       // Static/local preview can run without the Worker status endpoint.
     }
@@ -356,8 +340,8 @@ export function createRealtimeVoiceAgent({
       setKeyStatus('Проверьте ключ: он должен начинаться с sk-.', 'error');
       return;
     }
-    if (!setupToken || !setupAvailable) {
-      setKeyStatus('Ссылка настройки недействительна или уже использована.', 'error');
+    if (!keySetupAvailable) {
+      setKeyStatus('Сохранение ключа сейчас недоступно. Обновите страницу.', 'error');
       return;
     }
 
@@ -367,15 +351,13 @@ export function createRealtimeVoiceAgent({
       const response = await fetchImpl(keySetupEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, setupToken })
+        body: JSON.stringify({ apiKey })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
       openAIKeyInput.value = '';
       keyConfigured = true;
-      setupAvailable = false;
-      setupToken = '';
-      removeSetupTokenFromAddress();
+      keySetupAvailable = false;
       renderKeySettings();
     } catch (error) {
       setKeyStatus(error.message || 'Не удалось сохранить ключ.', 'error');

@@ -2,11 +2,6 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from '../../worker/openai-key-setup.js';
 
-async function sha256(value) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 describe('OpenAI key server setup', () => {
   test('reports only setup state and never returns the saved key', async () => {
     const response = await handleOpenAIKeyStatus({ configured: true, setupAvailable: false });
@@ -14,20 +9,17 @@ describe('OpenAI key server setup', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  test('accepts a same-origin key once with the hashed setup token', async () => {
-    const setupToken = 'one-time-mobile-setup-token-1234567890';
+  test('accepts a same-origin key from Settings without a setup link', async () => {
     const configureKey = vi.fn(async () => true);
     const request = new Request('https://vlist-dev.smileme.ai/api/realtime/key', {
       method: 'POST',
       headers: { Origin: 'https://vlist-dev.smileme.ai', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        apiKey: 'sk-example-server-key-1234567890',
-        setupToken
+        apiKey: 'sk-example-server-key-1234567890'
       })
     });
 
     const response = await handleOpenAIKeySetup(request, {
-      setupTokenHash: await sha256(setupToken),
       configureKey
     });
 
@@ -36,28 +28,25 @@ describe('OpenAI key server setup', () => {
     expect(await response.text()).not.toContain('sk-example');
   });
 
-  test('rejects cross-origin, invalid-token, and already-used setup attempts', async () => {
-    const setupToken = 'one-time-mobile-setup-token-1234567890';
-    const body = JSON.stringify({ apiKey: 'sk-example-server-key-1234567890', setupToken });
+  test('rejects cross-origin, invalid-key, and already-used setup attempts', async () => {
+    const body = JSON.stringify({ apiKey: 'sk-example-server-key-1234567890' });
     const crossOrigin = new Request('https://vlist-dev.smileme.ai/api/realtime/key', {
       method: 'POST',
       headers: { Origin: 'https://example.com', 'Content-Type': 'application/json' },
       body
     });
     expect((await handleOpenAIKeySetup(crossOrigin, {
-      setupTokenHash: await sha256(setupToken),
       configureKey: vi.fn()
     })).status).toBe(403);
 
-    const invalidToken = new Request('https://vlist-dev.smileme.ai/api/realtime/key', {
+    const invalidKey = new Request('https://vlist-dev.smileme.ai/api/realtime/key', {
       method: 'POST',
       headers: { Origin: 'https://vlist-dev.smileme.ai', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: 'sk-example-server-key-1234567890', setupToken: 'wrong-token-that-is-long-enough-123456' })
+      body: JSON.stringify({ apiKey: 'not-an-openai-key' })
     });
-    expect((await handleOpenAIKeySetup(invalidToken, {
-      setupTokenHash: await sha256(setupToken),
+    expect((await handleOpenAIKeySetup(invalidKey, {
       configureKey: vi.fn()
-    })).status).toBe(403);
+    })).status).toBe(400);
 
     const alreadyUsed = new Request('https://vlist-dev.smileme.ai/api/realtime/key', {
       method: 'POST',
@@ -65,7 +54,6 @@ describe('OpenAI key server setup', () => {
       body
     });
     expect((await handleOpenAIKeySetup(alreadyUsed, {
-      setupTokenHash: await sha256(setupToken),
       configureKey: vi.fn(async () => false)
     })).status).toBe(409);
   });
