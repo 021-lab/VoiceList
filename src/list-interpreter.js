@@ -1,5 +1,6 @@
 import { findCandidates } from './resolver.js';
 import { adaptSnapshot } from './snapshot-adapter.js';
+import { isDeadline } from './task-deadline.js';
 
 const STATUS_VALUES = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'Info']);
 const INBOX_ID = 'inbox';
@@ -35,6 +36,7 @@ function buildLabel(command, payload = {}) {
   if (command === 'editItem') return `Изменена задача: ${payload.line1}`;
   if (command === 'deleteItem') return 'Удалена задача';
   if (command === 'setTags') return `Изменены теги: ${payload.tag}`;
+  if (command === 'setDeadline') return `Дедлайн: ${payload.deadline}`;
   if (command === 'toggleCollapse') return 'Переключено сворачивание';
   if (command === 'reorderItems') return 'Изменён порядок списка';
   if (command === 'importWorkflowyTree') return `Импортировано дерево Workflowy: ${payload.tree?.title || 'без названия'}`;
@@ -196,6 +198,10 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
       } else if (input.command === 'setStatus') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         if (item && STATUS_VALUES.has(payload.status)) item.status = payload.status;
+      } else if (input.command === 'setDeadline') {
+        const item = nextItems.find((candidate) => candidate.id === input.actId);
+        if (!item || !isDeadline(payload.deadline)) return noChange();
+        item.deadline = payload.deadline;
       } else if (input.command === 'setParent') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         const parentId = payload.parentId ?? null;

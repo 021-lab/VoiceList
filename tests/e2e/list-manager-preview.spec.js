@@ -691,7 +691,7 @@ test('preview app imports a Workflowy shared tree from settings', async ({ page 
   await expect(page.locator('#list-container')).toContainText('Nested task');
 });
 
-test('preview app disables task-list voice and keeps voice commands on the frontier', async ({ page }) => {
+test('preview app keeps long-press voice and uses the shared left menu to postpone focus tasks', async ({ page }) => {
   await page.addInitScript(() => {
     window.__voiceTest = { phrase: 'шум' };
   });
@@ -735,19 +735,16 @@ test('preview app disables task-list voice and keeps voice commands on the front
   await page.mouse.up();
   await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
 
-  await page.evaluate(() => { window.__voiceTest = { phrase: 'готово' }; });
-  const frontierRow = page.locator('.list-item-wrapper[data-id="goldn"]').locator('.list-item');
-  const box = await frontierRow.boundingBox();
-  if (!box) throw new Error('No frontier row box');
+  await triggerLeftPanelAction(page, goldenRow, 'Неделя');
+  await expect(page.locator('#voice-overlay')).not.toHaveClass(/open/);
+  await expect(page.locator('.list-item-wrapper[data-id="goldn"] .item-index')).toHaveText('7');
 
-  await page.mouse.move(box.x + box.width - 24, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width - leftSwipeDistance, box.y + box.height / 2, { steps: 8 });
-  await expect(page.locator('#voice-overlay')).toHaveClass(/open/);
-  await page.mouse.up();
+  const grannyRow = page.locator('.list-item-wrapper[data-id="grnsm"]').locator('.list-item');
+  await triggerLeftPanelAction(page, grannyRow, 'Завтра');
+  await expect(page.locator('.list-item-wrapper[data-id="grnsm"] .item-index')).toHaveText('1');
 
-  await page.locator('#frontier-tab-btn').click();
-  await expect(page.locator('.list-item-wrapper[data-id="goldn"]')).toContainText('Done');
+  const focusedOrder = await visibleListOrder(page);
+  expect(focusedOrder.indexOf('grnsm')).toBeLessThan(focusedOrder.indexOf('goldn'));
 });
 
 test('preview app can mark a task as Info from the right menu and hides it from frontier', async ({ page }) => {

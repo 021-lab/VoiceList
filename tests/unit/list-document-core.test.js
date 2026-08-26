@@ -87,6 +87,28 @@ describe('Cloudflare list document core', () => {
     expect(core.listLog()).toHaveLength(1);
   });
 
+  test('persists a deadline through the Durable Object command path', async () => {
+    const core = createDocumentCore({ seedState, openRouterApiKey: '' });
+    await core.init();
+
+    const applied = await core.handleClientMessage({
+      type: 'command',
+      clientKey: 'tab-a',
+      seq: 1,
+      input: {
+        actId: 'milk1',
+        actType: 'task',
+        command: 'setDeadline',
+        payload: { deadline: '2026-09-01' },
+        source: 'left-swipe-panel'
+      }
+    });
+
+    expect(applied.ack).toMatchObject({ status: 'applied', newTarget: 'milk1' });
+    expect(applied.state.content.snapshot.items.find((item) => item.id === 'milk1')).toMatchObject({ deadline: '2026-09-01' });
+    expect(core.listLog().at(-1)).toMatchObject({ op: 'setDeadline', label: 'Дедлайн: 2026-09-01' });
+  });
+
   test('stores voice comments on the addressed log entry', async () => {
     const core = createDocumentCore({ seedState, openRouterApiKey: '' });
     await core.init();

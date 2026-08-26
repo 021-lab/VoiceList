@@ -1,6 +1,7 @@
 import { BrowserASR } from './asr-browser.js';
 import { MockASR } from './asr-mock.js';
 import { C as VOICE_C, selectAt as selectVoiceAt } from './gesture.js';
+import { deadlineFromToday } from './task-deadline.js';
 import { VoiceSession, validate as validateVoiceCommand } from './voice-session.js';
 
 const AVAILABLE_TAGS = ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'];
@@ -415,6 +416,16 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     });
   }
 
+  function buildDeadlinePanelActions() {
+    return [
+      { id: 'deadline:0', label: 'Сегодня', icon: '◷', color: '#34c759', kind: 'deadline', days: 0 },
+      { id: 'deadline:1', label: 'Завтра', icon: '◷', color: '#007aff', kind: 'deadline', days: 1 },
+      { id: 'deadline:3', label: 'Три дня', icon: '◷', color: '#5856d6', kind: 'deadline', days: 3 },
+      { id: 'deadline:7', label: 'Неделя', icon: '◷', color: '#ff9500', kind: 'deadline', days: 7 },
+      { id: 'deadline:30', label: 'Месяц', icon: '◷', color: '#8e8e93', kind: 'deadline', days: 30 }
+    ];
+  }
+
   function renderPanel(panelEl, actions) {
     panelEl.innerHTML = '';
     panelEl._actions = actions;
@@ -486,7 +497,15 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function showTagPanel(anchorY, itemId) {
-    renderPanel(tagPanel, buildTagPanelActions(findItem(getState(), itemId)));
+    showLeftPanel(anchorY, buildTagPanelActions(findItem(getState(), itemId)));
+  }
+
+  function showDeadlinePanel(anchorY) {
+    showLeftPanel(anchorY, buildDeadlinePanelActions());
+  }
+
+  function showLeftPanel(anchorY, actions) {
+    renderPanel(tagPanel, actions);
     showPanel(tagPanel, anchorY, 0);
     tagAction = setActiveItem(tagPanel, 0);
   }
@@ -1251,6 +1270,11 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     if (action.kind === 'tag') {
       dispatchUserInput({ actId: itemId, actType: 'task', command: 'setTags', payload: { tag: action.tag }, source });
       showToast(`Тег: ${action.tag}`);
+      return;
+    }
+    if (action.kind === 'deadline') {
+      dispatchUserInput({ actId: itemId, actType: 'task', command: 'setDeadline', payload: { deadline: deadlineFromToday(action.days) }, source });
+      showToast(`Отложено: ${action.label}`);
     }
   }
 
@@ -1315,15 +1339,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       }
 
       if (ldAnchor !== null || dx < -threshold) {
-        if (isFrontierView()) {
-          ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
-          active = false;
-          if (startVoice(itemId, curY)) {
-            if (isFinite(curY)) updateVoice(curY);
-          }
-          resetRowGesture(row, actionBg);
-          return;
-        }
         if (ldAnchor !== null && dx > -threshold) {
           hideTagPanel();
           ldAnchor = null;
@@ -1332,7 +1347,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         }
         if (!ldAnchor) {
           ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
-          showTagPanel(ldAnchor, itemId);
+          // Voice remains available on a long press; the left swipe now uses the shared menu for deadlines.
+          if (isFrontierView()) showDeadlinePanel(ldAnchor);
+          else showTagPanel(ldAnchor, itemId);
         }
         row.style.transform = `translate(${Math.max(dx, -110)}px, ${offsetY}px)`;
         actionBg.style.opacity = '0';
