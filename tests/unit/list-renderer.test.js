@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { createRenderer } from '../../src/list-renderer.js';
+import { deadlineFromToday } from '../../src/task-deadline.js';
 
 describe('list renderer', () => {
   test('renders nested rows from flat items and shows status badge', () => {
@@ -115,6 +116,36 @@ describe('list renderer', () => {
 
     expect(document.querySelector('.frontier-focus-strip')?.textContent).toContain('Focused task');
     expect(document.body.textContent).toContain('Action child');
+  });
+
+  test('sorts frontier tasks by deadline and replaces their order number with the remaining days', () => {
+    document.body.innerHTML = `
+      <div id="root"></div>
+      <div id="list-container"></div>
+      <div id="action-log-panel"></div>
+    `;
+
+    const renderer = createRenderer({
+      rootPanel: document.getElementById('root'),
+      container: document.getElementById('list-container'),
+      actionLogPanel: document.getElementById('action-log-panel')
+    });
+
+    renderer.render({
+      snapshot: {
+        items: [
+          { id: 'later', parentId: null, order: 10, status: 'Open', line1: 'Later', deadline: deadlineFromToday(7), collapsed: false, tags: [] },
+          { id: 'soon', parentId: null, order: 20, status: 'Open', line1: 'Soon', deadline: deadlineFromToday(1), collapsed: false, tags: [] },
+          { id: 'unscheduled', parentId: null, order: 30, status: 'Open', line1: 'Unscheduled', collapsed: false, tags: [] }
+        ]
+      },
+      actionLog: []
+    }, 'frontier');
+
+    expect([...document.querySelectorAll('.list-item-wrapper')].map((row) => row.dataset.id)).toEqual(['soon', 'later', 'unscheduled']);
+    expect(document.querySelector('[data-id="soon"] .item-index')?.textContent).toBe('1');
+    expect(document.querySelector('[data-id="later"] .item-index')?.textContent).toBe('7');
+    expect(document.querySelector('[data-id="unscheduled"] .item-index')).toBeNull();
   });
 
   test('renders frontier rows full width and toggles parent context above tapped task', () => {

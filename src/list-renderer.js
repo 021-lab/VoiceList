@@ -1,4 +1,5 @@
 import { calculateFrontier } from './list-frontier.js';
+import { compareByDeadline, deadlineDaysLabel } from './task-deadline.js';
 
 function isArchived(item) {
   return String(item?.status || '').toLowerCase() === 'archive';
@@ -69,7 +70,7 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
     }
   }
 
-  function renderRow({ actionBgClass = 'del', fragment, hasChildren, hidden = false, index, item, level, onRowClick = null }) {
+  function renderRow({ actionBgClass = 'del', fragment, hasChildren, hidden = false, index, item, level, onRowClick = null, showDeadline = false }) {
     const wrapper = document.createElement('div');
     wrapper.className = 'list-item-wrapper';
     wrapper.dataset.id = item.id;
@@ -88,6 +89,7 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
     row.dataset.actId = item.id;
     row.dataset.actType = 'task';
     const chevron = hasChildren ? `<span class="chevron">${item.collapsed ? '▶' : '▼'}</span>` : '';
+    const deadlineLabel = showDeadline ? deadlineDaysLabel(item.deadline) : '';
     row.innerHTML = `
       <div class="item-head">
         <div class="item-copy">
@@ -97,7 +99,7 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
         </div>
         <div class="item-side">
           <span class="status-badge" style="--badge-color:${statusColor(item.status)}">${escHtml(item.status)}</span>
-          <div class="item-index">${index}</div>
+          ${showDeadline ? (deadlineLabel ? `<div class="item-index item-deadline">${escHtml(deadlineLabel)}</div>` : '') : `<div class="item-index">${index}</div>`}
         </div>
       </div>
     `;
@@ -169,7 +171,7 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
       fragment.appendChild(focusStrip);
     }
 
-    result.frontier.forEach((item, position) => {
+    [...result.frontier].sort(compareByDeadline).forEach((item, position) => {
       const parent = item.parentId ? itemById.get(item.parentId) : {
         id: '__root__',
         status: 'Open',
@@ -190,6 +192,7 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
         index: position + 1,
         item,
         level: parentExpanded ? 1 : 0,
+        showDeadline: true,
         onRowClick: parent ? () => {
           if (expandedFrontierParents.has(item.id)) expandedFrontierParents.delete(item.id);
           else expandedFrontierParents.add(item.id);

@@ -1679,6 +1679,42 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     return adaptSnapshot(items.filter((it) => !banned.has(it.id)));
   }
 
+  // src/task-deadline.js
+  var DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function pad(value) {
+    return String(value).padStart(2, "0");
+  }
+  function isDeadline(value) {
+    const match = DATE_PATTERN.exec(String(value || ""));
+    if (!match) return false;
+    const [, year, month, day] = match.map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  }
+  function deadlineFromToday(days, now = /* @__PURE__ */ new Date()) {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  function deadlineDaysFromToday(deadline, now = /* @__PURE__ */ new Date()) {
+    if (!isDeadline(deadline)) return null;
+    const [, year, month, day] = DATE_PATTERN.exec(deadline).map(Number);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(year, month - 1, day);
+    return Math.round((target - today) / 864e5);
+  }
+  function compareByDeadline(left, right, now = /* @__PURE__ */ new Date()) {
+    const leftDays = deadlineDaysFromToday(left.deadline, now);
+    const rightDays = deadlineDaysFromToday(right.deadline, now);
+    if (leftDays === null && rightDays === null) return (left.order || 0) - (right.order || 0);
+    if (leftDays === null) return 1;
+    if (rightDays === null) return -1;
+    return leftDays - rightDays || (left.order || 0) - (right.order || 0);
+  }
+  function deadlineDaysLabel(deadline, now = /* @__PURE__ */ new Date()) {
+    const days = deadlineDaysFromToday(deadline, now);
+    return days === null ? "" : String(days);
+  }
+
   // src/list-interpreter.js
   var STATUS_VALUES = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause", "Info"]);
   var INBOX_ID = "inbox";
@@ -1709,6 +1745,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     if (command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${payload.line1}`;
     if (command === "deleteItem") return "\u0423\u0434\u0430\u043B\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430";
     if (command === "setTags") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u044B \u0442\u0435\u0433\u0438: ${payload.tag}`;
+    if (command === "setDeadline") return `\u0414\u0435\u0434\u043B\u0430\u0439\u043D: ${payload.deadline}`;
     if (command === "toggleCollapse") return "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435";
     if (command === "reorderItems") return "\u0418\u0437\u043C\u0435\u043D\u0451\u043D \u043F\u043E\u0440\u044F\u0434\u043E\u043A \u0441\u043F\u0438\u0441\u043A\u0430";
     if (command === "importWorkflowyTree") return `\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0434\u0435\u0440\u0435\u0432\u043E Workflowy: ${payload.tree?.title || "\u0431\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F"}`;
@@ -1852,6 +1889,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         } else if (input.command === "setStatus") {
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           if (item && STATUS_VALUES.has(payload.status)) item.status = payload.status;
+        } else if (input.command === "setDeadline") {
+          const item = nextItems.find((candidate) => candidate.id === input.actId);
+          if (!item || !isDeadline(payload.deadline)) return noChange();
+          item.deadline = payload.deadline;
         } else if (input.command === "setParent") {
           const item = nextItems.find((candidate) => candidate.id === input.actId);
           const parentId = payload.parentId ?? null;
@@ -2144,7 +2185,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         actionLogList.appendChild(row);
       }
     }
-    function renderRow({ actionBgClass = "del", fragment, hasChildren, hidden = false, index, item, level, onRowClick = null }) {
+    function renderRow({ actionBgClass = "del", fragment, hasChildren, hidden = false, index, item, level, onRowClick = null, showDeadline = false }) {
       const wrapper = document.createElement("div");
       wrapper.className = "list-item-wrapper";
       wrapper.dataset.id = item.id;
@@ -2161,6 +2202,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       row.dataset.actId = item.id;
       row.dataset.actType = "task";
       const chevron = hasChildren ? `<span class="chevron">${item.collapsed ? "\u25B6" : "\u25BC"}</span>` : "";
+      const deadlineLabel = showDeadline ? deadlineDaysLabel(item.deadline) : "";
       row.innerHTML = `
       <div class="item-head">
         <div class="item-copy">
@@ -2170,7 +2212,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         </div>
         <div class="item-side">
           <span class="status-badge" style="--badge-color:${statusColor(item.status)}">${escHtml(item.status)}</span>
-          <div class="item-index">${index}</div>
+          ${showDeadline ? deadlineLabel ? `<div class="item-index item-deadline">${escHtml(deadlineLabel)}</div>` : "" : `<div class="item-index">${index}</div>`}
         </div>
       </div>
     `;
@@ -2231,7 +2273,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       `;
         fragment.appendChild(focusStrip);
       }
-      result.frontier.forEach((item, position) => {
+      [...result.frontier].sort(compareByDeadline).forEach((item, position) => {
         const parent = item.parentId ? itemById.get(item.parentId) : {
           id: "__root__",
           status: "Open",
@@ -2250,6 +2292,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           index: position + 1,
           item,
           level: parentExpanded ? 1 : 0,
+          showDeadline: true,
           onRowClick: parent ? () => {
             if (expandedFrontierParents.has(item.id)) expandedFrontierParents.delete(item.id);
             else expandedFrontierParents.add(item.id);
@@ -4015,6 +4058,15 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         };
       });
     }
+    function buildDeadlinePanelActions() {
+      return [
+        { id: "deadline:0", label: "\u0421\u0435\u0433\u043E\u0434\u043D\u044F", icon: "\u25F7", color: "#34c759", kind: "deadline", days: 0 },
+        { id: "deadline:1", label: "\u0417\u0430\u0432\u0442\u0440\u0430", icon: "\u25F7", color: "#007aff", kind: "deadline", days: 1 },
+        { id: "deadline:3", label: "\u0422\u0440\u0438 \u0434\u043D\u044F", icon: "\u25F7", color: "#5856d6", kind: "deadline", days: 3 },
+        { id: "deadline:7", label: "\u041D\u0435\u0434\u0435\u043B\u044F", icon: "\u25F7", color: "#ff9500", kind: "deadline", days: 7 },
+        { id: "deadline:30", label: "\u041C\u0435\u0441\u044F\u0446", icon: "\u25F7", color: "#8e8e93", kind: "deadline", days: 30 }
+      ];
+    }
     function renderPanel(panelEl, actions) {
       panelEl.innerHTML = "";
       panelEl._actions = actions;
@@ -4076,7 +4128,13 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       dropAction = null;
     }
     function showTagPanel(anchorY, itemId) {
-      renderPanel(tagPanel, buildTagPanelActions(findItem(getState(), itemId)));
+      showLeftPanel(anchorY, buildTagPanelActions(findItem(getState(), itemId)));
+    }
+    function showDeadlinePanel(anchorY) {
+      showLeftPanel(anchorY, buildDeadlinePanelActions());
+    }
+    function showLeftPanel(anchorY, actions) {
+      renderPanel(tagPanel, actions);
       showPanel(tagPanel, anchorY, 0);
       tagAction = setActiveItem(tagPanel, 0);
     }
@@ -4755,6 +4813,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       if (action.kind === "tag") {
         dispatchUserInput({ actId: itemId, actType: "task", command: "setTags", payload: { tag: action.tag }, source });
         showToast(`\u0422\u0435\u0433: ${action.tag}`);
+        return;
+      }
+      if (action.kind === "deadline") {
+        dispatchUserInput({ actId: itemId, actType: "task", command: "setDeadline", payload: { deadline: deadlineFromToday(action.days) }, source });
+        showToast(`\u041E\u0442\u043B\u043E\u0436\u0435\u043D\u043E: ${action.label}`);
       }
     }
     function bindGesture(row, actionBg, itemId, wrapper) {
@@ -4812,15 +4875,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           return;
         }
         if (ldAnchor !== null || dx < -threshold) {
-          if (isFrontierView()) {
-            ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
-            active = false;
-            if (startVoice(itemId, curY)) {
-              if (isFinite(curY)) updateVoice(curY);
-            }
-            resetRowGesture(row, actionBg);
-            return;
-          }
           if (ldAnchor !== null && dx > -threshold) {
             hideTagPanel();
             ldAnchor = null;
@@ -4829,7 +4883,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           }
           if (!ldAnchor) {
             ldAnchor = row.getBoundingClientRect().top + row.offsetHeight / 2;
-            showTagPanel(ldAnchor, itemId);
+            if (isFrontierView()) showDeadlinePanel(ldAnchor);
+            else showTagPanel(ldAnchor, itemId);
           }
           row.style.transform = `translate(${Math.max(dx, -110)}px, ${offsetY}px)`;
           actionBg.style.opacity = "0";
