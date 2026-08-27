@@ -5,6 +5,24 @@ export const OPENAI_PROMPT_ENDPOINT = '/api/realtime/prompt';
 
 const MAX_DIALOGUES = 30;
 const MAX_MESSAGES_PER_DIALOGUE = 240;
+
+// This intentionally does not create an offer, add a microphone track, or
+// contact OpenAI. It only warms browser-side WebRTC construction before voice
+// mode is requested.
+export function createPreparedRealtimeTransport(RTCPeerConnectionCtor = globalThis.RTCPeerConnection) {
+  if (!RTCPeerConnectionCtor) return null;
+  let peerConnection = null;
+  try {
+    peerConnection = new RTCPeerConnectionCtor();
+    return {
+      peerConnection,
+      channel: peerConnection.createDataChannel('oai-events')
+    };
+  } catch {
+    try { peerConnection?.close(); } catch {}
+    return null;
+  }
+}
 const TOOL_RESULT_REPLY_INSTRUCTIONS = [
   'The task operation result is now available in the function_call_output.',
   'Do not continue any previous sentence.',
@@ -270,6 +288,7 @@ export function createRealtimeVoiceAgent({
   let keyConfigured = null;
   let keySetupAvailable = false;
   let promptConfigured = false;
+  let preparedTransport = null;
 
   function setKeyStatus(message, tone = '') {
     if (!openAIKeyStatus) return;
@@ -554,6 +573,22 @@ export function createRealtimeVoiceAgent({
     }
   }
 
+  function prepareVoiceTransport() {
+    if (!preparedTransport) preparedTransport = createPreparedRealtimeTransport(RTCPeerConnectionCtor);
+  }
+
+  function takePreparedVoiceTransport() {
+    const transport = preparedTransport || createPreparedRealtimeTransport(RTCPeerConnectionCtor);
+    preparedTransport = null;
+    return transport;
+  }
+
+  function cleanupPreparedVoiceTransport() {
+    try { preparedTransport?.channel?.close(); } catch {}
+    try { preparedTransport?.peerConnection?.close(); } catch {}
+    preparedTransport = null;
+  }
+
   function stopVoice() {
     const session = active;
     if (!session) return;
@@ -586,7 +621,9 @@ export function createRealtimeVoiceAgent({
       session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
       if (active !== session) return cleanupVoiceSession(session);
 
-      const pc = new RTCPeerConnectionCtor();
+      const transport = takePreparedVoiceTransport();
+      if (!transport) throw new Error('Голосовой режим не поддерживается браузером');
+      const { peerConnection: pc, channel } = transport;
       session.peerConnection = pc;
       const audio = documentLike.createElement('audio');
       audio.autoplay = true;
@@ -597,7 +634,6 @@ export function createRealtimeVoiceAgent({
       pc.ontrack = (event) => { audio.srcObject = event.streams[0]; };
 
       for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
-      const channel = pc.createDataChannel('oai-events');
       session.channel = channel;
       channel.addEventListener('open', () => {
         if (active === session) setVoiceState('active', 'Слушаю');
@@ -660,17 +696,19 @@ export function createRealtimeVoiceAgent({
     // Mobile browsers can keep WebRTC alive while the tab/app is backgrounded;
     // close our Realtime transport explicitly so the session does not keep listening.
     if (documentLike.visibilityState === 'hidden') stopVoice();
+    if (documentLike.visibilityState === 'hidden') cleanupPreparedVoiceTransport();
   });
   windowLike?.addEventListener('pagehide', () => {
     // Page teardown is a separate lifecycle path from visibilitychange in some browsers.
     stopVoice();
+    cleanupPreparedVoiceTransport();
   });
 
   setVoiceState('idle', '');
   setDialoguesOpen(false);
   renderDialogues();
-  void refreshKeyStatus();
-  void refreshPrompt();
+  void Promise.all([refreshKeyStatus(), refreshPrompt()]);
+  prepareVoiceTransport();
 
   return {
     renderDialogues,

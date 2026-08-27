@@ -251,7 +251,7 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
   let keyConfigured = false;
   await page.addInitScript(() => {
     window.__realtimeChannels = [];
-    window.__realtimeLifecycle = { channelClosed: 0, peerClosed: 0, tracksStopped: 0 };
+    window.__realtimeLifecycle = { channelClosed: 0, peerClosed: 0, tracksStopped: 0, mediaRequested: 0 };
     class FakeDataChannel {
       constructor() {
         this.readyState = 'connecting';
@@ -294,6 +294,7 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
     Object.defineProperty(navigator, 'mediaDevices', {
       value: {
         async getUserMedia() {
+          window.__realtimeLifecycle.mediaRequested += 1;
           return { getTracks: () => [{ stop() { window.__realtimeLifecycle.tracksStopped += 1; } }] };
         }
       },
@@ -335,6 +336,8 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
   await expect(page.locator('#openai-key-field')).toBeHidden();
   await expect(page.locator('#openai-key-status')).toContainText('Ключ сохранён на сервере');
   await page.locator('#settings-close').click();
+  expect(sessionRequest).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.__realtimeLifecycle.mediaRequested)).toBe(0);
 
   const box = await page.locator('#realtime-voice-btn').boundingBox();
   const viewport = page.viewportSize();
@@ -400,7 +403,8 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
   await expect.poll(() => page.evaluate(() => window.__realtimeLifecycle)).toEqual({
     channelClosed: 1,
     peerClosed: 1,
-    tracksStopped: 1
+    tracksStopped: 1,
+    mediaRequested: 1
   });
   await page.locator('#dialogues-tab-btn').click();
   await expect(page.locator('#dialogues-panel')).toBeVisible();

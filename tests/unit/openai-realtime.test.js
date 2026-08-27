@@ -64,6 +64,7 @@ describe('OpenAI Realtime Worker session', () => {
       expect(options.body.get('sdp')).toBe('offer-sdp');
       const session = JSON.parse(options.body.get('session'));
       expect(session.instructions).toContain('Task from browser');
+      expect(session.instructions).toContain('Saved server prompt');
       return new Response('answer-sdp', { status: 200 });
     });
     const request = new Request('https://vlist-dev.smileme.ai/api/realtime/session', {
@@ -82,7 +83,7 @@ describe('OpenAI Realtime Worker session', () => {
     const response = await handleOpenAIRealtimeSession(
       request,
       { OPENAI_API_KEY: 'test-openai-key' },
-      { fetchImpl }
+      { fetchImpl, systemPrompt: 'Saved server prompt' }
     );
 
     expect(fetchImpl).toHaveBeenCalledWith('https://api.openai.com/v1/realtime/calls', expect.any(Object));
