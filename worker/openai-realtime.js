@@ -273,7 +273,8 @@ function errorResponse(error, status) {
 
 export async function handleOpenAIRealtimeSession(request, env, {
   fetchImpl = fetch,
-  apiKey = env.OPENAI_API_KEY || ''
+  apiKey = env.OPENAI_API_KEY || '',
+  systemPrompt = ''
 } = {}) {
   if (request.method !== 'POST') return errorResponse('Method not allowed', 405);
 
@@ -296,7 +297,7 @@ export async function handleOpenAIRealtimeSession(request, env, {
 
   const form = new FormData();
   form.set('sdp', sdp);
-  form.set('session', JSON.stringify(buildRealtimeSessionConfig(body?.taskTree || body?.tasks)));
+  form.set('session', JSON.stringify(buildRealtimeSessionConfig(body?.taskTree || body?.tasks, { systemPrompt })));
 
   let openAIResponse;
   try {

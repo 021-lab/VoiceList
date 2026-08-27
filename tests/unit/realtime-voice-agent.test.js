@@ -5,7 +5,8 @@ import {
   DIALOGUES_STORAGE_KEY,
   taskContextFromState,
   taskTreeFromState,
-  taskInputFromToolCall
+  taskInputFromToolCall,
+  createPreparedRealtimeTransport
 } from '../../src/realtime-voice-agent.js';
 
 function createMemoryStorage() {
@@ -17,6 +18,19 @@ function createMemoryStorage() {
 }
 
 describe('Realtime voice agent', () => {
+  test('prepares browser WebRTC objects without creating an offer or opening a session', () => {
+    const peerConnection = {
+      createDataChannel: (name) => ({ name }),
+      createOffer: () => { throw new Error('must not create offer while prewarming'); },
+      close() {}
+    };
+    const transport = createPreparedRealtimeTransport(function FakeRTCPeerConnection() {
+      return peerConnection;
+    });
+
+    expect(transport).toEqual({ peerConnection, channel: { name: 'oai-events' } });
+  });
+
   test('persists separate dialogue transcripts across repository instances', () => {
     const storage = createMemoryStorage();
     let tick = 0;

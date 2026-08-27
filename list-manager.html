@@ -2379,6 +2379,23 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
   var OPENAI_PROMPT_ENDPOINT = "/api/realtime/prompt";
   var MAX_DIALOGUES = 30;
   var MAX_MESSAGES_PER_DIALOGUE = 240;
+  function createPreparedRealtimeTransport(RTCPeerConnectionCtor = globalThis.RTCPeerConnection) {
+    if (!RTCPeerConnectionCtor) return null;
+    let peerConnection = null;
+    try {
+      peerConnection = new RTCPeerConnectionCtor();
+      return {
+        peerConnection,
+        channel: peerConnection.createDataChannel("oai-events")
+      };
+    } catch {
+      try {
+        peerConnection?.close();
+      } catch {
+      }
+      return null;
+    }
+  }
   var TOOL_RESULT_REPLY_INSTRUCTIONS = [
     "The task operation result is now available in the function_call_output.",
     "Do not continue any previous sentence.",
@@ -2612,6 +2629,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     let keyConfigured = null;
     let keySetupAvailable = false;
     let promptConfigured = false;
+    let preparedTransport = null;
     function setKeyStatus(message, tone = "") {
       if (!openAIKeyStatus) return;
       openAIKeyStatus.textContent = message;
@@ -2871,6 +2889,25 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         session.audioElement.remove();
       }
     }
+    function prepareVoiceTransport() {
+      if (!preparedTransport) preparedTransport = createPreparedRealtimeTransport(RTCPeerConnectionCtor);
+    }
+    function takePreparedVoiceTransport() {
+      const transport = preparedTransport || createPreparedRealtimeTransport(RTCPeerConnectionCtor);
+      preparedTransport = null;
+      return transport;
+    }
+    function cleanupPreparedVoiceTransport() {
+      try {
+        preparedTransport?.channel?.close();
+      } catch {
+      }
+      try {
+        preparedTransport?.peerConnection?.close();
+      } catch {
+      }
+      preparedTransport = null;
+    }
     function stopVoice() {
       const session = active;
       if (!session) return;
@@ -2900,7 +2937,9 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         if (!RTCPeerConnectionCtor || !mediaDevices?.getUserMedia) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
         session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
         if (active !== session) return cleanupVoiceSession(session);
-        const pc = new RTCPeerConnectionCtor();
+        const transport = takePreparedVoiceTransport();
+        if (!transport) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
+        const { peerConnection: pc, channel } = transport;
         session.peerConnection = pc;
         const audio = documentLike.createElement("audio");
         audio.autoplay = true;
@@ -2912,7 +2951,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           audio.srcObject = event.streams[0];
         };
         for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
-        const channel = pc.createDataChannel("oai-events");
         session.channel = channel;
         channel.addEventListener("open", () => {
           if (active === session) setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
@@ -2975,15 +3013,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     for (const button of navigationButtons) button?.addEventListener("click", () => setDialoguesOpen(false));
     documentLike.addEventListener("visibilitychange", () => {
       if (documentLike.visibilityState === "hidden") stopVoice();
+      if (documentLike.visibilityState === "hidden") cleanupPreparedVoiceTransport();
     });
     windowLike?.addEventListener("pagehide", () => {
       stopVoice();
+      cleanupPreparedVoiceTransport();
     });
     setVoiceState("idle", "");
     setDialoguesOpen(false);
     renderDialogues();
-    void refreshKeyStatus();
-    void refreshPrompt();
+    void Promise.all([refreshKeyStatus(), refreshPrompt()]);
+    prepareVoiceTransport();
     return {
       renderDialogues,
       start: startVoice,

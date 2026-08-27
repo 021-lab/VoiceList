@@ -35,6 +35,8 @@ export class ListDocumentDO extends DurableObject {
     super(ctx, env);
     this.core = null;
     this.queue = Promise.resolve();
+    this.openAIApiKeyPromise = null;
+    this.openAISystemPromptPromise = null;
   }
 
   async ensureCore() {
@@ -68,11 +70,21 @@ export class ListDocumentDO extends DurableObject {
   }
 
   async getOpenAIApiKey() {
-    return await this.ctx.storage.get(OPENAI_API_KEY_STORAGE_KEY) || '';
+    if (!this.openAIApiKeyPromise) {
+      this.openAIApiKeyPromise = this.ctx.storage
+        .get(OPENAI_API_KEY_STORAGE_KEY)
+        .then((value) => value || '');
+    }
+    return await this.openAIApiKeyPromise;
   }
 
   async getOpenAISystemPrompt() {
-    return await this.ctx.storage.get(OPENAI_SYSTEM_PROMPT_STORAGE_KEY) || '';
+    if (!this.openAISystemPromptPromise) {
+      this.openAISystemPromptPromise = this.ctx.storage
+        .get(OPENAI_SYSTEM_PROMPT_STORAGE_KEY)
+        .then((value) => value || '');
+    }
+    return await this.openAISystemPromptPromise;
   }
 
   async isOpenAIKeyConfigured() {
@@ -90,12 +102,14 @@ export class ListDocumentDO extends DurableObject {
       [OPENAI_API_KEY_STORAGE_KEY]: apiKey,
       [OPENAI_SETUP_USED_STORAGE_KEY]: true
     });
+    this.openAIApiKeyPromise = Promise.resolve(apiKey);
     return true;
   }
 
   async configureOpenAISystemPrompt(prompt) {
     const value = String(prompt || '').trim();
     await this.ctx.storage.put(OPENAI_SYSTEM_PROMPT_STORAGE_KEY, value);
+    this.openAISystemPromptPromise = Promise.resolve(value);
     return true;
   }
 
@@ -220,8 +234,11 @@ export default {
     }
 
     if (url.pathname === '/api/realtime/session') {
-      const apiKey = env.OPENAI_API_KEY || await documentStub(env).getOpenAIApiKey();
-      const systemPrompt = await documentStub(env).getOpenAISystemPrompt();
+      const [storedApiKey, systemPrompt] = await Promise.all([
+        env.OPENAI_API_KEY ? Promise.resolve('') : documentStub(env).getOpenAIApiKey(),
+        documentStub(env).getOpenAISystemPrompt()
+      ]);
+      const apiKey = env.OPENAI_API_KEY || storedApiKey;
       return handleOpenAIRealtimeSession(request, env, { apiKey, systemPrompt });
     }
 
