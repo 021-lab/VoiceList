@@ -2377,6 +2377,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
   var OPENAI_KEY_STATUS_ENDPOINT = "/api/realtime/key/status";
   var OPENAI_KEY_SETUP_ENDPOINT = "/api/realtime/key";
   var OPENAI_PROMPT_ENDPOINT = "/api/realtime/prompt";
+  var REALTIME_DIAGNOSTICS_ENDPOINT = "/api/realtime/diagnostics";
   var MAX_DIALOGUES = 30;
   var MAX_MESSAGES_PER_DIALOGUE = 240;
   function createPreparedRealtimeTransport(RTCPeerConnectionCtor = globalThis.RTCPeerConnection) {
@@ -2614,6 +2615,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
     keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
     promptEndpoint = OPENAI_PROMPT_ENDPOINT,
+    diagnosticsEndpoint = REALTIME_DIAGNOSTICS_ENDPOINT,
     fetchImpl = fetch,
     mediaDevices = navigator.mediaDevices,
     RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
@@ -2621,6 +2623,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     windowLike = globalThis.window,
     storage = localStorage,
     now = () => /* @__PURE__ */ new Date(),
+    monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(),
     createId = () => crypto.randomUUID(),
     AbortControllerCtor = globalThis.AbortController
   }) {
@@ -2780,6 +2783,35 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       voiceStatus.textContent = message || "";
       voiceStatus.hidden = !message;
     }
+    function elapsed(from, to) {
+      if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+      return Math.max(0, Math.round(to - from));
+    }
+    function reportVoiceDiagnostics(session, outcome) {
+      const profile = session.profile;
+      if (!profile || profile.reported) return;
+      profile.reported = true;
+      const finishedAt = monotonicNow();
+      const payload = {
+        outcome,
+        prewarmedTransport: profile.prewarmedTransport,
+        totalMs: elapsed(profile.startedAt, finishedAt),
+        microphoneMs: elapsed(profile.startedAt, profile.microphoneReadyAt),
+        offerMs: elapsed(profile.microphoneReadyAt, profile.offerReadyAt),
+        localDescriptionMs: elapsed(profile.offerReadyAt, profile.localDescriptionReadyAt),
+        sessionRequestMs: elapsed(profile.sessionRequestStartedAt, profile.sessionResponseAt),
+        remoteDescriptionMs: elapsed(profile.sessionResponseAt, profile.remoteDescriptionReadyAt),
+        dataChannelMs: elapsed(profile.remoteDescriptionReadyAt, profile.channelOpenedAt),
+        failedStage: outcome === "error" ? profile.failedStage : null
+      };
+      void Promise.resolve().then(() => fetchImpl(diagnosticsEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true
+      })).catch(() => {
+      });
+    }
     function append(role, text, eventId = null) {
       if (!active) return;
       repository.append(active.dialogueId, { role, text, eventId });
@@ -2911,6 +2943,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     function stopVoice() {
       const session = active;
       if (!session) return;
+      reportVoiceDiagnostics(session, "cancelled");
       active = null;
       cleanupVoiceSession(session);
       repository.finish(session.dialogueId);
@@ -2928,7 +2961,20 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         channel: null,
         ignoredErrorEventIds: /* @__PURE__ */ new Set(),
         toolCalls: /* @__PURE__ */ new Set(),
-        latestUserTranscript: ""
+        latestUserTranscript: "",
+        profile: {
+          startedAt: monotonicNow(),
+          prewarmedTransport: Boolean(preparedTransport),
+          microphoneReadyAt: null,
+          offerReadyAt: null,
+          localDescriptionReadyAt: null,
+          sessionRequestStartedAt: null,
+          sessionResponseAt: null,
+          remoteDescriptionReadyAt: null,
+          channelOpenedAt: null,
+          failedStage: null,
+          reported: false
+        }
       };
       active = session;
       renderDialogues();
@@ -2936,6 +2982,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       try {
         if (!RTCPeerConnectionCtor || !mediaDevices?.getUserMedia) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
         session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
+        session.profile.microphoneReadyAt = monotonicNow();
         if (active !== session) return cleanupVoiceSession(session);
         const transport = takePreparedVoiceTransport();
         if (!transport) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
@@ -2953,7 +3000,11 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
         session.channel = channel;
         channel.addEventListener("open", () => {
-          if (active === session) setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
+          if (active === session) {
+            session.profile.channelOpenedAt = monotonicNow();
+            setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
+            reportVoiceDiagnostics(session, "active");
+          }
         });
         channel.addEventListener("message", (message) => {
           try {
@@ -2966,7 +3017,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           if (active === session) stopVoice();
         });
         const offer = await pc.createOffer();
+        session.profile.offerReadyAt = monotonicNow();
         await pc.setLocalDescription(offer);
+        session.profile.localDescriptionReadyAt = monotonicNow();
+        session.profile.sessionRequestStartedAt = monotonicNow();
         const response = await fetchImpl(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2976,14 +3030,18 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           }),
           signal: session.abortController.signal
         });
+        session.profile.sessionResponseAt = monotonicNow();
         if (!response.ok) {
           const detail = await response.json().catch(() => ({}));
           throw new Error(detail.error || `Realtime HTTP ${response.status}`);
         }
         await pc.setRemoteDescription({ type: "answer", sdp: await response.text() });
+        session.profile.remoteDescriptionReadyAt = monotonicNow();
         if (active === session && channel.readyState === "open") setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
       } catch (error) {
         if (active !== session || error.name === "AbortError") return;
+        session.profile.failedStage = session.profile.microphoneReadyAt == null ? "microphone" : session.profile.sessionResponseAt == null ? "session" : "transport";
+        reportVoiceDiagnostics(session, "error");
         append("system", error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
         stopVoice();
         setVoiceState("error", "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F");
