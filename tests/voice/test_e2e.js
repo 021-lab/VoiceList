@@ -172,6 +172,11 @@ const one = (text, ctx = null) => { const p = P(text, ctx); return p.kind === 'o
   check('разбор: «это архив» — Archive', one('это архив', '3').rule.status === 'Archive');
   check('разбор: «это открыто» — Open', one('это открыто', '3').rule.status === 'Open');
   check('разбор: «это информация» — Info', one('это информация', '3').rule.status === 'Info');
+  check('разбор: «сделай это сделано» — Done', one('сделай это сделано', '3').rule.status === 'Done');
+  check('разбор: «сделай это пауза» — Pause', one('сделай это пауза', '3').rule.status === 'Pause');
+  check('разбор: «сделай это архив» — Archive', one('сделай это архив', '3').rule.status === 'Archive');
+  check('разбор: «сделай это открыто» — Open', one('сделай это открыто', '3').rule.status === 'Open');
+  check('разбор: «сделай это информация» — Info', one('сделай это информация', '3').rule.status === 'Info');
 }
 {
   check('разбор: «это на паузу»', one('это на паузу', '3').rule.status === 'Pause');
