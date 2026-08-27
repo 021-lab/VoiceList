@@ -165,6 +165,8 @@ const one = (text, ctx = null) => { const p = P(text, ctx); return p.kind === 'o
   check('разбор: голое существительное командой не является', P('фокус', '3').kind === 'empty');
   check('разбор: «это в фокус» — статус', one('это в фокус', '3').rule.status === 'Focus');
   check('разбор: «это фокус» без предлога — статус', one('это фокус', '3').rule.status === 'Focus');
+  check('разбор: «сделай это фокус» — статус', one('сделай это фокус', '3').rule.status === 'Focus');
+  check('разбор: «сделай фокус» — статус', one('сделай фокус', '3').rule.status === 'Focus');
 }
 {
   check('разбор: «это на паузу»', one('это на паузу', '3').rule.status === 'Pause');
