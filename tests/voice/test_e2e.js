@@ -167,6 +167,11 @@ const one = (text, ctx = null) => { const p = P(text, ctx); return p.kind === 'o
   check('разбор: «это фокус» без предлога — статус', one('это фокус', '3').rule.status === 'Focus');
   check('разбор: «сделай это фокус» — статус', one('сделай это фокус', '3').rule.status === 'Focus');
   check('разбор: «сделай фокус» — статус', one('сделай фокус', '3').rule.status === 'Focus');
+  check('разбор: «это сделано» — Done', one('это сделано', '3').rule.status === 'Done');
+  check('разбор: «это пауза» — Pause', one('это пауза', '3').rule.status === 'Pause');
+  check('разбор: «это архив» — Archive', one('это архив', '3').rule.status === 'Archive');
+  check('разбор: «это открыто» — Open', one('это открыто', '3').rule.status === 'Open');
+  check('разбор: «это информация» — Info', one('это информация', '3').rule.status === 'Info');
 }
 {
   check('разбор: «это на паузу»', one('это на паузу', '3').rule.status === 'Pause');
