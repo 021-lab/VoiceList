@@ -60,7 +60,7 @@ const FRAMES = [
     forms: ['сфокусируй', 'фокусируй', 'это в фокус', 'это фокус', 'сделай в фокус', 'сделай фокус', 'сделай это фокус'] },
 
   { command: 'setStatus', status: 'Pause', slot: 'none', ctx: 'required', target: false,
-    forms: ['отложи', 'отложить', 'это на паузу', 'это паузу', 'это потом'] },
+    forms: ['отложи', 'отложить', 'это на паузу', 'это паузу', 'это пауза', 'это потом'] },
 
   { command: 'setStatus', status: 'Archive', slot: 'none', ctx: 'required', target: false,
     forms: ['удали', 'удалить', 'убери', 'убрать', 'заархивируй',
@@ -68,7 +68,10 @@ const FRAMES = [
 
   { command: 'setStatus', status: 'Open', slot: 'none', ctx: 'required', target: false,
     forms: ['сними', 'сними фокус', 'сними паузу', 'возобнови',
-            'это в работу', 'это работу'] },
+            'это в работу', 'это работу', 'это открыто'] },
+
+  { command: 'setStatus', status: 'Info', slot: 'none', ctx: 'required', target: false,
+    forms: ['это информация', 'это инфо'] },
 
   { command: 'undo', slot: 'none', ctx: 'forbidden', target: false,
     forms: ['отмени', 'отменить', 'откати', 'откатить', 'верни как было'] },

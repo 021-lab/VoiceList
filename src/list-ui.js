@@ -1431,7 +1431,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
           return;
         }
         if (isFrontierView()) {
-          startVoice(null, curY);
+          startVoice(itemId, curY);
           resetRowGesture(row, actionBg);
           return;
         }
@@ -1475,7 +1475,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
           return;
         }
         if (isFrontierView()) {
-          startVoice(null, curY);
+          startVoice(itemId, curY);
           resetRowGesture(row, actionBg);
           return;
         }
