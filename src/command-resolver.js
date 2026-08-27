@@ -57,7 +57,7 @@ const FRAMES = [
             'заверши', 'завершить', 'это готово', 'это сделано'] },
 
   { command: 'setStatus', status: 'Focus', slot: 'none', ctx: 'required', target: false,
-    forms: ['сфокусируй', 'фокусируй', 'это в фокус', 'это фокус'] },
+    forms: ['сфокусируй', 'фокусируй', 'это в фокус', 'это фокус', 'сделай в фокус', 'сделай фокус', 'сделай это фокус'] },
 
   { command: 'setStatus', status: 'Pause', slot: 'none', ctx: 'required', target: false,
     forms: ['отложи', 'отложить', 'это на паузу', 'это паузу', 'это потом'] },
