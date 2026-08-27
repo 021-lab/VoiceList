@@ -11,6 +11,8 @@ const STORAGE_KEY = 'voicelist.document.v1';
 const OPENAI_API_KEY_STORAGE_KEY = 'voicelist.openai-api-key.v1';
 const OPENAI_SETUP_USED_STORAGE_KEY = 'voicelist.openai-setup-used.v1';
 const OPENAI_SYSTEM_PROMPT_STORAGE_KEY = 'voicelist.openai-system-prompt.v1';
+const REALTIME_DIAGNOSTICS_STORAGE_KEY = 'voicelist.realtime-diagnostics.v1';
+const MAX_REALTIME_DIAGNOSTICS = 50;
 
 function json(data, init = {}) {
   return Response.json(data, {
@@ -111,6 +113,33 @@ export class ListDocumentDO extends DurableObject {
     await this.ctx.storage.put(OPENAI_SYSTEM_PROMPT_STORAGE_KEY, value);
     this.openAISystemPromptPromise = Promise.resolve(value);
     return true;
+  }
+
+  async recordRealtimeDiagnostics(rawEntry) {
+    const number = (value) => Number.isFinite(value) && value >= 0 && value <= 120_000 ? Math.round(value) : null;
+    const entry = {
+      at: new Date().toISOString(),
+      outcome: ['active', 'cancelled', 'error'].includes(rawEntry?.outcome) ? rawEntry.outcome : 'error',
+      prewarmedTransport: Boolean(rawEntry?.prewarmedTransport),
+      totalMs: number(rawEntry?.totalMs),
+      microphoneMs: number(rawEntry?.microphoneMs),
+      offerMs: number(rawEntry?.offerMs),
+      localDescriptionMs: number(rawEntry?.localDescriptionMs),
+      sessionRequestMs: number(rawEntry?.sessionRequestMs),
+      remoteDescriptionMs: number(rawEntry?.remoteDescriptionMs),
+      dataChannelMs: number(rawEntry?.dataChannelMs),
+      failedStage: ['microphone', 'session', 'transport'].includes(rawEntry?.failedStage) ? rawEntry.failedStage : null
+    };
+    const existing = await this.ctx.storage.get(REALTIME_DIAGNOSTICS_STORAGE_KEY);
+    const entries = Array.isArray(existing) ? existing : [];
+    entries.unshift(entry);
+    await this.ctx.storage.put(REALTIME_DIAGNOSTICS_STORAGE_KEY, entries.slice(0, MAX_REALTIME_DIAGNOSTICS));
+    return entry;
+  }
+
+  async getRealtimeDiagnostics() {
+    const entries = await this.ctx.storage.get(REALTIME_DIAGNOSTICS_STORAGE_KEY);
+    return Array.isArray(entries) ? entries : [];
   }
 
   broadcastState(state) {
@@ -240,6 +269,24 @@ export default {
       ]);
       const apiKey = env.OPENAI_API_KEY || storedApiKey;
       return handleOpenAIRealtimeSession(request, env, { apiKey, systemPrompt });
+    }
+
+    if (url.pathname === '/api/realtime/diagnostics') {
+      if (request.method === 'POST') {
+        const origin = request.headers.get('Origin');
+        if (origin && origin !== url.origin) return json({ error: 'Origin not allowed' }, { status: 403 });
+        const body = await readRequestJson(request);
+        if (!body || typeof body !== 'object') return json({ error: 'Invalid diagnostics' }, { status: 400 });
+        await documentStub(env).recordRealtimeDiagnostics(body);
+        return json({ recorded: true }, { status: 202 });
+      }
+      if (request.method === 'GET') {
+        if (!env.REALTIME_DIAGNOSTICS_TOKEN || request.headers.get('X-VoiceList-Diagnostics-Token') !== env.REALTIME_DIAGNOSTICS_TOKEN) {
+          return new Response('Not found', { status: 404 });
+        }
+        return json({ entries: await documentStub(env).getRealtimeDiagnostics() });
+      }
+      return json({ error: 'Method not allowed' }, { status: 405 });
     }
 
     if (url.pathname === '/api/tasks/tree.json') {

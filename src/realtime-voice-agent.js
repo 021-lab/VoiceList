@@ -2,6 +2,7 @@ export const DIALOGUES_STORAGE_KEY = 'voicelist.realtime-dialogues.v1';
 export const OPENAI_KEY_STATUS_ENDPOINT = '/api/realtime/key/status';
 export const OPENAI_KEY_SETUP_ENDPOINT = '/api/realtime/key';
 export const OPENAI_PROMPT_ENDPOINT = '/api/realtime/prompt';
+export const REALTIME_DIAGNOSTICS_ENDPOINT = '/api/realtime/diagnostics';
 
 const MAX_DIALOGUES = 30;
 const MAX_MESSAGES_PER_DIALOGUE = 240;
@@ -273,6 +274,7 @@ export function createRealtimeVoiceAgent({
   keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
   keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
   promptEndpoint = OPENAI_PROMPT_ENDPOINT,
+  diagnosticsEndpoint = REALTIME_DIAGNOSTICS_ENDPOINT,
   fetchImpl = fetch,
   mediaDevices = navigator.mediaDevices,
   RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
@@ -280,6 +282,7 @@ export function createRealtimeVoiceAgent({
   windowLike = globalThis.window,
   storage = localStorage,
   now = () => new Date(),
+  monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(),
   createId = () => crypto.randomUUID(),
   AbortControllerCtor = globalThis.AbortController
 }) {
@@ -457,6 +460,38 @@ export function createRealtimeVoiceAgent({
     voiceStatus.hidden = !message;
   }
 
+  function elapsed(from, to) {
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+    return Math.max(0, Math.round(to - from));
+  }
+
+  function reportVoiceDiagnostics(session, outcome) {
+    const profile = session.profile;
+    if (!profile || profile.reported) return;
+    profile.reported = true;
+    const finishedAt = monotonicNow();
+    const payload = {
+      outcome,
+      prewarmedTransport: profile.prewarmedTransport,
+      totalMs: elapsed(profile.startedAt, finishedAt),
+      microphoneMs: elapsed(profile.startedAt, profile.microphoneReadyAt),
+      offerMs: elapsed(profile.microphoneReadyAt, profile.offerReadyAt),
+      localDescriptionMs: elapsed(profile.offerReadyAt, profile.localDescriptionReadyAt),
+      sessionRequestMs: elapsed(profile.sessionRequestStartedAt, profile.sessionResponseAt),
+      remoteDescriptionMs: elapsed(profile.sessionResponseAt, profile.remoteDescriptionReadyAt),
+      dataChannelMs: elapsed(profile.remoteDescriptionReadyAt, profile.channelOpenedAt),
+      failedStage: outcome === 'error' ? profile.failedStage : null
+    };
+    void Promise.resolve()
+      .then(() => fetchImpl(diagnosticsEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }))
+      .catch(() => {});
+  }
+
   function append(role, text, eventId = null) {
     if (!active) return;
     repository.append(active.dialogueId, { role, text, eventId });
@@ -592,6 +627,7 @@ export function createRealtimeVoiceAgent({
   function stopVoice() {
     const session = active;
     if (!session) return;
+    reportVoiceDiagnostics(session, 'cancelled');
     active = null;
     cleanupVoiceSession(session);
     repository.finish(session.dialogueId);
@@ -610,7 +646,20 @@ export function createRealtimeVoiceAgent({
       channel: null,
       ignoredErrorEventIds: new Set(),
       toolCalls: new Set(),
-      latestUserTranscript: ''
+      latestUserTranscript: '',
+      profile: {
+        startedAt: monotonicNow(),
+        prewarmedTransport: Boolean(preparedTransport),
+        microphoneReadyAt: null,
+        offerReadyAt: null,
+        localDescriptionReadyAt: null,
+        sessionRequestStartedAt: null,
+        sessionResponseAt: null,
+        remoteDescriptionReadyAt: null,
+        channelOpenedAt: null,
+        failedStage: null,
+        reported: false
+      }
     };
     active = session;
     renderDialogues();
@@ -619,6 +668,7 @@ export function createRealtimeVoiceAgent({
     try {
       if (!RTCPeerConnectionCtor || !mediaDevices?.getUserMedia) throw new Error('Голосовой режим не поддерживается браузером');
       session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
+      session.profile.microphoneReadyAt = monotonicNow();
       if (active !== session) return cleanupVoiceSession(session);
 
       const transport = takePreparedVoiceTransport();
@@ -636,7 +686,11 @@ export function createRealtimeVoiceAgent({
       for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
       session.channel = channel;
       channel.addEventListener('open', () => {
-        if (active === session) setVoiceState('active', 'Слушаю');
+        if (active === session) {
+          session.profile.channelOpenedAt = monotonicNow();
+          setVoiceState('active', 'Слушаю');
+          reportVoiceDiagnostics(session, 'active');
+        }
       });
       channel.addEventListener('message', (message) => {
         try {
@@ -650,7 +704,10 @@ export function createRealtimeVoiceAgent({
       });
 
       const offer = await pc.createOffer();
+      session.profile.offerReadyAt = monotonicNow();
       await pc.setLocalDescription(offer);
+      session.profile.localDescriptionReadyAt = monotonicNow();
+      session.profile.sessionRequestStartedAt = monotonicNow();
       const response = await fetchImpl(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -660,14 +717,19 @@ export function createRealtimeVoiceAgent({
         }),
         signal: session.abortController.signal
       });
+      session.profile.sessionResponseAt = monotonicNow();
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
         throw new Error(detail.error || `Realtime HTTP ${response.status}`);
       }
       await pc.setRemoteDescription({ type: 'answer', sdp: await response.text() });
+      session.profile.remoteDescriptionReadyAt = monotonicNow();
       if (active === session && channel.readyState === 'open') setVoiceState('active', 'Слушаю');
     } catch (error) {
       if (active !== session || error.name === 'AbortError') return;
+      session.profile.failedStage = session.profile.microphoneReadyAt == null ? 'microphone' :
+        session.profile.sessionResponseAt == null ? 'session' : 'transport';
+      reportVoiceDiagnostics(session, 'error');
       append('system', error.message || 'Не удалось начать голосовой диалог');
       stopVoice();
       setVoiceState('error', 'Не удалось подключиться');
