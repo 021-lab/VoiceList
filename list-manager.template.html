@@ -56,35 +56,28 @@ __INLINE_CSS__
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
       <h2 id="task-page-title">Задача</h2>
-      <button class="task-page-save" id="task-page-save" type="button">Сохранить</button>
+      <select class="task-page-status" id="task-page-status" aria-label="Статус задачи">
+        <option>Open</option>
+        <option>Done</option>
+        <option>Focus</option>
+        <option>Archive</option>
+        <option>Pause</option>
+        <option>Info</option>
+      </select>
     </div>
     <div class="task-page-body">
       <label class="task-page-field">
         <span>Название</span>
         <input type="text" id="task-page-line1" maxlength="60">
       </label>
-      <label class="task-page-field">
-        <span>Подпись</span>
-        <input type="text" id="task-page-line2" maxlength="80">
-      </label>
-      <label class="task-page-field">
-        <span>Статус</span>
-        <select id="task-page-status">
-          <option>Open</option>
-          <option>Done</option>
-          <option>Focus</option>
-          <option>Archive</option>
-          <option>Pause</option>
-          <option>Info</option>
-        </select>
-      </label>
+      <a class="task-page-parent" id="task-page-parent" href="#" hidden></a>
       <section class="task-page-subtasks">
         <h3>Подзадачи</h3>
-        <div id="task-page-subtasks"></div>
         <div class="task-page-add-child">
           <input type="text" id="task-page-child-input" placeholder="Новая подзадача" maxlength="60">
           <button id="task-page-add-child" type="button">Добавить</button>
         </div>
+        <div id="task-page-subtasks"></div>
       </section>
     </div>
   </section>

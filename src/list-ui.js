@@ -5,6 +5,13 @@ import { VoiceSession, validate as validateVoiceCommand } from './voice-session.
 
 const AVAILABLE_TAGS = ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'];
 const STATUS_ACTIONS = new Set(['Open', 'Done', 'Focus', 'Archive', 'Pause', 'Info']);
+const TASK_PAGE_CHILD_STATUS_ORDER = ['Focus', 'Open', 'Info', 'Pause'];
+const TASK_PAGE_CHILD_STATUS_LABELS = {
+  Focus: 'Фокус',
+  Open: 'Открыта',
+  Info: 'Инфо',
+  Pause: 'Пауза'
+};
 const PANEL_ITEM_HEIGHT = 72;
 const VOICE_LONGPRESS_MS = 400;
 const TAP_TOLERANCE_PX = 10;
@@ -47,7 +54,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageTitle, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -64,6 +71,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   let tagAction = null;
   let taskPageOpen = false;
   let taskPageTargetId = null;
+  let taskPageInitial = null;
   let settingsOpen = false;
   let voiceState = null;
   let voicePressTimer = null;
@@ -641,9 +649,13 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function renderTaskPageSubtasks(itemId, state = getState()) {
+    const statusRank = new Map(TASK_PAGE_CHILD_STATUS_ORDER.map((status, index) => [status, index]));
     const children = state.snapshot.items
-      .filter((item) => item.parentId === itemId)
-      .sort((left, right) => (left.order || 0) - (right.order || 0));
+      .filter((item) => item.parentId === itemId && statusRank.has(item.status || 'Open'))
+      .sort((left, right) => (
+        statusRank.get(left.status || 'Open') - statusRank.get(right.status || 'Open')
+        || (left.order || 0) - (right.order || 0)
+      ));
 
     if (!children.length) {
       taskPageSubtasks.innerHTML = '<div class="task-page-empty">Подзадач пока нет</div>';
@@ -651,11 +663,19 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     }
 
     taskPageSubtasks.innerHTML = children.map((child) => `
-      <div class="task-page-subtask">
+      <button class="task-page-subtask" type="button" data-task-id="${escHtml(child.id)}">
         ${escHtml(child.line1)}
-        ${child.line2 ? `<small>${escHtml(child.line2)}</small>` : ''}
-      </div>
+        <small>${TASK_PAGE_CHILD_STATUS_LABELS[child.status || 'Open']}</small>
+      </button>
     `).join('');
+  }
+
+  function renderTaskPageParent(item, state = getState()) {
+    if (!taskPageParent) return;
+    const parent = item?.parentId ? findItem(state, item.parentId) : null;
+    taskPageParent.hidden = !parent;
+    taskPageParent.dataset.taskId = parent?.id || '';
+    taskPageParent.textContent = parent ? `Родитель: ${parent.line1}` : '';
   }
 
   function openTaskPage(itemId, state = getState()) {
@@ -666,9 +686,10 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     taskPageOpen = true;
     taskPageTitle.textContent = item.line1 || 'Задача';
     taskPageLine1.value = item.line1 || '';
-    taskPageLine2.value = item.line2 || '';
     taskPageStatus.value = item.status || 'Open';
+    taskPageInitial = { line1: item.line1 || '', line2: item.line2 || '', status: item.status || 'Open' };
     taskPageChildInput.value = '';
+    renderTaskPageParent(item, state);
     renderTaskPageSubtasks(itemId, state);
     taskPage.classList.add('open');
     taskPage.setAttribute('aria-hidden', 'false');
@@ -680,35 +701,41 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     taskPage.setAttribute('aria-hidden', 'true');
     taskPageOpen = false;
     taskPageTargetId = null;
+    taskPageInitial = null;
   }
 
   function saveTaskPage() {
     if (!taskPageTargetId) return;
     const line1 = taskPageLine1.value.trim();
-    const line2 = taskPageLine2.value.trim();
     const status = taskPageStatus.value;
     if (!line1) {
       taskPageLine1.focus();
       return;
     }
 
-    saveUndoSnapshot();
+    const titleChanged = line1 !== taskPageInitial?.line1;
+    const statusChanged = status !== taskPageInitial?.status;
+    if (titleChanged || statusChanged) saveUndoSnapshot();
 
-    dispatchUserInput({
-      actId: taskPageTargetId,
-      actType: 'task',
-      command: 'editItem',
-      payload: { line1, line2 },
-      source: 'task-page-save'
-    });
-    dispatchUserInput({
-      actId: taskPageTargetId,
-      actType: 'task',
-      command: 'setStatus',
-      payload: { status },
-      source: 'task-page-save'
-    });
-    showToast('Сохранено');
+    if (titleChanged) {
+      dispatchUserInput({
+        actId: taskPageTargetId,
+        actType: 'task',
+        command: 'editItem',
+        payload: { line1, line2: taskPageInitial?.line2 || '' },
+        source: 'task-page-close'
+      });
+    }
+    if (statusChanged) {
+      dispatchUserInput({
+        actId: taskPageTargetId,
+        actType: 'task',
+        command: 'setStatus',
+        payload: { status },
+        source: 'task-page-close'
+      });
+    }
+    if (titleChanged || statusChanged) showToast('Сохранено');
     closeTaskPage();
   }
 
@@ -783,8 +810,17 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     [input1, input2].forEach((input) => input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') confirmModal();
     }));
-    taskPageClose?.addEventListener('click', closeTaskPage);
-    taskPageSave?.addEventListener('click', saveTaskPage);
+    taskPageClose?.addEventListener('click', saveTaskPage);
+    taskPageParent?.addEventListener('click', (event) => {
+      event.preventDefault();
+      const parentId = taskPageParent.dataset.taskId;
+      if (parentId) openTaskPage(parentId);
+    });
+    taskPageSubtasks?.addEventListener('click', (event) => {
+      const subtask = event.target.closest('.task-page-subtask');
+      const childId = subtask?.dataset.taskId;
+      if (childId) openTaskPage(childId);
+    });
     taskPageAddChild?.addEventListener('click', addTaskPageChild);
     taskPageChildInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') addTaskPageChild();

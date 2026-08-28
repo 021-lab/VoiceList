@@ -558,7 +558,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   text-align: center;
 }
 .task-page-close,
-.task-page-save,
 .task-page-add-child button {
   border: none;
   border-radius: 999px;
@@ -569,8 +568,18 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   cursor: pointer;
 }
 .task-page-close { background: #eeeeef; color: #555; }
-.task-page-save,
 .task-page-add-child button { background: #007aff; color: #fff; }
+.task-page-status {
+  max-width: 112px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a1a2e;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
 .task-page-body {
   padding: 18px 16px 32px;
   overflow: auto;
@@ -617,12 +626,16 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   gap: 10px;
 }
 .task-page-subtask {
+  width: 100%;
+  text-align: left;
+  background: #fff;
   border: 1px solid #eeeeef;
   border-radius: 12px;
   padding: 11px 12px;
   color: #1a1a2e;
   font-size: 15px;
   font-weight: 700;
+  cursor: pointer;
 }
 .task-page-subtask small {
   display: block;
@@ -634,6 +647,13 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .task-page-empty {
   color: #aaa;
   font-size: 14px;
+}
+.task-page-parent {
+  align-self: flex-start;
+  color: #007aff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
 }
 .task-page-add-child {
   display: flex;
@@ -753,35 +773,28 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
       <h2 id="task-page-title">Задача</h2>
-      <button class="task-page-save" id="task-page-save" type="button">Сохранить</button>
+      <select class="task-page-status" id="task-page-status" aria-label="Статус задачи">
+        <option>Open</option>
+        <option>Done</option>
+        <option>Focus</option>
+        <option>Archive</option>
+        <option>Pause</option>
+        <option>Info</option>
+      </select>
     </div>
     <div class="task-page-body">
       <label class="task-page-field">
         <span>Название</span>
         <input type="text" id="task-page-line1" maxlength="60">
       </label>
-      <label class="task-page-field">
-        <span>Подпись</span>
-        <input type="text" id="task-page-line2" maxlength="80">
-      </label>
-      <label class="task-page-field">
-        <span>Статус</span>
-        <select id="task-page-status">
-          <option>Open</option>
-          <option>Done</option>
-          <option>Focus</option>
-          <option>Archive</option>
-          <option>Pause</option>
-          <option>Info</option>
-        </select>
-      </label>
+      <a class="task-page-parent" id="task-page-parent" href="#" hidden></a>
       <section class="task-page-subtasks">
         <h3>Подзадачи</h3>
-        <div id="task-page-subtasks"></div>
         <div class="task-page-add-child">
           <input type="text" id="task-page-child-input" placeholder="Новая подзадача" maxlength="60">
           <button id="task-page-add-child" type="button">Добавить</button>
         </div>
+        <div id="task-page-subtasks"></div>
       </section>
     </div>
   </section>
@@ -2822,6 +2835,13 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
   // src/list-ui.js
   var AVAILABLE_TAGS = ["\u0412\u0430\u0436\u043D\u043E\u0435", "\u0421\u0440\u043E\u0447\u043D\u043E", "\u041A\u0443\u043F\u0438\u0442\u044C", "\u0414\u043E\u043C", "\u0420\u0430\u0431\u043E\u0442\u0430", "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"];
   var STATUS_ACTIONS = /* @__PURE__ */ new Set(["Open", "Done", "Focus", "Archive", "Pause", "Info"]);
+  var TASK_PAGE_CHILD_STATUS_ORDER = ["Focus", "Open", "Info", "Pause"];
+  var TASK_PAGE_CHILD_STATUS_LABELS = {
+    Focus: "\u0424\u043E\u043A\u0443\u0441",
+    Open: "\u041E\u0442\u043A\u0440\u044B\u0442\u0430",
+    Info: "\u0418\u043D\u0444\u043E",
+    Pause: "\u041F\u0430\u0443\u0437\u0430"
+  };
   var PANEL_ITEM_HEIGHT = 72;
   var VOICE_LONGPRESS_MS = 400;
   var TAP_TOLERANCE_PX = 10;
@@ -2852,7 +2872,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       return { id, parentId, order: currentOrder };
     });
   }
-  function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageLine1, taskPageLine2, taskPageStatus, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
+  function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageTitle, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
     let dispatchUserInput = () => {
     };
     let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
@@ -2870,6 +2890,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     let tagAction = null;
     let taskPageOpen = false;
     let taskPageTargetId = null;
+    let taskPageInitial = null;
     let settingsOpen = false;
     let voiceState = null;
     let voicePressTimer = null;
@@ -3391,17 +3412,25 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       closeModal();
     }
     function renderTaskPageSubtasks(itemId, state = getState()) {
-      const children = state.snapshot.items.filter((item) => item.parentId === itemId).sort((left, right) => (left.order || 0) - (right.order || 0));
+      const statusRank = new Map(TASK_PAGE_CHILD_STATUS_ORDER.map((status, index) => [status, index]));
+      const children = state.snapshot.items.filter((item) => item.parentId === itemId && statusRank.has(item.status || "Open")).sort((left, right) => statusRank.get(left.status || "Open") - statusRank.get(right.status || "Open") || (left.order || 0) - (right.order || 0));
       if (!children.length) {
         taskPageSubtasks.innerHTML = '<div class="task-page-empty">\u041F\u043E\u0434\u0437\u0430\u0434\u0430\u0447 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442</div>';
         return;
       }
       taskPageSubtasks.innerHTML = children.map((child) => `
-      <div class="task-page-subtask">
+      <button class="task-page-subtask" type="button" data-task-id="${escHtml2(child.id)}">
         ${escHtml2(child.line1)}
-        ${child.line2 ? `<small>${escHtml2(child.line2)}</small>` : ""}
-      </div>
+        <small>${TASK_PAGE_CHILD_STATUS_LABELS[child.status || "Open"]}</small>
+      </button>
     `).join("");
+    }
+    function renderTaskPageParent(item, state = getState()) {
+      if (!taskPageParent) return;
+      const parent = item?.parentId ? findItem(state, item.parentId) : null;
+      taskPageParent.hidden = !parent;
+      taskPageParent.dataset.taskId = parent?.id || "";
+      taskPageParent.textContent = parent ? `\u0420\u043E\u0434\u0438\u0442\u0435\u043B\u044C: ${parent.line1}` : "";
     }
     function openTaskPage(itemId, state = getState()) {
       const item = findItem(state, itemId);
@@ -3410,9 +3439,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       taskPageOpen = true;
       taskPageTitle.textContent = item.line1 || "\u0417\u0430\u0434\u0430\u0447\u0430";
       taskPageLine1.value = item.line1 || "";
-      taskPageLine2.value = item.line2 || "";
       taskPageStatus.value = item.status || "Open";
+      taskPageInitial = { line1: item.line1 || "", line2: item.line2 || "", status: item.status || "Open" };
       taskPageChildInput.value = "";
+      renderTaskPageParent(item, state);
       renderTaskPageSubtasks(itemId, state);
       taskPage.classList.add("open");
       taskPage.setAttribute("aria-hidden", "false");
@@ -3423,32 +3453,38 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       taskPage.setAttribute("aria-hidden", "true");
       taskPageOpen = false;
       taskPageTargetId = null;
+      taskPageInitial = null;
     }
     function saveTaskPage() {
       if (!taskPageTargetId) return;
       const line1 = taskPageLine1.value.trim();
-      const line2 = taskPageLine2.value.trim();
       const status = taskPageStatus.value;
       if (!line1) {
         taskPageLine1.focus();
         return;
       }
-      saveUndoSnapshot();
-      dispatchUserInput({
-        actId: taskPageTargetId,
-        actType: "task",
-        command: "editItem",
-        payload: { line1, line2 },
-        source: "task-page-save"
-      });
-      dispatchUserInput({
-        actId: taskPageTargetId,
-        actType: "task",
-        command: "setStatus",
-        payload: { status },
-        source: "task-page-save"
-      });
-      showToast("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E");
+      const titleChanged = line1 !== taskPageInitial?.line1;
+      const statusChanged = status !== taskPageInitial?.status;
+      if (titleChanged || statusChanged) saveUndoSnapshot();
+      if (titleChanged) {
+        dispatchUserInput({
+          actId: taskPageTargetId,
+          actType: "task",
+          command: "editItem",
+          payload: { line1, line2: taskPageInitial?.line2 || "" },
+          source: "task-page-close"
+        });
+      }
+      if (statusChanged) {
+        dispatchUserInput({
+          actId: taskPageTargetId,
+          actType: "task",
+          command: "setStatus",
+          payload: { status },
+          source: "task-page-close"
+        });
+      }
+      if (titleChanged || statusChanged) showToast("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E");
       closeTaskPage();
     }
     function addTaskPageChild() {
@@ -3514,8 +3550,17 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       [input1, input2].forEach((input) => input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") confirmModal();
       }));
-      taskPageClose?.addEventListener("click", closeTaskPage);
-      taskPageSave?.addEventListener("click", saveTaskPage);
+      taskPageClose?.addEventListener("click", saveTaskPage);
+      taskPageParent?.addEventListener("click", (event) => {
+        event.preventDefault();
+        const parentId = taskPageParent.dataset.taskId;
+        if (parentId) openTaskPage(parentId);
+      });
+      taskPageSubtasks?.addEventListener("click", (event) => {
+        const subtask = event.target.closest(".task-page-subtask");
+        const childId = subtask?.dataset.taskId;
+        if (childId) openTaskPage(childId);
+      });
       taskPageAddChild?.addEventListener("click", addTaskPageChild);
       taskPageChildInput?.addEventListener("keydown", (event) => {
         if (event.key === "Enter") addTaskPageChild();
@@ -4206,11 +4251,10 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       actionLogPanel: document.getElementById("action-log-panel"),
       taskPage: document.getElementById("task-page"),
       taskPageClose: document.getElementById("task-page-close"),
-      taskPageSave: document.getElementById("task-page-save"),
       taskPageTitle: document.getElementById("task-page-title"),
       taskPageLine1: document.getElementById("task-page-line1"),
-      taskPageLine2: document.getElementById("task-page-line2"),
       taskPageStatus: document.getElementById("task-page-status"),
+      taskPageParent: document.getElementById("task-page-parent"),
       taskPageSubtasks: document.getElementById("task-page-subtasks"),
       taskPageChildInput: document.getElementById("task-page-child-input"),
       taskPageAddChild: document.getElementById("task-page-add-child"),
