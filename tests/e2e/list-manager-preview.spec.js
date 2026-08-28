@@ -253,6 +253,8 @@ test('task page saves title and status on close, filters subtasks, and follows p
   await expect(page.locator('#task-page-parent')).toHaveText(`Родитель: ${parentTitle}`);
   await page.locator('#task-page-status').selectOption('Pause');
   await page.locator('#task-page-save').click();
+  await expect(page.locator('#task-page')).toHaveClass(/open/);
+  await page.locator('#task-page-close').click();
 
   await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
     (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
@@ -261,6 +263,8 @@ test('task page saves title and status on close, filters subtasks, and follows p
   await expect(page.locator('#task-page-parent')).toHaveText(`Родитель: ${parentTitle}`);
   await page.locator('#task-page-status').selectOption('Focus');
   await page.locator('#task-page-save').click();
+  await expect(page.locator('#task-page')).toHaveClass(/open/);
+  await page.locator('#task-page-close').click();
 
   await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
     (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
@@ -272,6 +276,8 @@ test('task page saves title and status on close, filters subtasks, and follows p
   await page.locator('#task-page-line1').fill(renamedParentTitle);
   await page.locator('#task-page-status').selectOption('Info');
   await page.locator('#task-page-save').click();
+  await expect(page.locator('#task-page')).toHaveClass(/open/);
+  await page.locator('#task-page-close').click();
 
   const renamedParentRow = page.locator('.list-item-wrapper', { hasText: renamedParentTitle });
   await expect(renamedParentRow).toContainText('Info');

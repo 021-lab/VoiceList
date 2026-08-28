@@ -3479,8 +3479,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           source: "task-page-save"
         });
       }
+      taskPageInitial = { line1, line2: taskPageInitial?.line2 || "", status };
       if (titleChanged || statusChanged) showToast("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E");
-      closeTaskPage();
     }
     function addTaskPageChild() {
       if (!taskPageTargetId) return;
