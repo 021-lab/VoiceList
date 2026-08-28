@@ -209,6 +209,65 @@ test('preview app can create task, create subtask, and change status', async ({ 
   await expect(page.locator('#action-log-list')).toContainText('Статус изменён: Done');
 });
 
+test('task page saves title and status on close, filters subtasks, and follows parent links', async ({ page }) => {
+  const parentTitle = `Edit parent ${Date.now()}`;
+  const pausedChildTitle = `Paused child ${Date.now()}`;
+  const focusChildTitle = `Focus child ${Date.now()}`;
+  const renamedParentTitle = `${parentTitle} renamed`;
+
+  await page.goto('');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+
+  await page.getByRole('button', { name: 'Добавить задачу' }).click();
+  await page.locator('#input-line1').fill(parentTitle);
+  await confirmModal(page);
+
+  const parentRow = page.locator('.list-item-wrapper', { hasText: parentTitle });
+  await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
+    (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
+  ));
+  await expect(page.locator('#task-page-line2')).toHaveCount(0);
+  await page.locator('#task-page-add-child').evaluate((button) => {
+    const list = document.getElementById('task-page-subtasks');
+    return Boolean(list && button.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }).then((isBeforeList) => expect(isBeforeList).toBe(true));
+
+  await page.locator('#task-page-child-input').fill(pausedChildTitle);
+  await page.locator('#task-page-add-child').click();
+  await page.locator('#task-page-child-input').fill(focusChildTitle);
+  await page.locator('#task-page-add-child').click();
+  await expect(page.locator('#task-page-subtasks')).toContainText(pausedChildTitle);
+  await expect(page.locator('#task-page-subtasks')).toContainText(focusChildTitle);
+
+  await page.locator('.task-page-subtask', { hasText: pausedChildTitle }).click();
+  await expect(page.locator('#task-page-parent')).toHaveText(`Родитель: ${parentTitle}`);
+  await page.locator('#task-page-status').selectOption('Pause');
+  await page.locator('#task-page-close').click();
+
+  await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
+    (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
+  ));
+  await page.locator('.task-page-subtask', { hasText: focusChildTitle }).click();
+  await expect(page.locator('#task-page-parent')).toHaveText(`Родитель: ${parentTitle}`);
+  await page.locator('#task-page-status').selectOption('Focus');
+  await page.locator('#task-page-close').click();
+
+  await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
+    (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
+  ));
+  await expect(page.locator('#task-page-subtasks .task-page-subtask')).toHaveCount(2);
+  await expect(page.locator('#task-page-subtasks .task-page-subtask').nth(0)).toContainText(focusChildTitle);
+  await expect(page.locator('#task-page-subtasks .task-page-subtask').nth(1)).toContainText(pausedChildTitle);
+
+  await page.locator('#task-page-line1').fill(renamedParentTitle);
+  await page.locator('#task-page-status').selectOption('Info');
+  await page.locator('#task-page-close').click();
+
+  const renamedParentRow = page.locator('.list-item-wrapper', { hasText: renamedParentTitle });
+  await expect(renamedParentRow).toContainText('Info');
+});
+
 test('cloudflare mode reconnects after an idle WebSocket close and renders status changes without reload', async ({ page }) => {
   await page.addInitScript(() => {
     const NativeWebSocket = window.WebSocket;
