@@ -734,8 +734,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         source: 'task-page-save'
       });
     }
+    taskPageInitial = { line1, line2: taskPageInitial?.line2 || '', status };
     if (titleChanged || statusChanged) showToast('Сохранено');
-    closeTaskPage();
   }
 
   function addTaskPageChild() {
