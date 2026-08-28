@@ -227,6 +227,7 @@ test('task page saves title and status on close, filters subtasks, and follows p
   await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
     (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
   ));
+  await expect(page.locator('#task-page-save')).toHaveText('Сохранить');
   await expect(page.locator('#task-page-line2')).toHaveCount(0);
   await page.locator('#task-page-add-child').evaluate((button) => {
     const list = document.getElementById('task-page-subtasks');
@@ -240,10 +241,18 @@ test('task page saves title and status on close, filters subtasks, and follows p
   await expect(page.locator('#task-page-subtasks')).toContainText(pausedChildTitle);
   await expect(page.locator('#task-page-subtasks')).toContainText(focusChildTitle);
 
+  await page.locator('#task-page-line1').fill(`${parentTitle} unsaved`);
+  await page.locator('#task-page-close').click();
+  await expect(page.locator('#task-page')).toHaveAttribute('aria-hidden', 'true');
+  await expect(parentRow).toContainText(parentTitle);
+
+  await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
+    (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
+  ));
   await page.locator('.task-page-subtask', { hasText: pausedChildTitle }).click();
   await expect(page.locator('#task-page-parent')).toHaveText(`Родитель: ${parentTitle}`);
   await page.locator('#task-page-status').selectOption('Pause');
-  await page.locator('#task-page-close').click();
+  await page.locator('#task-page-save').click();
 
   await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
     (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
@@ -251,7 +260,7 @@ test('task page saves title and status on close, filters subtasks, and follows p
   await page.locator('.task-page-subtask', { hasText: focusChildTitle }).click();
   await expect(page.locator('#task-page-parent')).toHaveText(`Родитель: ${parentTitle}`);
   await page.locator('#task-page-status').selectOption('Focus');
-  await page.locator('#task-page-close').click();
+  await page.locator('#task-page-save').click();
 
   await triggerRightPanelActionUntil(page, parentRow.locator('.list-item'), 'Edit', async () => (
     (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
@@ -262,7 +271,7 @@ test('task page saves title and status on close, filters subtasks, and follows p
 
   await page.locator('#task-page-line1').fill(renamedParentTitle);
   await page.locator('#task-page-status').selectOption('Info');
-  await page.locator('#task-page-close').click();
+  await page.locator('#task-page-save').click();
 
   const renamedParentRow = page.locator('.list-item-wrapper', { hasText: renamedParentTitle });
   await expect(renamedParentRow).toContainText('Info');

@@ -543,13 +543,10 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   gap: 12px;
 }
 .task-page-bar h2 {
-  flex: 1;
-  color: #1a1a2e;
-  font-size: 18px;
-  font-weight: 800;
-  text-align: center;
+  display: none;
 }
 .task-page-close,
+.task-page-save,
 .task-page-add-child button {
   border: none;
   border-radius: 999px;
@@ -560,6 +557,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   cursor: pointer;
 }
 .task-page-close { background: #eeeeef; color: #555; }
+.task-page-save { background: #007aff; color: #fff; }
 .task-page-add-child button { background: #007aff; color: #fff; }
 .task-page-status {
   max-width: 112px;
@@ -591,7 +589,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   flex-direction: column;
   gap: 8px;
 }
-.task-page-field span,
 .task-page-subtasks h3 {
   color: #8e8e93;
   font-size: 12px;
