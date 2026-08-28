@@ -34,7 +34,7 @@ function createUiFixture(rootPanel = el('app-root')) {
     actionLogPanel: el('action-log-panel'),
     taskPage: el('task-page'),
     taskPageClose: el('task-page-close', 'button'),
-    taskPageTitle: el('task-page-title'),
+    taskPageSave: el('task-page-save', 'button'),
     taskPageLine1: el('task-page-line1', 'input'),
     taskPageStatus: el('task-page-status', 'select'),
     taskPageParent: el('task-page-parent', 'a'),

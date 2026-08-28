@@ -551,13 +551,10 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   gap: 12px;
 }
 .task-page-bar h2 {
-  flex: 1;
-  color: #1a1a2e;
-  font-size: 18px;
-  font-weight: 800;
-  text-align: center;
+  display: none;
 }
 .task-page-close,
+.task-page-save,
 .task-page-add-child button {
   border: none;
   border-radius: 999px;
@@ -568,6 +565,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   cursor: pointer;
 }
 .task-page-close { background: #eeeeef; color: #555; }
+.task-page-save { background: #007aff; color: #fff; }
 .task-page-add-child button { background: #007aff; color: #fff; }
 .task-page-status {
   max-width: 112px;
@@ -599,7 +597,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   flex-direction: column;
   gap: 8px;
 }
-.task-page-field span,
 .task-page-subtasks h3 {
   color: #8e8e93;
   font-size: 12px;
@@ -772,7 +769,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	  <section class="task-page" id="task-page" aria-hidden="true">
     <div class="task-page-bar">
       <button class="task-page-close" id="task-page-close" type="button">Закрыть</button>
-      <h2 id="task-page-title">Задача</h2>
+      <button class="task-page-save" id="task-page-save" type="button">Сохранить</button>
       <select class="task-page-status" id="task-page-status" aria-label="Статус задачи">
         <option>Open</option>
         <option>Done</option>
@@ -784,8 +781,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
     </div>
     <div class="task-page-body">
       <label class="task-page-field">
-        <span>Название</span>
-        <input type="text" id="task-page-line1" maxlength="60">
+        <input type="text" id="task-page-line1" aria-label="Название задачи" maxlength="60">
       </label>
       <a class="task-page-parent" id="task-page-parent" href="#" hidden></a>
       <section class="task-page-subtasks">
@@ -2872,7 +2868,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       return { id, parentId, order: currentOrder };
     });
   }
-  function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageTitle, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
+  function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
     let dispatchUserInput = () => {
     };
     let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
@@ -3437,7 +3433,6 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       if (!item || !taskPage) return;
       taskPageTargetId = itemId;
       taskPageOpen = true;
-      taskPageTitle.textContent = item.line1 || "\u0417\u0430\u0434\u0430\u0447\u0430";
       taskPageLine1.value = item.line1 || "";
       taskPageStatus.value = item.status || "Open";
       taskPageInitial = { line1: item.line1 || "", line2: item.line2 || "", status: item.status || "Open" };
@@ -3472,7 +3467,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           actType: "task",
           command: "editItem",
           payload: { line1, line2: taskPageInitial?.line2 || "" },
-          source: "task-page-close"
+          source: "task-page-save"
         });
       }
       if (statusChanged) {
@@ -3481,7 +3476,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
           actType: "task",
           command: "setStatus",
           payload: { status },
-          source: "task-page-close"
+          source: "task-page-save"
         });
       }
       if (titleChanged || statusChanged) showToast("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E");
@@ -3550,7 +3545,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       [input1, input2].forEach((input) => input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") confirmModal();
       }));
-      taskPageClose?.addEventListener("click", saveTaskPage);
+      taskPageClose?.addEventListener("click", closeTaskPage);
+      taskPageSave?.addEventListener("click", saveTaskPage);
       taskPageParent?.addEventListener("click", (event) => {
         event.preventDefault();
         const parentId = taskPageParent.dataset.taskId;
@@ -4251,7 +4247,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       actionLogPanel: document.getElementById("action-log-panel"),
       taskPage: document.getElementById("task-page"),
       taskPageClose: document.getElementById("task-page-close"),
-      taskPageTitle: document.getElementById("task-page-title"),
+      taskPageSave: document.getElementById("task-page-save"),
       taskPageLine1: document.getElementById("task-page-line1"),
       taskPageStatus: document.getElementById("task-page-status"),
       taskPageParent: document.getElementById("task-page-parent"),

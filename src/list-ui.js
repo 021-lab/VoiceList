@@ -54,7 +54,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageTitle, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -684,7 +684,6 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     taskPageTargetId = itemId;
     taskPageOpen = true;
-    taskPageTitle.textContent = item.line1 || 'Задача';
     taskPageLine1.value = item.line1 || '';
     taskPageStatus.value = item.status || 'Open';
     taskPageInitial = { line1: item.line1 || '', line2: item.line2 || '', status: item.status || 'Open' };
@@ -723,7 +722,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actType: 'task',
         command: 'editItem',
         payload: { line1, line2: taskPageInitial?.line2 || '' },
-        source: 'task-page-close'
+        source: 'task-page-save'
       });
     }
     if (statusChanged) {
@@ -732,7 +731,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actType: 'task',
         command: 'setStatus',
         payload: { status },
-        source: 'task-page-close'
+        source: 'task-page-save'
       });
     }
     if (titleChanged || statusChanged) showToast('Сохранено');
@@ -810,7 +809,8 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     [input1, input2].forEach((input) => input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') confirmModal();
     }));
-    taskPageClose?.addEventListener('click', saveTaskPage);
+    taskPageClose?.addEventListener('click', closeTaskPage);
+    taskPageSave?.addEventListener('click', saveTaskPage);
     taskPageParent?.addEventListener('click', (event) => {
       event.preventDefault();
       const parentId = taskPageParent.dataset.taskId;

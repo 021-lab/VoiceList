@@ -50,7 +50,7 @@ async function bootstrapListManagerPreview() {
     actionLogPanel: document.getElementById('action-log-panel'),
     taskPage: document.getElementById('task-page'),
     taskPageClose: document.getElementById('task-page-close'),
-    taskPageTitle: document.getElementById('task-page-title'),
+    taskPageSave: document.getElementById('task-page-save'),
     taskPageLine1: document.getElementById('task-page-line1'),
     taskPageStatus: document.getElementById('task-page-status'),
     taskPageParent: document.getElementById('task-page-parent'),
