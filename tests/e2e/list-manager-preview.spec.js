@@ -749,6 +749,17 @@ test('preview app keeps long-press voice and uses the shared left menu to postpo
 
   const focusedOrder = await visibleListOrder(page);
   expect(focusedOrder.indexOf('grnsm')).toBeLessThan(focusedOrder.indexOf('goldn'));
+
+  await page.reload();
+  await expect(page.locator('#list-container')).toBeVisible();
+  if (!await page.locator('#frontier-tab-btn').evaluate((button) => button.classList.contains('active'))) {
+    await page.locator('#frontier-tab-btn').click();
+  }
+
+  await expect(page.locator('.list-item-wrapper[data-id="grnsm"] .item-index')).toHaveText('1');
+  await expect(page.locator('.list-item-wrapper[data-id="goldn"] .item-index')).toHaveText('7');
+  const reloadedOrder = await visibleListOrder(page);
+  expect(reloadedOrder.indexOf('grnsm')).toBeLessThan(reloadedOrder.indexOf('goldn'));
 });
 
 test('preview app can mark a task as Info from the right menu and hides it from frontier', async ({ page }) => {
