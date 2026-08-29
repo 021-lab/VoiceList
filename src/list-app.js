@@ -165,6 +165,7 @@ export function createApp({ adapter, documentClient = null, interpreter, rendere
     getState() {
       return state;
     },
+    dispatchUserInput,
     onLogEntriesChange(nextActionLog) {
       refreshState(snapshotState, nextActionLog);
       render();

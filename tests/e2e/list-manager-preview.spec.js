@@ -151,6 +151,14 @@ async function mockWorkflowyExport(page) {
   });
 }
 
+test('preview keeps the realtime voice button visible', async ({ page }) => {
+  await page.goto('');
+  const voiceButton = page.locator('#realtime-voice-btn');
+  await expect(voiceButton).toBeVisible();
+  await expect(voiceButton).toHaveAttribute('aria-label', 'Начать голосовой диалог');
+  await expect(voiceButton).toHaveAttribute('data-state', 'idle');
+});
+
 test('preview app can create task, create subtask, and change status', async ({ page }) => {
   const taskTitle = `E2E Task ${Date.now()}`;
   const subtaskTitle = `E2E Subtask ${Date.now()}`;
