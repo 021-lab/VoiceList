@@ -680,11 +680,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   gap: 12px;
 }
 .task-page-bar h2 {
-  flex: 1;
-  color: #1a1a2e;
-  font-size: 18px;
-  font-weight: 800;
-  text-align: center;
+  display: none;
 }
 .task-page-close,
 .task-page-save,
@@ -698,8 +694,19 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   cursor: pointer;
 }
 .task-page-close { background: #eeeeef; color: #555; }
-.task-page-save,
+.task-page-save { background: #007aff; color: #fff; }
 .task-page-add-child button { background: #007aff; color: #fff; }
+.task-page-status {
+  max-width: 112px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 999px;
+  background: #fff;
+  color: #1a1a2e;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
 .task-page-body {
   padding: 18px 16px 32px;
   overflow: auto;
@@ -719,7 +726,6 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   flex-direction: column;
   gap: 8px;
 }
-.task-page-field span,
 .task-page-subtasks h3 {
   color: #8e8e93;
   font-size: 12px;
@@ -746,12 +752,16 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   gap: 10px;
 }
 .task-page-subtask {
+  width: 100%;
+  text-align: left;
+  background: #fff;
   border: 1px solid #eeeeef;
   border-radius: 12px;
   padding: 11px 12px;
   color: #1a1a2e;
   font-size: 15px;
   font-weight: 700;
+  cursor: pointer;
 }
 .task-page-subtask small {
   display: block;
@@ -763,6 +773,13 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .task-page-empty {
   color: #aaa;
   font-size: 14px;
+}
+.task-page-parent {
+  align-self: flex-start;
+  color: #007aff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
 }
 .task-page-add-child {
   display: flex;
