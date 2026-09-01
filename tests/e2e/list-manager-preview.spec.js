@@ -314,6 +314,7 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
   let sessionRequest = null;
   let keySetupRequest = null;
   let keyConfigured = false;
+  let frontierRequested = false;
   await page.addInitScript(() => {
     window.__realtimeChannels = [];
     window.__realtimeLifecycle = { channelClosed: 0, peerClosed: 0, tracksStopped: 0, mediaRequested: 0 };
@@ -381,6 +382,22 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
     keySetupRequest = route.request().postDataJSON();
     keyConfigured = true;
     await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ configured: true }) });
+  });
+  await page.route('**/api/tasks/frontier.json', async (route) => {
+    frontierRequested = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        frontier: [{
+          parentTitle: 'Покупки',
+          taskId: 'milk1',
+          taskTitle: 'Молоко 3.2%',
+          status: 'Open',
+          deadline: '2026-09-02'
+        }]
+      })
+    });
   });
 
   await page.goto('');
@@ -460,6 +477,37 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
   });
 
   await expect(page.locator('#list-container')).toContainText('Позвонить маме');
+  await page.evaluate(() => {
+    const channel = window.__realtimeChannels.at(-1);
+    channel.emit('message', {
+      data: JSON.stringify({
+        type: 'conversation.item.input_audio_transcription.completed',
+        event_id: 'user-frontier',
+        transcript: 'Что во фронтире?'
+      })
+    });
+    channel.emit('message', {
+      data: JSON.stringify({
+        type: 'response.output_item.done',
+        event_id: 'tool-frontier',
+        item: {
+          type: 'function_call',
+          call_id: 'call-frontier',
+          name: 'getFrontier',
+          arguments: '{}'
+        }
+      })
+    });
+  });
+  await expect.poll(() => frontierRequested).toBe(true);
+  await expect.poll(() => page.evaluate(() => {
+    const sent = window.__realtimeChannels.at(-1).sent;
+    const output = sent.find((event) => event.item?.call_id === 'call-frontier');
+    return output?.item?.output || '';
+  })).toContain('Молоко 3.2%');
+  expect(await page.evaluate(() => (
+    window.__realtimeChannels.at(-1).sent.at(-1).response.instructions
+  ))).toContain('taskTitle');
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     document.dispatchEvent(new Event('visibilitychange'));

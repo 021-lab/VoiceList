@@ -22,6 +22,8 @@ describe('OpenAI Realtime Worker session', () => {
     expect(config.instructions).toContain('Never read, enumerate, or summarize it automatically');
     expect(config.instructions).toContain(TASK_OPERATION_INSTRUCTIONS);
     expect(config.instructions).toContain('A question about a status is not a request to set that status.');
+    expect(config.instructions).toContain('"Фронтир" -> Call getFrontier once');
+    expect(config.instructions).toContain('enumerate the taskTitle values in the returned order');
     expect(config.instructions).toContain('"Какой статус у задачи Первый поход?" -> No tool.');
     expect(config.instructions).toContain('"Поставь задачу Первый поход в фокус" -> Call setStatus once');
     expect(config.instructions).toContain('addInfo(parentId, line1)');
@@ -39,7 +41,8 @@ describe('OpenAI Realtime Worker session', () => {
       'addInfo',
       'setStatus',
       'editItem',
-      'setParent'
+      'setParent',
+      'getFrontier'
     ]);
     expect(config.tools.flatMap((tool) => Object.keys(tool.parameters.properties))).not.toContain('line2');
     expect(config.tool_choice).toBe('auto');

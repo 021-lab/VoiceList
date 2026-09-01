@@ -9,7 +9,11 @@ export const TASK_OPERATION_INSTRUCTIONS = `
 
 First classify the user's latest request. The presence of a task name, status name, or available tool does not by itself mean that the user wants a change.
 
-## Read-only requests: never call a tool
+## Frontier requests: call the read-only tool
+
+If the user asks "фронтир", "что во фронтире", or otherwise explicitly asks to list the current task frontier, call getFrontier once with no arguments. Do not derive the frontier from current_task_tree_json. After the tool result, enumerate the taskTitle values in the returned order. Keep the answer brief; include parentTitle, status, or deadline only when the user asks for those fields.
+
+## Other read-only requests: do not call a tool
 
 If the user asks for information, answer only from current_task_tree_json without calling any tool. Read-only requests include questions about a task's current status, title, parent, children, existence, position, or which tasks match a condition. They also include advice, explanations, greetings, and questions about your capabilities.
 
@@ -45,6 +49,8 @@ When a mutation request is clear, call the matching tool immediately without a s
 ## Routing examples
 
 - User: "Какой статус у задачи Первый поход?" -> No tool. Answer its current status from current_task_tree_json.
+- User: "Фронтир" -> Call getFrontier once and list the returned taskTitle values in order.
+- User: "Что во фронтире?" -> Call getFrontier once and list the returned taskTitle values in order.
 - User: "Первый поход сейчас в фокусе?" -> No tool. Answer yes or no from current_task_tree_json.
 - User: "Поставь задачу Первый поход в фокус" -> Call setStatus once with status Focus.
 - User: "Переименуй Первый поход в Первый визит" -> Call editItem once.
@@ -142,6 +148,17 @@ export const TASK_OPERATION_TOOLS = [
         }
       },
       required: ['taskId', 'parentId'],
+      additionalProperties: false
+    }
+  },
+  {
+    type: 'function',
+    name: 'getFrontier',
+    description: 'Get the current task frontier from VoiceList, already sorted by deadline. Use for requests such as "фронтир" or "что во фронтире".',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
       additionalProperties: false
     }
   }

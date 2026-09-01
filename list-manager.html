@@ -2387,6 +2387,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
   var OPENAI_KEY_SETUP_ENDPOINT = "/api/realtime/key";
   var OPENAI_PROMPT_ENDPOINT = "/api/realtime/prompt";
   var REALTIME_DIAGNOSTICS_ENDPOINT = "/api/realtime/diagnostics";
+  var TASK_FRONTIER_ENDPOINT = "/api/tasks/frontier.json";
   var MAX_DIALOGUES = 30;
   var MAX_MESSAGES_PER_DIALOGUE = 240;
   function createPreparedRealtimeTransport(RTCPeerConnectionCtor = globalThis.RTCPeerConnection) {
@@ -2410,6 +2411,12 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     "The task operation result is now available in the function_call_output.",
     "Do not continue any previous sentence.",
     "Answer only from that result, in one short Russian sentence."
+  ].join(" ");
+  var FRONTIER_RESULT_REPLY_INSTRUCTIONS = [
+    "The current VoiceList frontier is now available in the function_call_output.",
+    "Answer briefly in Russian and enumerate taskTitle values in the returned order.",
+    "If the frontier is empty, say that there are no tasks in the frontier.",
+    "Mention parentTitle, status, or deadline only if the user asked for those details."
   ].join(" ");
   var ALLOWED_STATUSES = /* @__PURE__ */ new Set(["Open", "Focus", "Pause", "Done", "Archive", "Info"]);
   function parseStoredDialogues(storage) {
@@ -2503,6 +2510,19 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       else roots.push(node);
     }
     return roots;
+  }
+  async function fetchTaskFrontier(fetchImpl = fetch, endpoint = TASK_FRONTIER_ENDPOINT) {
+    const response = await fetchImpl(endpoint, { headers: { Accept: "application/json" } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Frontier HTTP ${response.status}`);
+    if (!Array.isArray(data.frontier)) throw new Error("Frontier response is invalid");
+    return data.frontier.slice(0, 2e3).map((item) => ({
+      parentTitle: String(item?.parentTitle || ""),
+      taskId: String(item?.taskId || ""),
+      taskTitle: String(item?.taskTitle || ""),
+      status: String(item?.status || "Open"),
+      deadline: item?.deadline == null ? null : String(item.deadline)
+    })).filter((item) => item.taskId && item.taskTitle);
   }
   function requireText(value, label) {
     const text = String(value || "").trim();
@@ -2625,6 +2645,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
     promptEndpoint = OPENAI_PROMPT_ENDPOINT,
     diagnosticsEndpoint = REALTIME_DIAGNOSTICS_ENDPOINT,
+    frontierEndpoint = TASK_FRONTIER_ENDPOINT,
     fetchImpl = fetch,
     mediaDevices = navigator.mediaDevices,
     RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
@@ -2845,19 +2866,31 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       session.toolCalls.add(item.call_id);
       let output;
       let applied = false;
+      let replyInstructions = TOOL_RESULT_REPLY_INSTRUCTIONS;
       try {
-        const input = taskInputFromToolCall(item.name, item.arguments, {
-          transcript: session.latestUserTranscript
-        });
-        const ack = await executeTaskCommand(input);
-        if (ack?.status && ack.status !== "applied") throw new Error(ack.reason || "Task operation was rejected");
-        repository.append(session.dialogueId, {
-          role: "tool",
-          text: `Tool ${item.name}(${item.arguments || "{}"}): ${operationLabel(input)}`,
-          eventId: `tool-${item.call_id}`
-        });
-        output = { status: "applied", operation: input.command, target: ack?.newTarget || input.actId };
-        applied = true;
+        if (item.name === "getFrontier") {
+          replyInstructions = FRONTIER_RESULT_REPLY_INSTRUCTIONS;
+          const frontier = await fetchTaskFrontier(fetchImpl, frontierEndpoint);
+          repository.append(session.dialogueId, {
+            role: "tool",
+            text: `\u041F\u043E\u043B\u0443\u0447\u0435\u043D \u0444\u0440\u043E\u043D\u0442\u0438\u0440: ${frontier.length} \u0437\u0430\u0434\u0430\u0447`,
+            eventId: `tool-${item.call_id}`
+          });
+          output = { status: "ok", frontier };
+        } else {
+          const input = taskInputFromToolCall(item.name, item.arguments, {
+            transcript: session.latestUserTranscript
+          });
+          const ack = await executeTaskCommand(input);
+          if (ack?.status && ack.status !== "applied") throw new Error(ack.reason || "Task operation was rejected");
+          repository.append(session.dialogueId, {
+            role: "tool",
+            text: `Tool ${item.name}(${item.arguments || "{}"}): ${operationLabel(input)}`,
+            eventId: `tool-${item.call_id}`
+          });
+          output = { status: "applied", operation: input.command, target: ack?.newTarget || input.actId };
+          applied = true;
+        }
       } catch (error) {
         repository.append(session.dialogueId, {
           role: "system",
@@ -2880,7 +2913,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
       sendRealtimeEvent(session, {
         type: "response.create",
         response: {
-          instructions: TOOL_RESULT_REPLY_INSTRUCTIONS
+          instructions: replyInstructions
         }
       });
     }

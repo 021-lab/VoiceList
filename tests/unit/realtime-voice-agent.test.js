@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   createDialogueRepository,
   DIALOGUES_STORAGE_KEY,
+  fetchTaskFrontier,
   taskContextFromState,
   taskTreeFromState,
   taskInputFromToolCall,
@@ -131,5 +132,29 @@ describe('Realtime voice agent', () => {
     }]);
     expect(JSON.stringify(tree)).not.toContain('secret details');
     expect(JSON.stringify(tree)).not.toContain('omit');
+  });
+
+  test('loads the deadline-sorted frontier for the read-only Realtime tool', async () => {
+    const fetchImpl = async (url, options) => {
+      expect(url).toBe('/api/tasks/frontier.json');
+      expect(options.headers.Accept).toBe('application/json');
+      return Response.json({
+        frontier: [{
+          parentTitle: 'Проект',
+          taskId: 'task-1',
+          taskTitle: 'Первая задача',
+          status: 'Focus',
+          deadline: '2026-09-02'
+        }]
+      });
+    };
+
+    await expect(fetchTaskFrontier(fetchImpl)).resolves.toEqual([{
+      parentTitle: 'Проект',
+      taskId: 'task-1',
+      taskTitle: 'Первая задача',
+      status: 'Focus',
+      deadline: '2026-09-02'
+    }]);
   });
 });

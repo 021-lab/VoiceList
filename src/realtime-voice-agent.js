@@ -3,6 +3,7 @@ export const OPENAI_KEY_STATUS_ENDPOINT = '/api/realtime/key/status';
 export const OPENAI_KEY_SETUP_ENDPOINT = '/api/realtime/key';
 export const OPENAI_PROMPT_ENDPOINT = '/api/realtime/prompt';
 export const REALTIME_DIAGNOSTICS_ENDPOINT = '/api/realtime/diagnostics';
+export const TASK_FRONTIER_ENDPOINT = '/api/tasks/frontier.json';
 
 const MAX_DIALOGUES = 30;
 const MAX_MESSAGES_PER_DIALOGUE = 240;
@@ -28,6 +29,12 @@ const TOOL_RESULT_REPLY_INSTRUCTIONS = [
   'The task operation result is now available in the function_call_output.',
   'Do not continue any previous sentence.',
   'Answer only from that result, in one short Russian sentence.'
+].join(' ');
+const FRONTIER_RESULT_REPLY_INSTRUCTIONS = [
+  'The current VoiceList frontier is now available in the function_call_output.',
+  'Answer briefly in Russian and enumerate taskTitle values in the returned order.',
+  'If the frontier is empty, say that there are no tasks in the frontier.',
+  'Mention parentTitle, status, or deadline only if the user asked for those details.'
 ].join(' ');
 const ALLOWED_STATUSES = new Set(['Open', 'Focus', 'Pause', 'Done', 'Archive', 'Info']);
 
@@ -145,6 +152,20 @@ export function taskTreeFromState(state) {
     else roots.push(node);
   }
   return roots;
+}
+
+export async function fetchTaskFrontier(fetchImpl = fetch, endpoint = TASK_FRONTIER_ENDPOINT) {
+  const response = await fetchImpl(endpoint, { headers: { Accept: 'application/json' } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Frontier HTTP ${response.status}`);
+  if (!Array.isArray(data.frontier)) throw new Error('Frontier response is invalid');
+  return data.frontier.slice(0, 2_000).map((item) => ({
+    parentTitle: String(item?.parentTitle || ''),
+    taskId: String(item?.taskId || ''),
+    taskTitle: String(item?.taskTitle || ''),
+    status: String(item?.status || 'Open'),
+    deadline: item?.deadline == null ? null : String(item.deadline)
+  })).filter((item) => item.taskId && item.taskTitle);
 }
 
 function requireText(value, label) {
@@ -275,6 +296,7 @@ export function createRealtimeVoiceAgent({
   keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
   promptEndpoint = OPENAI_PROMPT_ENDPOINT,
   diagnosticsEndpoint = REALTIME_DIAGNOSTICS_ENDPOINT,
+  frontierEndpoint = TASK_FRONTIER_ENDPOINT,
   fetchImpl = fetch,
   mediaDevices = navigator.mediaDevices,
   RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
@@ -521,19 +543,31 @@ export function createRealtimeVoiceAgent({
     session.toolCalls.add(item.call_id);
     let output;
     let applied = false;
+    let replyInstructions = TOOL_RESULT_REPLY_INSTRUCTIONS;
     try {
-      const input = taskInputFromToolCall(item.name, item.arguments, {
-        transcript: session.latestUserTranscript
-      });
-      const ack = await executeTaskCommand(input);
-      if (ack?.status && ack.status !== 'applied') throw new Error(ack.reason || 'Task operation was rejected');
-      repository.append(session.dialogueId, {
-        role: 'tool',
-        text: `Tool ${item.name}(${item.arguments || '{}'}): ${operationLabel(input)}`,
-        eventId: `tool-${item.call_id}`
-      });
-      output = { status: 'applied', operation: input.command, target: ack?.newTarget || input.actId };
-      applied = true;
+      if (item.name === 'getFrontier') {
+        replyInstructions = FRONTIER_RESULT_REPLY_INSTRUCTIONS;
+        const frontier = await fetchTaskFrontier(fetchImpl, frontierEndpoint);
+        repository.append(session.dialogueId, {
+          role: 'tool',
+          text: `Получен фронтир: ${frontier.length} задач`,
+          eventId: `tool-${item.call_id}`
+        });
+        output = { status: 'ok', frontier };
+      } else {
+        const input = taskInputFromToolCall(item.name, item.arguments, {
+          transcript: session.latestUserTranscript
+        });
+        const ack = await executeTaskCommand(input);
+        if (ack?.status && ack.status !== 'applied') throw new Error(ack.reason || 'Task operation was rejected');
+        repository.append(session.dialogueId, {
+          role: 'tool',
+          text: `Tool ${item.name}(${item.arguments || '{}'}): ${operationLabel(input)}`,
+          eventId: `tool-${item.call_id}`
+        });
+        output = { status: 'applied', operation: input.command, target: ack?.newTarget || input.actId };
+        applied = true;
+      }
     } catch (error) {
       repository.append(session.dialogueId, {
         role: 'system',
@@ -557,7 +591,7 @@ export function createRealtimeVoiceAgent({
     sendRealtimeEvent(session, {
       type: 'response.create',
       response: {
-        instructions: TOOL_RESULT_REPLY_INSTRUCTIONS
+        instructions: replyInstructions
       }
     });
   }
