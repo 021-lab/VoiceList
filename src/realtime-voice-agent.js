@@ -225,6 +225,15 @@ export function taskInputFromToolCall(name, rawArguments, { transcript = '' } = 
       source: 'openai-realtime'
     }, transcript);
   }
+  if (name === 'setDeadline') {
+    return withTranscript({
+      actId: requireText(args.taskId, 'taskId'),
+      actType: 'task',
+      command: 'setDeadline',
+      payload: { deadline: requireText(args.deadline, 'deadline') },
+      source: 'openai-realtime'
+    }, transcript);
+  }
   if (name === 'editItem') {
     return withTranscript({
       actId: requireText(args.taskId, 'taskId'),
@@ -251,6 +260,7 @@ function operationLabel(input) {
   if (input.command === 'addChild' && input.payload.status === 'Info') return `Добавлена информация: ${input.payload.line1}`;
   if (input.command === 'addChild') return `Добавлена подзадача: ${input.payload.line1}`;
   if (input.command === 'setStatus') return `Статус ${input.actId}: ${input.payload.status}`;
+  if (input.command === 'setDeadline') return `Дедлайн ${input.actId}: ${input.payload.deadline}`;
   if (input.command === 'editItem') return `Изменена задача ${input.actId}: ${input.payload.line1}`;
   if (input.command === 'setParent') return `Перемещена задача ${input.actId}`;
   return input.command;

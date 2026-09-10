@@ -41,10 +41,11 @@ Call a task tool only when the user clearly and explicitly asks to create, add i
 2. addChild(parentId, line1): create a new Open task under a named existing parent.
 3. addInfo(parentId, line1): add information to an existing task. This creates a child task under parentId with status Info. Use it when the user says "добавь информацию", "запиши информацию", "добавь заметку", "добавь комментарий" or gives informational text for a task rather than a new actionable subtask.
 4. setStatus(taskId, status): change an existing task to Open, Focus, Pause, Done, Archive, or Info. Use it only for an explicit status change such as "поставь статус", "отметь выполненной", "переведи в фокус" or "поставь на паузу".
-5. editItem(taskId, line1): rename an existing task title. This does not change other fields.
-6. setParent(taskId, parentId): move an existing task under another task, or use null when the user explicitly asks to move it to the root.
+5. setDeadline(taskId, deadline): set the deadline of an existing task. deadline must be an exact calendar date in YYYY-MM-DD format. Resolve relative dates such as "сегодня" and "завтра" to that format using the current date.
+6. editItem(taskId, line1): rename an existing task title. This does not change other fields.
+7. setParent(taskId, parentId): move an existing task under another task, or use null when the user explicitly asks to move it to the root.
 
-For multiple explicit changes, make one tool call per requested change, in the user's order. Wait for each result before deciding whether to continue.
+For multiple explicit changes, make one tool call per requested change, in the user's order. Wait for each result before deciding whether to continue. A newly created task's result contains target: use that exact id for its immediately requested status, deadline, or parent changes. Do not ask for confirmation when all requested fields are clear; apply every requested change in that same turn.
 
 ## Resolve references before acting
 
@@ -65,6 +66,8 @@ When a mutation request is clear, call the matching tool immediately without a s
 - User: "Что во фронтире?" -> Call getFrontier once and list the returned taskTitle values in order.
 - User: "Первый поход сейчас в фокусе?" -> No tool. Answer yes or no from current_task_tree_json.
 - User: "Поставь задачу Первый поход в фокус" -> Call setStatus once with status Focus.
+- User: "Поставь дедлайн Первому походу сегодня" -> Call setDeadline once with today's YYYY-MM-DD date.
+- User: "Создай задачу Купить молоко, поставь в фокус и дедлайн сегодня" -> Call addItem once. After its successful result, call setStatus with its returned target and Focus, then call setDeadline with the same target and today's YYYY-MM-DD date.
 - User: "Переименуй Первый поход в Первый визит" -> Call editItem once.
 - User: "Фуджи перенеси под Голден" -> Call setParent once for the task titled Фуджи and parent titled Голден. Do not reuse a previous task.
 - User: "[unclear task name] перенеси под Голден" -> No tool. Ask which task to move.
@@ -179,6 +182,29 @@ Generated from TASK_OPERATION_TOOLS.
       "required": [
         "taskId",
         "status"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "setDeadline",
+    "description": "Set the deadline of one existing task to an exact YYYY-MM-DD calendar date.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Exact existing task id."
+        },
+        "deadline": {
+          "type": "string",
+          "description": "Calendar date in YYYY-MM-DD format."
+        }
+      },
+      "required": [
+        "taskId",
+        "deadline"
       ],
       "additionalProperties": false
     }

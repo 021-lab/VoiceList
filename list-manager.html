@@ -2578,6 +2578,15 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
         source: "openai-realtime"
       }, transcript);
     }
+    if (name === "setDeadline") {
+      return withTranscript({
+        actId: requireText(args.taskId, "taskId"),
+        actType: "task",
+        command: "setDeadline",
+        payload: { deadline: requireText(args.deadline, "deadline") },
+        source: "openai-realtime"
+      }, transcript);
+    }
     if (name === "editItem") {
       return withTranscript({
         actId: requireText(args.taskId, "taskId"),
@@ -2603,6 +2612,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "gapfix-20260806154849";
     if (input.command === "addChild" && input.payload.status === "Info") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F: ${input.payload.line1}`;
     if (input.command === "addChild") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
     if (input.command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441 ${input.actId}: ${input.payload.status}`;
+    if (input.command === "setDeadline") return `\u0414\u0435\u0434\u043B\u0430\u0439\u043D ${input.actId}: ${input.payload.deadline}`;
     if (input.command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}: ${input.payload.line1}`;
     if (input.command === "setParent") return `\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}`;
     return input.command;

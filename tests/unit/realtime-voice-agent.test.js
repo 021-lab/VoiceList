@@ -74,6 +74,11 @@ describe('Realtime voice agent', () => {
       command: 'setStatus',
       payload: { status: 'Done' }
     });
+    expect(taskInputFromToolCall('setDeadline', { taskId: 'milk1', deadline: '2026-09-10' })).toMatchObject({
+      actId: 'milk1',
+      command: 'setDeadline',
+      payload: { deadline: '2026-09-10' }
+    });
     expect(() => taskInputFromToolCall('deleteItem', { taskId: 'milk1' })).toThrow(/Unsupported task operation/);
   });
 

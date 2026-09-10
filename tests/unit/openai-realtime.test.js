@@ -26,6 +26,8 @@ describe('OpenAI Realtime Worker session', () => {
     expect(config.instructions).toContain('enumerate the taskTitle values in the returned order');
     expect(config.instructions).toContain('"Какой статус у задачи Первый поход?" -> No tool.');
     expect(config.instructions).toContain('"Поставь задачу Первый поход в фокус" -> Call setStatus once');
+    expect(config.instructions).toContain('"Поставь дедлайн Первому походу сегодня" -> Call setDeadline once');
+    expect(config.instructions).toContain('Создай задачу Купить молоко, поставь в фокус и дедлайн сегодня');
     expect(config.instructions).toContain('addInfo(parentId, line1)');
     expect(config.instructions).toContain('"Добавь информацию к Яблокам');
     expect(config.instructions).toContain('silently estimate your confidence');
@@ -40,6 +42,7 @@ describe('OpenAI Realtime Worker session', () => {
       'addChild',
       'addInfo',
       'setStatus',
+      'setDeadline',
       'editItem',
       'setParent',
       'getFrontier'
