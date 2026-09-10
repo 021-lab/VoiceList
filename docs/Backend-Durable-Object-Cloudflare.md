@@ -70,6 +70,7 @@ source: openai-realtime. Это важно: голосовой агент не �
 | GET / и GET /index.html | HTML-приложение. |
 | GET /health | Проверка Worker; возвращает ok. |
 | GET /api/tasks/tree.json | Полное вложенное дерево из id, title, status и children. Это read-only API; голосовой UI не загружает через него дерево при старте. |
+| GET /api/tasks/frontier.json | Текущий фронтир, отсортированный по дедлайну. Каждая запись содержит parentTitle, taskId, taskTitle, status и deadline. |
 | GET /api/realtime/key/status | Состояние конфигурации OpenAI-ключа. |
 | POST /api/realtime/key | Одноразовое сохранение OpenAI API key по setup-токену. |
 | GET /api/realtime/prompt | Текущий системный промпт; если сохранённого нет, возвращает встроенный промпт. |
@@ -92,6 +93,10 @@ id, title, status, children. Worker передаёт его модели вну�
 русскую транскрибацию gpt-live-transcribe, near-field noise reduction и
 function tools для операций с задачами. Конкретный набор tools определён в
 worker/openai-realtime.js.
+
+Read-only tool getFrontier используется для запросов «фронтир» и «что во
+фронтире». Браузер получает свежий результат через /api/tasks/frontier.json и
+передаёт его модели как function_call_output; изменение документа не происходит.
 
 Сохранённый в настройках пользовательский промпт не заменяет обязательные
 инструкции VoiceList: он добавляется перед ними. Поэтому правила о точных id,

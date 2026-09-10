@@ -5,6 +5,7 @@ import { LIST_MANAGER_HTML } from './generated-html.js';
 import { createDocumentCore } from './list-document-core.js';
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from './openai-key-setup.js';
 import { getDefaultRealtimeSystemPrompt, handleOpenAIRealtimeSession } from './openai-realtime.js';
+import { taskFrontierFromItems } from './task-frontier.js';
 import { taskTreeFromItems } from './task-tree.js';
 
 const STORAGE_KEY = 'voicelist.document.v1';
@@ -96,6 +97,11 @@ export class ListDocumentDO extends DurableObject {
   async getTaskTree() {
     const core = await this.ensureCore();
     return taskTreeFromItems(core.getSnapshot().content.snapshot.items);
+  }
+
+  async getTaskFrontier() {
+    const core = await this.ensureCore();
+    return taskFrontierFromItems(core.getSnapshot().content.snapshot.items);
   }
 
   async configureOpenAIApiKey(apiKey) {
@@ -291,6 +297,11 @@ export default {
 
     if (url.pathname === '/api/tasks/tree.json') {
       return json({ tasks: await documentStub(env).getTaskTree() });
+    }
+
+    if (url.pathname === '/api/tasks/frontier.json') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, { status: 405 });
+      return json({ frontier: await documentStub(env).getTaskFrontier() });
     }
 
     if (url.pathname === '/reset' && request.method === 'POST') {
