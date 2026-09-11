@@ -20,5 +20,8 @@
     "jsdom": "^26.1.0",
     "vitest": "^3.2.4",
     "wrangler": "^4.118.0"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }

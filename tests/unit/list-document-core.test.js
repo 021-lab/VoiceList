@@ -236,6 +236,145 @@ describe('Cloudflare list document core', () => {
     });
   });
 
+  test('exports the full task title tree as text', async () => {
+    const core = createDocumentCore({ seedState, openRouterApiKey: '' });
+    await core.init();
+
+    const lines = core.getTaskTitleTreeText().trimEnd().split('\n');
+
+    expect(lines[0]).toBe('inbox >> Входящие >> root');
+    expect(lines).toContain('bread >> Хлеб ржаной >> root');
+    expect(lines).toContain('borod >>   Бородинский >> Хлеб ржаной');
+    expect(lines).toContain('first >>         Первый позад >> Воовоага');
+  });
+
+  test('returns one task with all attributes and recursive children by id', async () => {
+    const core = createDocumentCore({ seedState, openRouterApiKey: '' });
+    await core.init();
+
+    const byId = core.getTaskTree({ id: 'bread' });
+    expect(byId.status).toBe('found');
+    expect(byId.task).toMatchObject({
+      id: 'bread',
+      parentId: null,
+      order: 20,
+      status: 'Open',
+      line1: 'Хлеб ржаной',
+      line2: '',
+      collapsed: false,
+      tags: [],
+      children: [
+        expect.objectContaining({ id: 'borod', line1: 'Бородинский', children: [] }),
+        expect.objectContaining({ id: 'stoli', line1: 'Столичный', children: [] })
+      ]
+    });
+    expect(core.getTaskTree({ title: 'Хлеб ржаной' })).toEqual({ status: 'missing-query' });
+    expect(core.getTaskTree({ q: 'bread' })).toEqual({ status: 'missing-query' });
+  });
+
+  test('returns MCP active task tree without archived branches', async () => {
+    const initialState = {
+      content: {
+        snapshot: {
+          items: [
+            ...seedState.snapshot.items,
+            { id: 'hidden', parentId: 'shamp', order: 10, status: 'Open', line1: 'Hidden child', line2: '', collapsed: false, tags: [] }
+          ]
+        },
+        actionLog: []
+      },
+      log: [],
+      rev: 0,
+      nextId: 1000,
+      clients: {}
+    };
+    const core = createDocumentCore({ seedState, initialState, openRouterApiKey: '' });
+    await core.init();
+
+    const treeText = JSON.stringify(core.getActiveTaskTree());
+
+    expect(treeText).toContain('"id":"bread"');
+    expect(treeText).not.toContain('"id":"shamp"');
+    expect(treeText).not.toContain('"id":"hidden"');
+  });
+
+  test('returns MCP task subgraph path, full task, and direct non-archived children', async () => {
+    const initialState = {
+      content: {
+        snapshot: {
+          items: [
+            ...seedState.snapshot.items,
+            { id: 'oldbread', parentId: 'bread', order: 30, status: 'Archive', line1: 'Old bread', line2: '', collapsed: false, tags: [] }
+          ]
+        },
+        actionLog: []
+      },
+      log: [],
+      rev: 0,
+      nextId: 1000,
+      clients: {}
+    };
+    const core = createDocumentCore({ seedState, initialState, openRouterApiKey: '' });
+    await core.init();
+
+    const result = core.getTaskSubgraph('bread');
+
+    expect(result.status).toBe('found');
+    expect(result.subgraph).toMatchObject({
+      path: [],
+      task: { id: 'bread', line1: 'Хлеб ржаной', line2: '', parentId: null },
+      children: [
+        { id: 'borod', title: 'Бородинский', status: 'Open' },
+        { id: 'stoli', title: 'Столичный', status: 'Open' }
+      ]
+    });
+    expect(JSON.stringify(result.subgraph.children)).not.toContain('oldbread');
+    expect(core.getTaskSubgraph('missing')).toEqual({ status: 'not-found' });
+  });
+
+  test('applies server commands directly and supports command-log undo', async () => {
+    const core = createDocumentCore({ seedState, openRouterApiKey: '' });
+    await core.init();
+
+    const added = await core.applyCommand({
+      actId: 'list',
+      actType: 'list',
+      command: 'addItem',
+      payload: { line1: 'MCP task', line2: '' },
+      source: 'unit-test'
+    }, { message: { clientKey: 'mcp-test', seq: 1 } });
+    expect(added.status).toBe('applied');
+    expect(core.getTaskById(added.newTarget)).toMatchObject({ line1: 'MCP task', status: 'Open' });
+
+    await core.applyCommand({
+      actId: added.newTarget,
+      actType: 'task',
+      command: 'setStatus',
+      payload: { status: 'Archive' },
+      source: 'unit-test'
+    }, { message: { clientKey: 'mcp-test', seq: 2 } });
+    expect(core.getTaskById(added.newTarget).status).toBe('Archive');
+
+    const statusUndo = await core.undoLastAction({ clientKey: 'mcp-test', seq: 3, source: 'unit-test' });
+    expect(statusUndo).toMatchObject({
+      status: 'applied',
+      undone: { command: 'setStatus', id: added.newTarget },
+      node: { id: added.newTarget, status: 'Open' }
+    });
+
+    const addUndo = await core.undoLastAction({ clientKey: 'mcp-test', seq: 4, source: 'unit-test' });
+    expect(addUndo).toMatchObject({
+      status: 'applied',
+      undone: { command: 'addItem', id: added.newTarget },
+      node: null
+    });
+    expect(core.getTaskById(added.newTarget)).toBeNull();
+    expect(await core.undoLastAction({ clientKey: 'mcp-test', seq: 5, source: 'unit-test' })).toEqual({
+      status: 'error',
+      error: 'нечего откатывать'
+    });
+  });
+
   test('compacts stored action-log patches and undo payload snapshots on init', async () => {
     const largePatch = [{ op: 'replace', path: '/snapshot/items', value: seedState.snapshot.items }];
     const initialState = {
