@@ -108,6 +108,170 @@ function findNewTarget(beforeItems, afterItems) {
   return afterItems.find((item) => !beforeIds.has(item.id))?.id || null;
 }
 
+function itemSort(left, right) {
+  return (left.order || 0) - (right.order || 0) ||
+    String(left.line1 || '').localeCompare(String(right.line1 || '')) ||
+    String(left.id || '').localeCompare(String(right.id || ''));
+}
+
+function createItemIndexes(items) {
+  const byId = new Map();
+  const childrenByParent = new Map();
+
+  for (const item of items) {
+    byId.set(item.id, item);
+    const parentKey = item.parentId ?? null;
+    const children = childrenByParent.get(parentKey) || [];
+    children.push(item);
+    childrenByParent.set(parentKey, children);
+  }
+
+  for (const children of childrenByParent.values()) children.sort(itemSort);
+  return { byId, childrenByParent };
+}
+
+function oneLine(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function formatTaskTitleTree(items) {
+  const { byId, childrenByParent } = createItemIndexes(items);
+  const lines = [];
+  const visited = new Set();
+
+  function appendChildren(parentId, depth) {
+    for (const item of childrenByParent.get(parentId) || []) {
+      if (visited.has(item.id)) continue;
+      visited.add(item.id);
+      const parent = item.parentId ? byId.get(item.parentId) : null;
+      const parentLabel = parent ? oneLine(parent.line1) : 'root';
+      lines.push(`${item.id} >> ${'  '.repeat(depth)}${oneLine(item.line1)} >> ${parentLabel}`);
+      appendChildren(item.id, depth + 1);
+    }
+  }
+
+  appendChildren(null, 0);
+
+  for (const item of [...items].sort(itemSort)) {
+    if (!visited.has(item.id)) {
+      visited.add(item.id);
+      const parentLabel = item.parentId ? 'missing parent' : 'root';
+      lines.push(`${item.id} >> ${oneLine(item.line1)} >> ${parentLabel}`);
+      appendChildren(item.id, 1);
+    }
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function createTaskNode(item, childrenByParent, visited = new Set()) {
+  if (visited.has(item.id)) {
+    return {
+      ...clone(item),
+      children: [],
+      cycleDetected: true
+    };
+  }
+
+  const nextVisited = new Set(visited);
+  nextVisited.add(item.id);
+  return {
+    ...clone(item),
+    children: (childrenByParent.get(item.id) || []).map((child) => createTaskNode(child, childrenByParent, nextVisited))
+  };
+}
+
+function findTaskTree(items, query = {}) {
+  const { byId, childrenByParent } = createItemIndexes(items);
+  const id = String(query.id || '').trim();
+
+  if (!id) return { status: 'missing-query' };
+  const item = byId.get(id);
+  return item ? { status: 'found', task: createTaskNode(item, childrenByParent) } : { status: 'not-found' };
+}
+
+function toTaskSummary(item) {
+  return {
+    id: item.id,
+    title: item.line1,
+    status: item.status
+  };
+}
+
+function createActiveTaskTree(items) {
+  const { byId, childrenByParent } = createItemIndexes(items);
+  const visited = new Set();
+
+  function isPrunedByArchivedAncestor(item) {
+    let parentId = item.parentId ?? null;
+    const seen = new Set([item.id]);
+    while (parentId) {
+      if (seen.has(parentId)) return false;
+      seen.add(parentId);
+      const parent = byId.get(parentId);
+      if (!parent) return false;
+      if (parent.status === 'Archive') return true;
+      parentId = parent.parentId ?? null;
+    }
+    return false;
+  }
+
+  function visit(item) {
+    if (visited.has(item.id) || item.status === 'Archive') return null;
+    visited.add(item.id);
+    return {
+      ...toTaskSummary(item),
+      children: (childrenByParent.get(item.id) || [])
+        .map(visit)
+        .filter(Boolean)
+    };
+  }
+
+  const roots = [];
+  for (const item of childrenByParent.get(null) || []) {
+    const node = visit(item);
+    if (node) roots.push(node);
+  }
+
+  for (const item of [...items].sort(itemSort)) {
+    if (!visited.has(item.id) && item.status !== 'Archive' && !isPrunedByArchivedAncestor(item)) {
+      const node = visit(item);
+      if (node) roots.push(node);
+    }
+  }
+
+  return roots;
+}
+
+function createTaskSubgraph(items, id) {
+  const { byId, childrenByParent } = createItemIndexes(items);
+  const task = byId.get(String(id || '').trim());
+  if (!task) return { status: 'not-found' };
+
+  const path = [];
+  const seen = new Set([task.id]);
+  let parentId = task.parentId ?? null;
+  while (parentId) {
+    if (seen.has(parentId)) break;
+    seen.add(parentId);
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    path.unshift(toTaskSummary(parent));
+    parentId = parent.parentId ?? null;
+  }
+
+  return {
+    status: 'found',
+    subgraph: {
+      path,
+      task: clone(task),
+      children: (childrenByParent.get(task.id) || [])
+        .filter((child) => child.status !== 'Archive')
+        .map(toTaskSummary)
+    }
+  };
+}
+
 function createActionLogView(log) {
   return log.map((entry) => ({
     id: entry.id,
@@ -222,6 +386,32 @@ export function createDocumentCore({
     return createStateEnvelope(state);
   }
 
+  function getTaskTitleTreeText() {
+    ensureReady();
+    return formatTaskTitleTree(state.content.snapshot.items);
+  }
+
+  function getTaskTree(query) {
+    ensureReady();
+    return findTaskTree(state.content.snapshot.items, query);
+  }
+
+  function getTaskById(id) {
+    ensureReady();
+    const taskId = String(id || '').trim();
+    return clone(state.content.snapshot.items.find((item) => item.id === taskId) || null);
+  }
+
+  function getActiveTaskTree() {
+    ensureReady();
+    return createActiveTaskTree(state.content.snapshot.items);
+  }
+
+  function getTaskSubgraph(id) {
+    ensureReady();
+    return createTaskSubgraph(state.content.snapshot.items, id);
+  }
+
   function listLog() {
     ensureReady();
     return clone(state.log);
@@ -242,9 +432,39 @@ export function createDocumentCore({
     };
   }
 
-  async function applyCommand(message, input, metadata = {}) {
+  function findLastUndoableLogEntry() {
+    const undone = new Set(state.log
+      .filter((entry) => entry.op === 'undo' && entry.undoes)
+      .map((entry) => entry.undoes));
+    for (let index = state.log.length - 1; index >= 0; index -= 1) {
+      const entry = state.log[index];
+      if (entry.op !== 'undo' && entry.undo?.snapshot && !undone.has(entry.id)) return entry;
+    }
+    return null;
+  }
+
+  async function applyCommand(input, { message = {}, metadata = {} } = {}) {
+    ensureReady();
+    const clientKey = String(message.clientKey || 'server');
+    const seq = Number.isFinite(Number(message.seq)) ? Number(message.seq) : state.rev + 1;
+    const commandMessage = { ...message, clientKey, seq };
     const beforeItems = clone(state.content.snapshot.items);
+    const beforeSnapshot = clone(state.content.snapshot);
     let allocatedId = null;
+    if (input.command === 'undo' && !input.payload?.snapshot) {
+      const undoEntry = findLastUndoableLogEntry();
+      if (!undoEntry) throw new Error('нечего откатывать');
+      input = {
+        ...input,
+        actId: undoEntry.target || input.actId || 'list',
+        actType: undoEntry.target ? 'task' : 'list',
+        payload: {
+          ...(input.payload || {}),
+          id: undoEntry.id,
+          snapshot: undoEntry.undo.snapshot
+        }
+      };
+    }
     if (input.command === 'importWorkflowy') {
       const url = String(input.payload?.url || '').trim();
       const tree = await importWorkflowyTreeFromUrl(url, { fetchImpl });
@@ -275,10 +495,10 @@ export function createDocumentCore({
     const result = interpreter.execute(state.content, input);
 
     if (result.viewMode || result.effect) {
-      return createRejectedAck(message, 'UI-only command is handled by the HTML frontend');
+      return createRejectedAck(commandMessage, 'UI-only command is handled by the HTML frontend');
     }
     if (!result.patch?.length && !result.logEntryDraft) {
-      return createRejectedAck(message, 'Command produced no document change');
+      return createRejectedAck(commandMessage, 'Command produced no document change');
     }
 
     const nextContent = result.patch?.length ? applyJsonPatch(state.content, result.patch) : clone(state.content);
@@ -292,12 +512,12 @@ export function createDocumentCore({
       logEntry = {
         id: encodeId(rev),
         rev,
-        clientKey: message.clientKey,
-        seq: message.seq,
+        clientKey: commandMessage.clientKey,
+        seq: commandMessage.seq,
         op: input.command,
         target: newTarget || input.actId || null,
         value: clone(input.payload || null),
-        undo: null,
+        undo: input.command === 'undo' ? null : { snapshot: beforeSnapshot },
         undoes: input.command === 'undo' ? input.payload?.id || null : null,
         transcript: metadata.transcript ?? input.transcript ?? null,
         llm_raw: metadata.llmRaw ?? null,
@@ -311,11 +531,44 @@ export function createDocumentCore({
     }
 
     return {
-      seq: message.seq,
+      seq: commandMessage.seq,
       id: logEntry?.id || null,
       status: 'applied',
       reason: null,
       newTarget: logEntry?.target || newTarget || input.actId || null
+    };
+  }
+
+  async function undoLastAction({ clientKey = 'server', seq = null, source = 'server' } = {}) {
+    ensureReady();
+    const undoEntry = findLastUndoableLogEntry();
+    if (!undoEntry) {
+      return {
+        status: 'error',
+        error: 'нечего откатывать'
+      };
+    }
+    const ack = await applyCommand({
+      actId: undoEntry.target || 'list',
+      actType: undoEntry.target ? 'task' : 'list',
+      command: 'undo',
+      payload: { id: undoEntry.id, snapshot: undoEntry.undo.snapshot },
+      source
+    }, {
+      message: {
+        clientKey,
+        seq: seq ?? state.rev + 1
+      }
+    });
+    return {
+      status: ack.status,
+      ack,
+      undone: {
+        logId: undoEntry.id,
+        command: undoEntry.op,
+        id: undoEntry.target || null
+      },
+      node: undoEntry.target ? getTaskById(undoEntry.target) : null
     };
   }
 
@@ -400,7 +653,7 @@ export function createDocumentCore({
   async function logFallbackUtterance(message, reason = null) {
     const transcript = String(message.transcript || '').trim();
     if (!transcript) return createRejectedAck(message, reason || 'Empty fallback utterance');
-    return applyCommand(message, {
+    return applyCommand({
       actId: message.target || 'list',
       actType: message.target ? 'task' : 'list',
       command: 'logFallbackUtterance',
@@ -410,6 +663,8 @@ export function createDocumentCore({
       },
       source: 'voice-fallback',
       transcript
+    }, {
+      message
     });
   }
 
@@ -425,10 +680,13 @@ export function createDocumentCore({
       if (message.type === 'command') {
         const input = message.input || {};
         if (input.command === 'commentLogEntry') ack = applyLogComment({ ...message, clientKey, seq }, input);
-        else ack = await applyCommand({ ...message, clientKey, seq }, input);
+        else ack = await applyCommand(input, { message: { ...message, clientKey, seq } });
       } else if (message.type === 'utterance') {
         const resolved = await resolveUtterance(message);
-        ack = await applyCommand({ ...message, clientKey, seq }, resolved.input, resolved.metadata);
+        ack = await applyCommand(resolved.input, {
+          message: { ...message, clientKey, seq },
+          metadata: resolved.metadata
+        });
       } else {
         ack = createRejectedAck({ ...message, seq }, `Unsupported message type: ${message.type}`);
       }
@@ -457,9 +715,16 @@ export function createDocumentCore({
 
   return {
     exportState,
+    applyCommand,
+    getActiveTaskTree,
+    getTaskTitleTreeText,
+    getTaskById,
+    getTaskSubgraph,
+    getTaskTree,
     getSnapshot,
     handleClientMessage,
     init,
-    listLog
+    listLog,
+    undoLastAction
   };
 }
