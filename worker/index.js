@@ -28,6 +28,7 @@ const OAUTH_DISCOVERY_PATHS = new Set([
   '/.well-known/oauth-authorization-server',
   '/.well-known/oauth-protected-resource'
 ]);
+const LOCAL_MCP_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 function json(data, init = {}) {
   return Response.json(data, {
@@ -55,6 +56,21 @@ function notFound() {
       'Content-Type': 'text/plain; charset=utf-8'
     }
   });
+}
+
+function parseAllowedMcpHosts(env) {
+  const value = typeof env.MCP_ALLOWED_HOSTS === 'string' ? env.MCP_ALLOWED_HOSTS : '';
+  return new Set(value
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean));
+}
+
+function isMcpHostAllowed(request, env) {
+  const hostname = new URL(request.url).hostname.toLowerCase();
+  const allowedHosts = parseAllowedMcpHosts(env);
+  if (allowedHosts.size === 0) return LOCAL_MCP_HOSTS.has(hostname);
+  return allowedHosts.has(hostname);
 }
 
 function mcpJson(data, init = {}) {
@@ -653,6 +669,7 @@ export default {
     }
 
     if (url.pathname === '/mcp') {
+      if (!isMcpHostAllowed(request, env)) return notFound();
       return documentStub(env).fetch(request);
     }
 
