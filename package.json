@@ -11,7 +11,11 @@
     "docs:realtime": "node scripts/generate-realtime-agent-instructions.mjs",
     "prepare-preview": "node scripts/prepare-preview.mjs",
     "build:cloudflare": "npm run prepare-preview && node scripts/prepare-cloudflare-assets.mjs",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
+    "build:v2": "VOICELIST_V02=1 node scripts/prepare-preview.mjs && node scripts/prepare-cloudflare-assets.mjs",
+    "dev:v2": "wrangler dev --config wrangler.dev.jsonc --port 4511",
+    "deploy:cloudflare": "npm run build:v2 && wrangler deploy --config wrangler.dev.jsonc",
+    "test:v2:worker": "node tests/v2/worker-integration.mjs",
+    "test:v2:browser": "playwright test --config tests/v2-browser/playwright.config.js",
     "serve:test": "node scripts/static-server.mjs"
   },
   "devDependencies": {
@@ -22,6 +26,7 @@
     "wrangler": "^4.118.0"
   },
   "dependencies": {
+    "agents": "0.23.0",
     "zod": "^4.4.3"
   }
 }

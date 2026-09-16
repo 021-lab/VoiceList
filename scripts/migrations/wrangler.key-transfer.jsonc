@@ -1,0 +1,15 @@
+{
+  "name": "vlist-v02-key-transfer",
+  "account_id": "7d501365312b59f08d08b766d32d9219",
+  "main": "copy-openai-key.js",
+  "compatibility_date": "2026-08-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "durable_objects": { "bindings": [
+    { "name": "SOURCE", "class_name": "ListDocumentDO", "script_name": "vlist-cloudflare-backend" },
+    { "name": "TARGET", "class_name": "ListDocumentDO", "script_name": "vlist-v02-dev" }
+  ] },
+  "vars": { "EXPIRES_AT": "2026-09-17T02:00:00Z" }
+}

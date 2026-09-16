@@ -99,11 +99,11 @@ Close/скролл/подсветка/черновик ASR — локальны�
 - [x] Отдельный worktree и ветка от свежего main; исходный worktree не изменён.
 - [x] Базовый прогон main: unit, голосовые алгоритмы, browser E2E.
 - [x] Контракт, две актуальные спецификации, перечень сохраняемых сценариев.
-- [ ] Новые TaskGraph/InteractionJournal/ActionService/TaskAgent/Presentation/Runtime с тестами.
-- [ ] Cloudflare Agents SDK: журнал → очередь, расписания, повторы и восстановление.
-- [ ] Новый Client и дерево компонентов; сохранение существующих экранов и жестов.
-- [ ] Новые touch-and-speak, тосты, история, страница действия, корректировки и откат.
-- [ ] Совместимые HTTP/WS/MCP/Realtime адаптеры, интеграционные и E2E проверки.
+- [x] Новые TaskGraph/InteractionJournal/ActionService/TaskAgent/Presentation/Runtime с тестами.
+- [x] Cloudflare Agents SDK: журнал → очередь, расписания, повторы и восстановление.
+- [x] Новый Client и дерево компонентов; сохранение существующих экранов и жестов.
+- [x] Новые touch-and-speak, тосты, история, страница действия, корректировки и откат.
+- [x] Совместимые HTTP/WS/MCP/Realtime адаптеры, интеграционные и E2E проверки; реальный микрофон требует ручной приёмки.
 - [ ] Точный проверенный коммит, публикация ветки, Dev-деплой, проверка домена.
 - [ ] Финальный отчёт: SHA, URL, version ID, тесты, ограничения и откат.
 
@@ -143,16 +143,23 @@ SHA main: 413e94056429af08565b14484a7f708fe8ee3906.
 Команды: npm ci; npm run test:unit -- --reporter=dot; npm run test:voice; npm run test:e2e -- --workers=1 --reporter=line.
 Не считать mock ASR/WebRTC проверкой реального микрофона или live модели. KEEP-18 и Workers runtime требуют дополнительного интеграционного прогона.
 
+## Проверки реализации
+
+Локальный Workers runtime: test:v2:worker проверяет устойчивое создание, дедупликацию, серверный разбор текста, корректировку, откат цепочки, страницу действия, события, Origin, отсутствие ключа в ответах, WebSocket и MCP. Browser suite test:v2:browser: реальный HTTP backend, создание/редактирование/статус/журнал/коррекция/откат/Закрыть/перезагрузка, верхний свайп, native-touch hold, ASR mock, отправка только после release, редактирование и отмена до отправки. Результаты: 106 unit-тестов, 80 голосовых сценариев + resolver, 3 browser-теста passed. Это не ручная приёмка реального микрофона/Realtime и жеста drag на физическом телефоне.
+Прежние src/list-*.js и tests/e2e сохранены как база сравнения и источник чистых переиспользуемых алгоритмов; новый browser entry src/v2/client/entry.js не импортирует старое приложение или store.
+
 ## Контракт Dev-деплоя
 
 Этот раздел заменяет docs/DEPLOYMENT.md для данной ветки.
 Целевой домен подтверждён пользователем: https://vlist-v02-dev.smileme.ai/.
 Только новый Worker vlist-v02-dev с собственным namespace LIST_DOCUMENT; привязка к Production запрещена.
 Допустимый источник: чистый коммит ветки codex/voice-interface-v0.2 с прошедшими проверками.
-Команда после подготовки отдельного конфига: npm run build:cloudflare && npx wrangler deploy --config wrangler.dev.jsonc.
+Команда: npm run build:v2 && npx wrangler deploy --config wrangler.dev.jsonc.
 Ни основной wrangler.jsonc с Production-маршрутом, ни Production secrets не используются для деплоя.
 Проверки: /health=200; schemaVersion=1 на /api/v2/document; открыть страницу, создать/изменить тестовую задачу, проверить журнал, коррекцию/откат и сохранение после перезагрузки.
 Записать SHA, URL, Worker version/deployment ID и результаты перед завершением.
 Откат: npx wrangler rollback <previous-dev-version-id> --config wrangler.dev.jsonc; возврат кода не является откатом данных.
 При первом релизе предыдущей версии нет: выключить доступ к Dev при серьёзном сбое, сохранив данные; Production не трогать.
-До публикации проверять свободен ли домен и права аккаунта. Отсутствие AI-ключа явно отмечать и запрашивать настройку, не копировать Production-секреты.
+До публикации проверять свободен ли домен и права аккаунта.
+Пользователь разрешил однократный перенос существующего OpenAI-ключа из Production в Dev. Для этого допускается временный служебный Worker без HTTP-маршрута: read-only RPC getOpenAIApiKey у Production и однократный configureOpenAIApiKey у Dev. После переноса служебный Worker удаляется. Секрет не выводится и не сохраняется локально; постоянной привязки Dev к Production нет. Задачи и настройки Production не меняются.
+Перенос: после первого Dev-деплоя проверить /api/realtime/key/status; при configured=false выполнить npx wrangler deploy --config scripts/migrations/wrangler.key-transfer.jsonc (только до EXPIRES_AT). Cron раз в минуту переносит только ключ. После configured=true удалить временный Worker: npx wrangler delete --config scripts/migrations/wrangler.key-transfer.jsonc --force. Файлы миграции не содержат секретов; повторный запуск после истечения срока ничего не делает.

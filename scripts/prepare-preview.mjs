@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,7 +10,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const outputPath = path.join(repoRoot, 'list-manager.html');
 const templatePath = path.join(repoRoot, 'list-manager.template.html');
 const cssPath = path.join(repoRoot, 'list-manager.css');
-const entryPath = path.join(repoRoot, 'src/list-preview-entry.js');
+const entryPath = path.join(repoRoot, process.env.VOICELIST_V02 === '1' ? 'src/v2/client/entry.js' : 'src/list-preview-entry.js');
 
 function generateBuildHash() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -29,7 +30,7 @@ async function readExistingBuildHash() {
   }
 }
 
-const buildHash = process.env.PREVIEW_BUILD_HASH || await readExistingBuildHash() || generateBuildHash();
+let buildHash = process.env.VOICELIST_V02 === '1' ? '__V02_BUILD_ID__' : process.env.PREVIEW_BUILD_HASH || await readExistingBuildHash() || generateBuildHash();
 const [template, css] = await Promise.all([
   readFile(templatePath, 'utf8'),
   readFile(cssPath, 'utf8')
@@ -47,7 +48,11 @@ const bundle = await build({
   }
 });
 
-const inlineJs = bundle.outputFiles[0].text;
+let inlineJs = bundle.outputFiles[0].text;
+if (process.env.VOICELIST_V02 === '1') {
+  buildHash = 'v02-' + createHash('sha256').update(template + css + inlineJs).digest('hex').slice(0,16);
+  inlineJs = inlineJs.replaceAll('__V02_BUILD_ID__', buildHash);
+}
 const html = template
   .replaceAll('__PREVIEW_BUILD_HASH__', buildHash)
   .replace('__INLINE_CSS__', css.trim())

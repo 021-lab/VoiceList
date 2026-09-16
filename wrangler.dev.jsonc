@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "vlist-v02-dev",
+  "account_id": "7d501365312b59f08d08b766d32d9219",
+  "main": "worker/v2/index.js",
+  "compatibility_date": "2026-08-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "vlist-v02-dev.smileme.ai", "custom_domain": true }],
+  "durable_objects": { "bindings": [{ "name": "LIST_DOCUMENT", "class_name": "ListDocumentDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ListDocumentDO"] }],
+  "observability": { "enabled": true },
+  "vars": { "AGENT_MODEL": "gpt-4.1-mini", "MCP_ALLOWED_HOSTS": "localhost,127.0.0.1,vlist-v02-dev.smileme.ai" }
+}
