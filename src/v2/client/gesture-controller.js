@@ -31,7 +31,7 @@ export class GestureController {
     if (this.state === 'recording' && dy < -18 && this.target.draggable) {
       this.state = 'dragging';
       this.cancelVoice?.();
-    } else if (this.state === 'recording' && dy > 42) {
+    } else if (this.state === 'recording' && dy > 24) {
       this.state = 'editing';
     }
     if (this.state === 'editing' && dy > 120) {

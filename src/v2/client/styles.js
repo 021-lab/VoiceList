@@ -5,6 +5,8 @@ export const clientStyles = `
 .v02-toast{pointer-events:auto;border:0;border-radius:12px;padding:13px 18px;max-width:540px;background:#1a1a2e;color:white;box-shadow:0 5px 20px #0002;font:inherit;text-align:left;cursor:pointer}
 .v02-voice-target{outline:2px solid #007aff;outline-offset:2px}
 .v02-transcript{position:fixed;z-index:2300;max-width:min(420px,90vw);padding:10px 14px;background:#fff;border:1px solid #007aff;border-radius:12px;box-shadow:0 5px 20px #0002;color:#1a1a2e;pointer-events:none;font-size:15px}
+.v02-transcript[data-state=editing]{border:2px solid #007aff;box-shadow:0 0 0 4px #007aff20,0 5px 20px #0002;background:#f5faff;white-space:pre-line}
+.v02-transcript[data-state=cancelled]{border-color:transparent;box-shadow:none;background:#f0f2f5;color:#555}
 .v02-action-page{position:fixed;inset:0;background:#f0f2f5;z-index:1400;overflow:auto;padding-bottom:24px}
 .v02-action-body{max-width:760px;margin:auto;padding:18px;display:grid;gap:14px}
 .v02-action-card,.v02-message{background:#fff;padding:14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}

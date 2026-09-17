@@ -386,6 +386,12 @@ export class Client {
     this.$('v02-toast-stack')?.append(button); setTimeout(() => button.remove(), 2000);
   }
   bindGestures(root) {
+    // Pointer preventDefault alone cannot stop native touch panning. Once the
+    // hold has selected voice/drag, keep the touch stream; pre-hold moves still
+    // use native scrolling and cancel the pending hold normally.
+    root.addEventListener('touchmove', (event) => {
+      if (['recording', 'editing', 'dragging', 'swiping', 'cancelled'].includes(this.gesture.state)) event.preventDefault();
+    }, { passive: false });
     root.addEventListener('pointerdown', (event) => {
       // A new deliberate press must not be swallowed by the preceding gesture's click guard.
       this.suppressClickUntil = 0;
@@ -403,16 +409,18 @@ export class Client {
       if (this.gesture.state !== 'idle' && event.pointerId === this.pointerId) {
         const state = this.gesture.move(point(event));
         if (['recording', 'editing', 'dragging', 'swiping', 'cancelled'].includes(state)) event.preventDefault();
-        if (state === 'editing') this.transcriptHint('Отпустите, чтобы исправить текст. Ещё ниже — отмена');
-        if (state === 'cancelled') this.transcriptHint('Ввод отменён');
+        if (state === 'editing') this.transcriptHint('Отпустите, чтобы исправить текст. Ещё ниже — отмена', 'editing');
+        if (state === 'cancelled') this.transcriptHint('Ввод отменён', 'cancelled');
       }
     }, { passive: false });
     this.dom.addEventListener('pointerup', (event) => {
       if (this.edgeStart) { if (event.clientY - this.edgeStart.y > 50) void this.navigate('log'); this.edgeStart = null; return; }
       if (event.pointerId !== this.pointerId) return;
+      const cancelled = this.gesture.state === 'cancelled';
       const suppress = this.gesture.state !== 'holding' && this.gesture.state !== 'idle';
       if (suppress) this.suppressClickUntil = Date.now() + 400;
       void this.gesture.end(point(event));
+      if (cancelled) this.$('v02-transcript').hidden = true;
     });
     this.dom.addEventListener('pointercancel', () => { this.edgeStart = null; this.gesture.cancel(); });
     root.addEventListener('click', (event) => { if (Date.now() < (this.suppressClickUntil || 0)) { event.preventDefault(); event.stopImmediatePropagation(); } }, true);
@@ -446,7 +454,7 @@ export class Client {
     this.voice = { target, text: '', final: '', error: false, asr: this.asrFactory() };
     const voice = this.voice;
     target.element.classList.add('v02-voice-target');
-    const overlay = this.$('v02-transcript'); overlay.hidden = false;
+    const overlay = this.$('v02-transcript'); overlay.hidden = false; overlay.dataset.state = 'recording';
     overlay.style.left = `${Math.max(8, Math.min(p.x - 100, this.win.innerWidth - 280))}px`;
     overlay.style.top = `${Math.max(8, p.y - 75)}px`; overlay.textContent = 'Говорите…';
     voice.asr.start({
@@ -456,7 +464,11 @@ export class Client {
     });
     voice.asr.speak?.();
   }
-  transcriptHint(text) { const el = this.$('v02-transcript'); if (el && !el.hidden) el.textContent = `${this.voice?.text || ''}\n${text}`; }
+  transcriptHint(text, state) {
+    const el = this.$('v02-transcript'); if (!el) return;
+    el.hidden = false; el.dataset.state = state;
+    el.textContent = state === 'cancelled' ? text : `${this.voice?.text || ''}\n${text}`;
+  }
   cancelVoice() {
     const voice = this.voice; this.voice = null;
     if (voice) { voice.target.element.classList.remove('v02-voice-target'); void voice.asr.stop(); }

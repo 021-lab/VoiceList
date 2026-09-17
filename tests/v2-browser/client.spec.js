@@ -1,10 +1,25 @@
 import { test, expect } from '@playwright/test';
 
+let createdTaskIds = [];
+
 test.beforeEach(async ({ page, request }) => {
+  createdTaskIds = [];
   expect((await request.get('/health')).status()).toBe(200);
   await page.goto('/');
   await expect(page.locator('#list-container')).toBeVisible();
   await expect.poll(() => page.evaluate(() => Boolean(window.__voiceListClient?.document))).toBe(true);
+});
+test.afterEach(async ({ request }) => {
+  const clientKey = `uat-cleanup-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  let seq = 0;
+  for (const id of [...new Set(createdTaskIds)].reverse()) {
+    const snapshot = await (await request.get('/api/v2/document')).json();
+    const body = { key: { clientKey, seq: ++seq }, context: { elementId: `task:${id}`, view: 'list', revision: snapshot.revision }, command: { command: 'deleteItem', actId: id, actType: 'task', payload: {} } };
+    const result = await request.post('/api/v2/input', { data: body });
+    if (result.status() === 404) continue;
+    expect(result.ok()).toBe(true);
+    await expect.poll(async () => (await (await request.post('/api/v2/input', { data: body })).json()).status, { timeout: 15000 }).toBe('completed');
+  }
 });
 async function add(page, title) {
   await page.locator('#add-btn').click();
@@ -12,7 +27,7 @@ async function add(page, title) {
   await page.locator('#input-line1').press('Enter');
   await expect(page.locator('#modal-overlay')).not.toHaveClass(/open/);
   const row = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-line1', { hasText: title }) });
-  await expect(row).toBeVisible(); return row;
+  await expect(row).toBeVisible(); createdTaskIds.push(await row.getAttribute('data-id')); return row;
 }
 async function swipe(page, row, label, direction = 1) {
   await row.scrollIntoViewIfNeeded(); const rect = await row.boundingBox();
@@ -93,4 +108,64 @@ test('hold voice sends final text only, downward edit and cancellation remain lo
   await page.locator('.v02-edit-transcript .btn-cancel').click();
   await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(360); await page.mouse.move(x, y + 150); await page.mouse.up();
   await expect(page.locator('.v02-edit-transcript')).toHaveCount(0); expect(sent).toHaveLength(before);
+});
+
+test('native touch hold-up selects drag, subsequent up-down moves preserve drag and persist order', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage(); await page.goto('/');
+  await expect.poll(() => page.evaluate(() => Boolean(window.__voiceListClient?.document))).toBe(true);
+  await page.evaluate(() => { window.__voiceTest = { phrase: '' }; });
+  const stamp = Date.now(); const first = await add(page, `Drag first ${stamp}`); const second = await add(page, `Drag second ${stamp}`);
+  const firstId = await first.getAttribute('data-id'), secondId = await second.getAttribute('data-id');
+  await second.scrollIntoViewIfNeeded();
+  const a = await first.boundingBox(), b = await second.boundingBox();
+  const x = b.x + 90, y = b.y + b.height / 2;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await page.waitForTimeout(360);
+  for (const nextY of [y - 24, y - 40, y - 10, a.y + a.height / 2]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: nextY }] });
+    await page.waitForTimeout(30);
+    await expect.poll(() => page.evaluate(() => window.__voiceListClient.gesture.state)).toBe('dragging');
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const order = () => page.locator('#list-container .list-item-wrapper').evaluateAll(elements => elements.map(el => el.dataset.id));
+  await expect.poll(async () => { const ids = await order(); return ids.indexOf(secondId) < ids.indexOf(firstId); }).toBe(true);
+  await page.reload();
+  await expect.poll(async () => { const ids = await order(); return ids.includes(secondId) && ids.indexOf(secondId) < ids.indexOf(firstId); }).toBe(true);
+  await context.close();
+});
+
+test('native touch down frames transcript until release and Send; deeper down cancels; pre-hold scroll stays native', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage(); await page.goto('/');
+  await expect.poll(() => page.evaluate(() => Boolean(window.__voiceListClient?.document))).toBe(true);
+  const row = await add(page, `Touch edit ${Date.now()}`); await row.scrollIntoViewIfNeeded();
+  await page.evaluate(() => { window.__voiceTest = { phrase: 'сделай паузу' }; });
+  const sent = []; page.on('request', request => { if (request.url().endsWith('/api/v2/input') && request.postDataJSON()?.text) sent.push(request.postDataJSON()); });
+  const cdp = await context.newCDPSession(page);
+  let box = await row.boundingBox(); let x = box.x + 75, y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await page.waitForTimeout(360);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 30 }] });
+  await expect(page.locator('#v02-transcript')).toHaveAttribute('data-state', 'editing');
+  await expect(page.locator('#v02-transcript')).toHaveCSS('border-top-width', '2px'); expect(sent).toHaveLength(0);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 5 }] });
+  await expect(page.locator('#v02-transcript')).toHaveAttribute('data-state', 'editing');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('#transcript-edit-input')).toHaveValue('сделай паузу'); expect(sent).toHaveLength(0);
+  await page.locator('#transcript-edit-input').fill('сделай фокус'); await page.locator('.v02-edit-transcript .v02-primary').click();
+  await expect(row).toContainText('Focus'); await page.waitForTimeout(1200); const before = sent.length;
+  box = await row.boundingBox(); x = box.x + 75; y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await page.waitForTimeout(360);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 140 }] });
+  await expect(page.locator('#v02-transcript')).toHaveAttribute('data-state', 'cancelled');
+  await expect(row).not.toHaveClass(/v02-voice-target/);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('#transcript-edit-input')).toHaveCount(0); await expect(page.locator('#v02-transcript')).toBeHidden(); expect(sent).toHaveLength(before);
+  const scrollBefore = await page.evaluate(() => scrollY);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 65 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(scrollBefore);
+  await page.waitForTimeout(350); await expect(page.locator('#v02-transcript')).toBeHidden(); expect(sent).toHaveLength(before);
+  await context.close();
 });

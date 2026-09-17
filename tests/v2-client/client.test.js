@@ -128,4 +128,16 @@ describe('exclusive gesture state machine', () => {
     const { gesture, callbacks } = make(); gesture.begin({ x: 0, y: 100 }, {}); gesture.move({ x: 0, y: 120 }); vi.advanceTimersByTime(400);
     expect(gesture.state).toBe('idle'); expect(callbacks.startVoice).not.toHaveBeenCalled();
   });
+  it('small downward selection remains editing even when finger returns upward', async () => {
+    const { gesture, callbacks } = make(); gesture.begin({ x: 0, y: 100 }, { draggable: true }); vi.advanceTimersByTime(301);
+    gesture.move({ x: 0, y: 130 }); expect(gesture.state).toBe('editing');
+    gesture.move({ x: 0, y: 80 }); expect(gesture.state).toBe('editing');
+    await gesture.end(); expect(callbacks.editVoice).toHaveBeenCalledOnce(); expect(callbacks.drag).not.toHaveBeenCalled();
+  });
+  it('deep cancellation is terminal until release even after moving back', async () => {
+    const { gesture, callbacks } = make(); gesture.begin({ x: 0, y: 100 }, { draggable: true }); vi.advanceTimersByTime(301);
+    gesture.move({ x: 0, y: 245 }); gesture.move({ x: 0, y: 60 });
+    expect(gesture.state).toBe('cancelled'); await gesture.end();
+    expect(callbacks.finishVoice).not.toHaveBeenCalled(); expect(callbacks.editVoice).not.toHaveBeenCalled(); expect(callbacks.drag).not.toHaveBeenCalled();
+  });
 });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-79cdbb52c783df4a">
+<meta name="preview-build-hash" content="v02-59866ee3d598b0af">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -986,7 +986,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-79cdbb52c783df4a";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-59866ee3d598b0af";
 </script>
 <script>
 (() => {
@@ -1183,7 +1183,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-79cdbb52c783df4a";
       if (this.state === "recording" && dy < -18 && this.target.draggable) {
         this.state = "dragging";
         this.cancelVoice?.();
-      } else if (this.state === "recording" && dy > 42) {
+      } else if (this.state === "recording" && dy > 24) {
         this.state = "editing";
       }
       if (this.state === "editing" && dy > 120) {
@@ -1224,6 +1224,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-79cdbb52c783df4a";
 .v02-toast{pointer-events:auto;border:0;border-radius:12px;padding:13px 18px;max-width:540px;background:#1a1a2e;color:white;box-shadow:0 5px 20px #0002;font:inherit;text-align:left;cursor:pointer}
 .v02-voice-target{outline:2px solid #007aff;outline-offset:2px}
 .v02-transcript{position:fixed;z-index:2300;max-width:min(420px,90vw);padding:10px 14px;background:#fff;border:1px solid #007aff;border-radius:12px;box-shadow:0 5px 20px #0002;color:#1a1a2e;pointer-events:none;font-size:15px}
+.v02-transcript[data-state=editing]{border:2px solid #007aff;box-shadow:0 0 0 4px #007aff20,0 5px 20px #0002;background:#f5faff;white-space:pre-line}
+.v02-transcript[data-state=cancelled]{border-color:transparent;box-shadow:none;background:#f0f2f5;color:#555}
 .v02-action-page{position:fixed;inset:0;background:#f0f2f5;z-index:1400;overflow:auto;padding-bottom:24px}
 .v02-action-body{max-width:760px;margin:auto;padding:18px;display:grid;gap:14px}
 .v02-action-card,.v02-message{background:#fff;padding:14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -1765,6 +1767,9 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       setTimeout(() => button.remove(), 2e3);
     }
     bindGestures(root) {
+      root.addEventListener("touchmove", (event) => {
+        if (["recording", "editing", "dragging", "swiping", "cancelled"].includes(this.gesture.state)) event.preventDefault();
+      }, { passive: false });
       root.addEventListener("pointerdown", (event) => {
         this.suppressClickUntil = 0;
         if (event.button !== 0 || event.target.closest("input,textarea,select")) return;
@@ -1782,8 +1787,8 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         if (this.gesture.state !== "idle" && event.pointerId === this.pointerId) {
           const state = this.gesture.move(point(event));
           if (["recording", "editing", "dragging", "swiping", "cancelled"].includes(state)) event.preventDefault();
-          if (state === "editing") this.transcriptHint("\u041E\u0442\u043F\u0443\u0441\u0442\u0438\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0442\u0435\u043A\u0441\u0442. \u0415\u0449\u0451 \u043D\u0438\u0436\u0435 \u2014 \u043E\u0442\u043C\u0435\u043D\u0430");
-          if (state === "cancelled") this.transcriptHint("\u0412\u0432\u043E\u0434 \u043E\u0442\u043C\u0435\u043D\u0451\u043D");
+          if (state === "editing") this.transcriptHint("\u041E\u0442\u043F\u0443\u0441\u0442\u0438\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0442\u0435\u043A\u0441\u0442. \u0415\u0449\u0451 \u043D\u0438\u0436\u0435 \u2014 \u043E\u0442\u043C\u0435\u043D\u0430", "editing");
+          if (state === "cancelled") this.transcriptHint("\u0412\u0432\u043E\u0434 \u043E\u0442\u043C\u0435\u043D\u0451\u043D", "cancelled");
         }
       }, { passive: false });
       this.dom.addEventListener("pointerup", (event) => {
@@ -1793,9 +1798,11 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
           return;
         }
         if (event.pointerId !== this.pointerId) return;
+        const cancelled = this.gesture.state === "cancelled";
         const suppress = this.gesture.state !== "holding" && this.gesture.state !== "idle";
         if (suppress) this.suppressClickUntil = Date.now() + 400;
         void this.gesture.end(point(event));
+        if (cancelled) this.$("v02-transcript").hidden = true;
       });
       this.dom.addEventListener("pointercancel", () => {
         this.edgeStart = null;
@@ -1863,6 +1870,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       target.element.classList.add("v02-voice-target");
       const overlay = this.$("v02-transcript");
       overlay.hidden = false;
+      overlay.dataset.state = "recording";
       overlay.style.left = `${Math.max(8, Math.min(p.x - 100, this.win.innerWidth - 280))}px`;
       overlay.style.top = `${Math.max(8, p.y - 75)}px`;
       overlay.textContent = "\u0413\u043E\u0432\u043E\u0440\u0438\u0442\u0435\u2026";
@@ -1883,9 +1891,12 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       });
       voice.asr.speak?.();
     }
-    transcriptHint(text) {
+    transcriptHint(text, state) {
       const el = this.$("v02-transcript");
-      if (el && !el.hidden) el.textContent = `${this.voice?.text || ""}
+      if (!el) return;
+      el.hidden = false;
+      el.dataset.state = state;
+      el.textContent = state === "cancelled" ? text : `${this.voice?.text || ""}
 ${text}`;
     }
     cancelVoice() {
@@ -2782,7 +2793,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-79cdbb52c783df4a";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-59866ee3d598b0af";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const realtime = createRealtimeVoiceAgent({
