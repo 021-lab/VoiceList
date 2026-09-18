@@ -488,11 +488,36 @@ export class Client {
   }
   async finishVoice(target, edit = false) {
     const voice = this.voice; if (!voice) return;
+    // Opening and focusing the editor must stay in the pointer-release call
+    // stack. Mobile browsers may refuse to show the keyboard after the first
+    // await because the user activation has already expired.
+    const initialDraft = (voice.final || voice.text).trim();
+    const editor = edit ? this.editTranscript(initialDraft, target) : null;
     await voice.asr.stop();
     const text = (voice.final || voice.text).trim();
-    this.cancelVoice();
-    if (!text || voice.error) { if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.'); return; }
-    if (edit) this.editTranscript(text, target); else await this.handleInput({ text, context: this.context(target) });
+    if (this.voice === voice) {
+      this.voice = null;
+      voice.target.element.classList.remove('v02-voice-target');
+      if (this.$('v02-transcript')) this.$('v02-transcript').hidden = true;
+    }
+    if (!text || voice.error) {
+      // Keep text entered while recognition was stopping. If the untouched
+      // draft is empty, retain the previous no-transcript behaviour.
+      if (editor && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft && !editor.input.value.trim()) editor.close();
+      if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.');
+      return;
+    }
+    if (edit) {
+      // A final ASR result may arrive during stop(). Apply it only while the
+      // user has not changed the draft that was shown on release.
+      if (this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
+        editor.input.value = text;
+        const end = editor.input.value.length;
+        editor.input.setSelectionRange(end, end);
+      }
+      return;
+    }
+    await this.handleInput({ text, context: this.context(target) });
   }
   editTranscript(text, target) {
     const overlay = this.node('div', { className: 'v02-edit-transcript', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Редактирование распознанного текста' });
@@ -500,7 +525,11 @@ export class Client {
     const nav = this.node('nav'); const cancel = this.node('button', { className: 'btn btn-cancel' }, 'Отмена'); const send = this.node('button', { className: 'v02-primary' }, 'Отправить');
     const close = () => { overlay.remove(); this.transcriptEditor = null; };
     cancel.onclick = close; send.onclick = async () => { if (!input.value.trim()) return; const value = input.value; close(); await this.handleInput({ text: value, context: this.context(target) }); };
-    nav.append(cancel, send); box.append(this.node('h2', {}, 'Исправить текст'), input, nav); overlay.append(box); this.$('app-root').append(overlay); this.transcriptEditor = overlay; input.focus();
+    nav.append(cancel, send); box.append(this.node('h2', {}, 'Исправить текст'), input, nav); overlay.append(box); this.$('app-root').append(overlay); this.transcriptEditor = overlay;
+    try { input.focus({ preventScroll: true }); } catch { input.focus(); }
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+    return { overlay, input, close };
   }
   drag(phase, target, p, delta) {
     const wrap = target.element.closest('.list-item-wrapper'); if (!wrap) return;

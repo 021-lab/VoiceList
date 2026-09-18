@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-f4f9d3a2f336a5b1">
+<meta name="preview-build-hash" content="v02-3342125af4864bec">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -986,7 +986,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-f4f9d3a2f336a5b1";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-3342125af4864bec";
 </script>
 <script>
 (() => {
@@ -2125,15 +2125,29 @@ ${text}`;
     async finishVoice(target, edit = false) {
       const voice = this.voice;
       if (!voice) return;
+      const initialDraft = (voice.final || voice.text).trim();
+      const editor = edit ? this.editTranscript(initialDraft, target) : null;
       await voice.asr.stop();
       const text = (voice.final || voice.text).trim();
-      this.cancelVoice();
+      if (this.voice === voice) {
+        this.voice = null;
+        voice.target.element.classList.remove("v02-voice-target");
+        if (this.$("v02-transcript")) this.$("v02-transcript").hidden = true;
+      }
       if (!text || voice.error) {
+        if (editor && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft && !editor.input.value.trim()) editor.close();
         if (voice.error) this.showToast("\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430: \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443.");
         return;
       }
-      if (edit) this.editTranscript(text, target);
-      else await this.handleInput({ text, context: this.context(target) });
+      if (edit) {
+        if (this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
+          editor.input.value = text;
+          const end = editor.input.value.length;
+          editor.input.setSelectionRange(end, end);
+        }
+        return;
+      }
+      await this.handleInput({ text, context: this.context(target) });
     }
     editTranscript(text, target) {
       const overlay = this.node("div", { className: "v02-edit-transcript", role: "dialog", "aria-modal": "true", "aria-label": "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u043D\u043E\u0433\u043E \u0442\u0435\u043A\u0441\u0442\u0430" });
@@ -2158,7 +2172,14 @@ ${text}`;
       overlay.append(box);
       this.$("app-root").append(overlay);
       this.transcriptEditor = overlay;
-      input.focus();
+      try {
+        input.focus({ preventScroll: true });
+      } catch {
+        input.focus();
+      }
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+      return { overlay, input, close };
     }
     drag(phase, target, p, delta) {
       const wrap = target.element.closest(".list-item-wrapper");
@@ -2985,7 +3006,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-f4f9d3a2f336a5b1";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-3342125af4864bec";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const realtime = createRealtimeVoiceAgent({
