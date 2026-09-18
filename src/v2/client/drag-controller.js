@@ -19,7 +19,7 @@ export class DragController {
     if (index < 0) return;
     for (let i = index + 1; i < all.length && Number(all[i].dataset.level || 0) > originalLevel; i++) children.push(all[i]);
     this.state = { wrapper, children, originalLevel, pendingLevel: originalLevel, offsetY: 0,
-      lastClientY: origin.y, nestBaseX: point.x, rightShifted: false, originalNodes: [...this.container.childNodes],
+      lastClientY: origin.y, nestBaseX: origin.x, rightShifted: false, originalNodes: [...this.container.childNodes],
       initial: new Map(all.map(el => [el, { level: el.dataset.level, style: el.getAttribute('style'), hidden: el.hidden }])),
       childDisplay: new Map(children.map(el => [el, el.style.display])) };
     wrapper.querySelector('.list-item').style.transition = 'none'; wrapper.classList.add('is-dragging'); wrapper.style.transition = 'none';
@@ -30,11 +30,6 @@ export class DragController {
     const s = this.state; if (!s) return;
     const value = `translateY(${s.offsetY}px)`; s.wrapper.style.transform = value;
     for (const child of s.children) child.style.transform = value;
-  }
-  groupEnd(all, index) {
-    const level = Number(all[index]?.dataset.level || 0);
-    while (index + 1 < all.length && Number(all[index + 1].dataset.level || 0) > level) index++;
-    return index;
   }
   moveBefore(reference) {
     const s = this.state, top = s.wrapper.getBoundingClientRect().top;
@@ -59,28 +54,39 @@ export class DragController {
     }
     if (index < visible.length - 1) {
       const next = visible[index + 1], box = next.getBoundingClientRect();
-      if (midpoint > box.top + box.height / 2) this.moveBefore(all[this.groupEnd(all, all.indexOf(next)) + 1] || null);
+      if (midpoint > box.top + box.height / 2) this.moveBefore(next.nextElementSibling);
     }
   }
+  anchor() {
+    const s = this.state, all = this.wrappers(), moving = new Set([s.wrapper, ...s.children]);
+    for (let index = all.indexOf(s.wrapper) - 1; index >= 0; index--) {
+      const candidate = all[index];
+      if (!moving.has(candidate) && !candidate.hidden && candidate.style.display !== 'none' && candidate.offsetParent !== null) return candidate;
+    }
+    return null;
+  }
   updateLevel() {
-    const s = this.state, all = this.wrappers(), index = all.indexOf(s.wrapper);
-    const level = s.rightShifted && index > 0 ? Number(all[index - 1].dataset.level || 0) + 1 : s.originalLevel;
+    const s = this.state, anchor = this.anchor(), anchorLevel = Number(anchor?.dataset.level || 0);
+    const level = anchor ? anchorLevel + (s.rightShifted ? 1 : 0) : 0;
     s.pendingLevel = level; s.wrapper.dataset.level = String(level); s.wrapper.style.marginLeft = `${level * 24}px`;
   }
   update(point) {
     const s = this.state; if (!s || s.settling) return;
     s.offsetY += (point.y - s.lastClientY) * 2; s.lastClientY = point.y;
     this.transform(); this.clamp(); this.checkSwap();
-    if (point.x - s.nestBaseX > 36 && !s.rightShifted) { s.rightShifted = true; s.nestBaseX = point.x; }
+    s.rightShifted = point.x - s.nestBaseX > 36;
     this.updateLevel();
   }
-  snapOutOfDeeperRows() {
-    const s = this.state; if (s.offsetY >= 0) return;
-    const all = this.wrappers(), index = all.indexOf(s.wrapper), end = index + s.children.length;
-    const above = index > 0 ? Number(all[index - 1].dataset.level || 0) : s.originalLevel;
-    const below = end < all.length - 1 ? Number(all[end + 1].dataset.level || 0) : s.originalLevel;
-    if (above <= s.originalLevel && below <= s.originalLevel) return;
-    for (let i = index - 1; i >= 0; i--) if (Number(all[i].dataset.level || 0) <= s.originalLevel) { this.moveBefore(all[i]); break; }
+  dropPlacement() {
+    const s = this.state, moving = new Set([s.wrapper, ...s.children]);
+    const remaining = this.wrappers().filter(el => !moving.has(el));
+    const anchor = this.anchor();
+    if (!anchor) return { level: 0, reference: remaining[0] || null };
+    const anchorIndex = remaining.indexOf(anchor), anchorLevel = Number(anchor.dataset.level || 0);
+    if (s.rightShifted) return { level: anchorLevel + 1, reference: remaining[anchorIndex + 1] || null };
+    let end = anchorIndex;
+    while (end + 1 < remaining.length && Number(remaining[end + 1].dataset.level || 0) > anchorLevel) end++;
+    return { level: anchorLevel, reference: remaining[end + 1] || null };
   }
   autoScroll() {
     const s = this.state; if (!s || s.settling) return;
@@ -105,9 +111,14 @@ export class DragController {
     }
     this.onRestored?.();
   }
-  finish() {
+  finish(point) {
     const s = this.state; if (!s || s.settling) return; this.stopAnimation();
-    if (!s.rightShifted) this.snapOutOfDeeperRows();
+    if (point && Number.isFinite(point.x)) s.rightShifted = point.x - s.nestBaseX > 36;
+    const placement = this.dropPlacement();
+    s.pendingLevel = placement.level;
+    s.wrapper.dataset.level = String(placement.level);
+    s.wrapper.style.marginLeft = `${placement.level * 24}px`;
+    this.moveBefore(placement.reference);
     const delta = s.pendingLevel - s.originalLevel;
     for (const child of s.children) {
       const level = Number(s.initial.get(child).level) + delta;

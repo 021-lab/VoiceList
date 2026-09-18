@@ -535,7 +535,7 @@ export class Client {
       else this.dragController.update(p);
       return;
     }
-    if (phase === 'end') this.dragController.finish(); else this.dragController.cancel();
+    if (phase === 'end') this.dragController.finish(p); else this.dragController.cancel();
   }
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
