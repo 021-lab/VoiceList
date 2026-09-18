@@ -8,10 +8,11 @@ export class ActionService {
     const prior = this.journal.entries.find(e => e.type === 'result' && e.actionId === commandEntryId);
     if (prior) return clone(prior);
     const input = entry.command;
+    const isRollback = input.command === 'rollbackAction' || input.command === 'undo';
     let result;
     try {
       if ((expectedRevision ?? entry.expectedRevision) !== this.graph.revision) fail('CONFLICT', 'Документ изменился после подготовки команды');
-      if (input.command === 'rollbackAction' || input.command === 'undo') {
+      if (isRollback) {
         const actionId = input.command === 'undo'
           ? this.journal.actions().filter(a => a.canRollback).at(-1)?.id : input.actId;
         if (!actionId) fail('NOT_FOUND', 'Нечего откатывать');
@@ -30,13 +31,13 @@ export class ActionService {
       return this.journal.append({
         type: 'result', actionId: entry.id, requestId: entry.requestId, rootActionId: entry.rootActionId || entry.id,
         sessionId: entry.sessionId, command: input, status: 'applied', ...result,
-        label: result.label || 'Готово', reply: entry.reply || '', silent: input.command === 'toggleCollapse'
+        label: result.label || 'Готово', reply: entry.reply || '', silent: input.command === 'toggleCollapse' || isRollback
       });
     } catch (error) {
       return this.journal.append({
         type: 'result', actionId: entry.id, requestId: entry.requestId, rootActionId: entry.rootActionId || entry.id,
         sessionId: entry.sessionId, command: input, status: 'failed', label: safeError(error).message,
-        error: safeError(error), changes: [], revision: this.graph.revision
+        error: safeError(error), changes: [], revision: this.graph.revision, silent: isRollback
       });
     }
   }

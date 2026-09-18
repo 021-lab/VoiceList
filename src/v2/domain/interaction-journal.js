@@ -21,8 +21,10 @@ export class InteractionJournal {
     return this.entries.filter(e => e.type === 'input' && !this.entries.some(x => x.type === 'settled' && x.requestId === e.id)).map(clone);
   }
   actions() {
-    const results = this.entries.filter(e => e.type === 'result' && !e.silent);
-    const undone = new Set(results.filter(e => e.status === 'applied').flatMap(e => e.undoneIds || []));
+    const results = this.entries.filter(e => e.type === 'result' && !e.silent && !['toggleCollapse', 'rollbackAction', 'undo'].includes(e.command?.command));
+    // Silent rollback outcomes still change the public state of their source
+    // actions even though they never become actions of their own.
+    const undone = new Set(this.entries.filter(e => e.type === 'result' && e.status === 'applied').flatMap(e => e.undoneIds || []));
     return results.map(result => {
       const request = this.get(result.requestId);
       return {
@@ -46,11 +48,12 @@ export class InteractionJournal {
   dialogue(actionId) {
     const action = this.actions().find(a => a.id === actionId);
     if (!action) return [];
+    const source = this.entries.find(e => e.type === 'result' && e.actionId === actionId);
     const root = action.rootActionId || actionId;
     const related = this.entries.filter(e => e.type === 'result' && (e.rootActionId === root || e.actionId === root));
     const ids = new Set(related.map(e => e.requestId));
     return this.entries.flatMap(e => {
-      if (e.type === 'input' && (ids.has(e.id) || e.input.context.actionId === root || e.input.context.actionId === actionId)) return [{ role: 'user', text: e.input.text || e.input.command?.transcript || e.input.command?.command || '', id: e.id }];
+      if (e.type === 'input' && e.id !== source?.requestId && (ids.has(e.id) || e.input.context.actionId === root || e.input.context.actionId === actionId)) return [{ role: 'user', text: e.input.text || e.input.command?.transcript || e.input.command?.command || '', id: e.id }];
       if (e.type === 'result' && (e.rootActionId === root || e.actionId === root)) return [{ role: 'assistant', text: e.reply || e.label, id: e.id }];
       return [];
     });
