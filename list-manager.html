@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-3342125af4864bec">
+<meta name="preview-build-hash" content="v02-8624b75b981813c1">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -986,7 +986,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-3342125af4864bec";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-8624b75b981813c1";
 </script>
 <script>
 (() => {
@@ -1426,8 +1426,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-3342125af4864bec";
 .v02-correction-form{display:flex;gap:8px;align-items:flex-end}.v02-correction-form textarea{flex:1;min-height:78px;border:1px solid #ccd0d5;border-radius:10px;padding:12px;font:inherit}
 .v02-correction-form button,.v02-primary{border:0;border-radius:10px;background:#007aff;color:white;padding:12px 16px;font:inherit;cursor:pointer}
 .v02-error{background:#fff1f0;color:#9b2020;padding:12px;border-radius:10px;margin:12px}
-.v02-edit-transcript{position:fixed;inset:0;z-index:2400;background:#0006;display:grid;place-items:center;padding:20px}
-.v02-edit-transcript section{width:min(500px,100%);background:white;padding:22px;border-radius:18px;display:grid;gap:14px}.v02-edit-transcript textarea{width:100%;min-height:140px;padding:12px;font:inherit}.v02-edit-transcript nav{display:flex;justify-content:flex-end;gap:10px}
+.v02-edit-transcript{--v02-editor-top:max(12px,env(safe-area-inset-top));position:fixed;inset:0;z-index:2400;background:#0006;display:grid;place-items:start center;padding:var(--v02-editor-top) 20px 0}
+.v02-edit-transcript section{width:min(500px,100%);height:min(310px,calc(50vh - var(--v02-editor-top)));max-height:calc(50vh - var(--v02-editor-top));height:min(310px,calc(50dvh - var(--v02-editor-top)));max-height:calc(50dvh - var(--v02-editor-top));background:white;padding:clamp(10px,2.6dvh,22px);border-radius:18px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:clamp(6px,1.65dvh,14px);overflow-y:auto}.v02-edit-transcript textarea{width:100%;height:140px;min-height:0;max-height:100%;padding:12px;font:inherit;overflow-y:auto}.v02-edit-transcript nav{display:flex;justify-content:flex-end;gap:10px}
 .v02-task-details{width:100%;min-height:90px;border:1px solid #ddd;padding:12px;border-radius:10px;font:inherit}.v02-search{padding:10px 12px;display:flex;gap:8px}.v02-search input{flex:1;min-width:0;border:1px solid #ddd;border-radius:10px;padding:9px;font:inherit}
 .v02-connection{font-size:12px;padding:6px 12px;background:#fff4d9;color:#684200}.v02-status-select{border:0;background:transparent;max-width:90px;font:inherit;color:inherit}
 .task-page-subtask{cursor:pointer}.v02-action-label{font-weight:600}.action-log-row{cursor:pointer}.list-item-wrapper{touch-action:pan-y}
@@ -3006,7 +3006,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-3342125af4864bec";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-8624b75b981813c1";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const realtime = createRealtimeVoiceAgent({
