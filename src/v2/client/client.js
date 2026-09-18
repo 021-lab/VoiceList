@@ -232,9 +232,14 @@ export class Client {
     for (const [id, menu] of Object.entries(menus)) if (this.$(id)) this.$(id).dataset.componentId = `menu:${menu}`;
     this.bindGestures(root);
     this.win.addEventListener('pagehide', () => this.disconnect());
-    const cancelInput = () => { this.gesture.cancel(); this.dragController.cancel(); };
-    this.win.addEventListener('blur', cancelInput);
-    this.dom.addEventListener('visibilitychange', () => { if (this.dom.visibilityState === 'hidden') cancelInput(); });
+    // A microphone permission prompt blurs the window. Cancelling the whole
+    // gesture here would stop ASR immediately, so blur only aborts an active
+    // drag. Page hiding still cancels every in-progress input safely.
+    this.win.addEventListener('blur', () => {
+      if (this.gesture.state === 'dragging') this.gesture.cancel();
+      else this.dragController.cancel();
+    });
+    this.dom.addEventListener('visibilitychange', () => { if (this.dom.visibilityState === 'hidden') { this.gesture.cancel(); this.dragController.cancel(); } });
     this.win.addEventListener('online', () => void this.resume());
   }
   render(document) {
