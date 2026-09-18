@@ -500,23 +500,20 @@ export class Client {
       voice.target.element.classList.remove('v02-voice-target');
       if (this.$('v02-transcript')) this.$('v02-transcript').hidden = true;
     }
-    if (!text || voice.error) {
-      // Keep text entered while recognition was stopping. If the untouched
-      // draft is empty, retain the previous no-transcript behaviour.
-      if (editor && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft && !editor.input.value.trim()) editor.close();
-      if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.');
-      return;
-    }
     if (edit) {
       // A final ASR result may arrive during stop(). Apply it only while the
       // user has not changed the draft that was shown on release.
-      if (this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
+      if (text && !voice.error && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
         editor.input.value = text;
         const end = editor.input.value.length;
         editor.input.setSelectionRange(end, end);
       }
+      // Editing mode is also the text-input fallback. Keep its focused editor
+      // open when recognition yields no text or reports an error.
+      if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.');
       return;
     }
+    if (!text || voice.error) { if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.'); return; }
     await this.handleInput({ text, context: this.context(target) });
   }
   editTranscript(text, target) {

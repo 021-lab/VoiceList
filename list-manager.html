@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-8624b75b981813c1">
+<meta name="preview-build-hash" content="v02-cac48b10657c4856">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -986,7 +986,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-8624b75b981813c1";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-cac48b10657c4856";
 </script>
 <script>
 (() => {
@@ -1427,7 +1427,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-8624b75b981813c1";
 .v02-correction-form button,.v02-primary{border:0;border-radius:10px;background:#007aff;color:white;padding:12px 16px;font:inherit;cursor:pointer}
 .v02-error{background:#fff1f0;color:#9b2020;padding:12px;border-radius:10px;margin:12px}
 .v02-edit-transcript{--v02-editor-top:max(12px,env(safe-area-inset-top));position:fixed;inset:0;z-index:2400;background:#0006;display:grid;place-items:start center;padding:var(--v02-editor-top) 20px 0}
-.v02-edit-transcript section{width:min(500px,100%);height:min(310px,calc(50vh - var(--v02-editor-top)));max-height:calc(50vh - var(--v02-editor-top));height:min(310px,calc(50dvh - var(--v02-editor-top)));max-height:calc(50dvh - var(--v02-editor-top));background:white;padding:clamp(10px,2.6dvh,22px);border-radius:18px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:clamp(6px,1.65dvh,14px);overflow-y:auto}.v02-edit-transcript textarea{width:100%;height:140px;min-height:0;max-height:100%;padding:12px;font:inherit;overflow-y:auto}.v02-edit-transcript nav{display:flex;justify-content:flex-end;gap:10px}
+.v02-edit-transcript section{width:min(500px,100%);height:min(310px,calc(50vh - var(--v02-editor-top)));max-height:calc(50vh - var(--v02-editor-top));height:min(310px,calc(50dvh - var(--v02-editor-top)));max-height:calc(50dvh - var(--v02-editor-top));background:white;padding:clamp(10px,2.6dvh,22px);border-radius:18px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:clamp(6px,1.65dvh,14px);overflow-y:auto}.v02-edit-transcript textarea{width:100%;height:auto;min-height:0;max-height:none;margin-top:1em;padding:12px;font:inherit;overflow-y:auto}.v02-edit-transcript nav{display:flex;justify-content:flex-end;gap:10px}
 .v02-task-details{width:100%;min-height:90px;border:1px solid #ddd;padding:12px;border-radius:10px;font:inherit}.v02-search{padding:10px 12px;display:flex;gap:8px}.v02-search input{flex:1;min-width:0;border:1px solid #ddd;border-radius:10px;padding:9px;font:inherit}
 .v02-connection{font-size:12px;padding:6px 12px;background:#fff4d9;color:#684200}.v02-status-select{border:0;background:transparent;max-width:90px;font:inherit;color:inherit}
 .task-page-subtask{cursor:pointer}.v02-action-label{font-weight:600}.action-log-row{cursor:pointer}.list-item-wrapper{touch-action:pan-y}
@@ -2134,17 +2134,17 @@ ${text}`;
         voice.target.element.classList.remove("v02-voice-target");
         if (this.$("v02-transcript")) this.$("v02-transcript").hidden = true;
       }
-      if (!text || voice.error) {
-        if (editor && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft && !editor.input.value.trim()) editor.close();
-        if (voice.error) this.showToast("\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430: \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443.");
-        return;
-      }
       if (edit) {
-        if (this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
+        if (text && !voice.error && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
           editor.input.value = text;
           const end = editor.input.value.length;
           editor.input.setSelectionRange(end, end);
         }
+        if (voice.error) this.showToast("\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430: \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443.");
+        return;
+      }
+      if (!text || voice.error) {
+        if (voice.error) this.showToast("\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430: \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443.");
         return;
       }
       await this.handleInput({ text, context: this.context(target) });
@@ -3006,7 +3006,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-8624b75b981813c1";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-cac48b10657c4856";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const realtime = createRealtimeVoiceAgent({
