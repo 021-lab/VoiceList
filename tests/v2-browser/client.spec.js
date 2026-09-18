@@ -126,10 +126,23 @@ test('native touch hold-up selects drag, subsequent up-down moves preserve drag 
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: nextY }] });
     await page.waitForTimeout(30);
     await expect.poll(() => page.evaluate(() => window.__voiceListClient.gesture.state)).toBe('dragging');
+    await expect(second).toHaveClass(/is-dragging/);
+    await expect(second.locator('.list-item')).toHaveCSS('border-top-width', '2px');
+    await expect(second.locator('.list-item')).toHaveCSS('border-top-color', 'rgb(0, 122, 255)');
+    await expect(second.locator('.list-item')).toHaveCSS('background-color', 'rgb(248, 251, 255)');
+    expect(await second.locator('.list-item').evaluate(el => getComputedStyle(el).boxShadow)).not.toBe('none');
+    expect(await second.evaluate(el => el.style.transform)).toMatch(/translateY\(/);
+    await expect(second.locator('.item-line1')).toBeVisible();
   }
+  const previewOrder = await page.locator('#list-container .list-item-wrapper').evaluateAll(elements => elements.map(el => el.dataset.id));
+  expect(previewOrder.indexOf(secondId)).toBeLessThan(previewOrder.indexOf(firstId));
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   const order = () => page.locator('#list-container .list-item-wrapper').evaluateAll(elements => elements.map(el => el.dataset.id));
   await expect.poll(async () => { const ids = await order(); return ids.indexOf(secondId) < ids.indexOf(firstId); }).toBe(true);
+  await expect.poll(() => page.evaluate(([firstId, secondId]) => {
+    const nodes = window.__voiceListClient.nodes;
+    return nodes.get(`task:${secondId}`)?.props.order < nodes.get(`task:${firstId}`)?.props.order;
+  }, [firstId, secondId])).toBe(true);
   await page.reload();
   await expect.poll(async () => { const ids = await order(); return ids.includes(secondId) && ids.indexOf(secondId) < ids.indexOf(firstId); }).toBe(true);
   await context.close();
@@ -167,5 +180,68 @@ test('native touch down frames transcript until release and Send; deeper down ca
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(scrollBefore);
   await page.waitForTimeout(350); await expect(page.locator('#v02-transcript')).toBeHidden(); expect(sent).toHaveLength(before);
+  await context.close();
+});
+
+test('full-card drag moves collapsed descendants as one group with complete arranged command', async ({ page }) => {
+  const stamp = Date.now();
+  const before = await add(page, `Group before ${stamp}`), parent = await add(page, `Group parent ${stamp}`);
+  const beforeId = await before.getAttribute('data-id'), parentId = await parent.getAttribute('data-id');
+  await parent.click(); await expect(page.locator('#task-page')).toHaveClass(/open/);
+  await page.locator('#task-page-child-input').fill(`Group child ${stamp}`); await page.locator('#task-page-add-child').click();
+  const childEditor = page.locator('.task-page-subtask').filter({ hasText: `Group child ${stamp}` }); await expect(childEditor).toBeVisible();
+  const childId = await childEditor.getAttribute('data-id'); createdTaskIds.push(childId);
+  await page.locator('#task-page-close').click(); await parent.click();
+  const child = page.locator(`.list-item-wrapper[data-id="${childId}"]`); await expect(child).toBeHidden();
+  await parent.scrollIntoViewIfNeeded(); await page.evaluate(() => { window.__voiceTest = { phrase: '' }; });
+  const calls = []; page.on('request', req => { if (req.url().endsWith('/api/v2/input') && req.postDataJSON()?.command?.command === 'reorderItems') calls.push(req.postDataJSON()); });
+  const box = await parent.boundingBox(), x = box.x + 100, y = box.y + box.height / 2;
+  await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(350);
+  await page.mouse.move(x, y - 40, { steps: 4 });
+  await expect(parent).toHaveClass(/is-dragging/); await expect(child).toBeHidden();
+  const liveOrder = await page.locator('#list-container .list-item-wrapper').evaluateAll(els => els.map(el => el.dataset.id));
+  expect(liveOrder.indexOf(parentId)).toBeLessThan(liveOrder.indexOf(beforeId));
+  expect(liveOrder.indexOf(childId)).toBe(liveOrder.indexOf(parentId) + 1); expect(calls).toHaveLength(0);
+  await page.mouse.up(); await expect(parent).not.toHaveClass(/is-dragging/);
+  await expect.poll(() => calls.length).toBeGreaterThan(0);
+  const keys = new Set(calls.map(call => JSON.stringify(call.key))); expect(keys.size).toBe(1);
+  expect(calls[0].command.payload.arranged.find(entry => entry.id === childId).parentId).toBe(parentId);
+  expect(calls[0].command.payload.arranged.find(entry => entry.id === parentId).parentId).toBeNull();
+  await expect.poll(() => page.evaluate(id => window.__voiceListClient.nodes.get(`task:${id}`).props.parentId, parentId)).toBeNull();
+  await page.waitForTimeout(400); await page.reload();
+  await expect.poll(() => page.evaluate(([parentId, beforeId]) => {
+    const ids = [...document.querySelectorAll('#list-container .list-item-wrapper')].map(el => el.dataset.id);
+    return ids.includes(parentId) && ids.indexOf(parentId) < ids.indexOf(beforeId);
+  }, [parentId, beforeId])).toBe(true);
+  await expect.poll(() => page.evaluate(id => window.__voiceListClient.nodes.get(`task:${id}`)?.props.parentId, childId)).toBe(parentId);
+});
+
+test('native drag cancel restores DOM without request; deliberate right shift nests on drop', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage(); await page.goto('/'); await expect.poll(() => page.evaluate(() => Boolean(window.__voiceListClient?.document))).toBe(true);
+  const stamp = Date.now(), anchor = await add(page, `Nest anchor ${stamp}`), moving = await add(page, `Nest moving ${stamp}`);
+  const anchorId = await anchor.getAttribute('data-id'), movingId = await moving.getAttribute('data-id');
+  await moving.scrollIntoViewIfNeeded(); await page.evaluate(() => { window.__voiceTest = { phrase: '' }; });
+  const calls = []; page.on('request', req => { if (req.url().endsWith('/api/v2/input')) calls.push(req.postDataJSON()); });
+  const original = await page.locator('#list-container .list-item-wrapper').evaluateAll(els => els.map(el => el.dataset.id));
+  let box = await moving.boundingBox(), x = box.x + 90, y = box.y + box.height / 2;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await page.waitForTimeout(350);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - 40 }] });
+  await expect(moving).toHaveClass(/is-dragging/);
+  expect(await page.locator('#list-container .list-item-wrapper').evaluateAll(els => els.map(el => el.dataset.id))).not.toEqual(original);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  await expect(moving).not.toHaveClass(/is-dragging/);
+  expect(await page.locator('#list-container .list-item-wrapper').evaluateAll(els => els.map(el => el.dataset.id))).toEqual(original);
+  expect(await moving.evaluate(el => el.style.transform)).toBe(''); expect(calls).toHaveLength(0);
+  box = await moving.boundingBox(); y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await page.waitForTimeout(350);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - 19 }] });
+  await expect(moving).toHaveAttribute('data-level', '0');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 45, y: y - 19 }] });
+  await expect(moving).toHaveAttribute('data-level', '1');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => page.evaluate(id => window.__voiceListClient.nodes.get(`task:${id}`)?.props.parentId, movingId)).toBe(anchorId);
+  await page.reload(); await expect.poll(() => page.evaluate(id => window.__voiceListClient.nodes.get(`task:${id}`)?.props.parentId, movingId)).toBe(anchorId);
   await context.close();
 });

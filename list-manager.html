@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-59866ee3d598b0af">
+<meta name="preview-build-hash" content="v02-7fae5c0a097bd9a4">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -986,7 +986,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-59866ee3d598b0af";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-7fae5c0a097bd9a4";
 </script>
 <script>
 (() => {
@@ -1216,6 +1216,199 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-59866ee3d598b0af";
     }
   };
 
+  // src/v2/client/drag-controller.js
+  function deriveArrangedFromWrappers(wrappers) {
+    const stack = [], orders = /* @__PURE__ */ new Map();
+    return wrappers.map((el) => {
+      const id = el.dataset.id, level = Number(el.dataset.level || 0);
+      while (stack.length > level) stack.pop();
+      const parentId = level === 0 ? null : stack[level - 1], order = (orders.get(parentId) || 0) + 10;
+      orders.set(parentId, order);
+      stack[level] = id;
+      stack.length = level + 1;
+      return { id, parentId, order };
+    });
+  }
+  var DragController = class {
+    constructor({ container, header, window: win, onDrop, onRestored }) {
+      Object.assign(this, { container, header, win, onDrop, onRestored });
+      this.state = null;
+    }
+    get active() {
+      return !!this.state;
+    }
+    wrappers() {
+      return [...this.container.querySelectorAll(".list-item-wrapper")];
+    }
+    start(wrapper, point2, origin = point2) {
+      this.cancel();
+      const all = this.wrappers(), index = all.indexOf(wrapper), originalLevel = Number(wrapper.dataset.level || 0), children = [];
+      if (index < 0) return;
+      for (let i = index + 1; i < all.length && Number(all[i].dataset.level || 0) > originalLevel; i++) children.push(all[i]);
+      this.state = {
+        wrapper,
+        children,
+        originalLevel,
+        pendingLevel: originalLevel,
+        offsetY: 0,
+        lastClientY: origin.y,
+        nestBaseX: point2.x,
+        rightShifted: false,
+        originalNodes: [...this.container.childNodes],
+        initial: new Map(all.map((el) => [el, { level: el.dataset.level, style: el.getAttribute("style"), hidden: el.hidden }])),
+        childDisplay: new Map(children.map((el) => [el, el.style.display]))
+      };
+      wrapper.querySelector(".list-item").style.transition = "none";
+      wrapper.classList.add("is-dragging");
+      wrapper.style.transition = "none";
+      for (const child of children) child.style.display = "none";
+      this.update(point2);
+      this.raf = this.win.requestAnimationFrame(() => this.autoScroll());
+    }
+    transform() {
+      const s = this.state;
+      if (!s) return;
+      const value = `translateY(${s.offsetY}px)`;
+      s.wrapper.style.transform = value;
+      for (const child of s.children) child.style.transform = value;
+    }
+    groupEnd(all, index) {
+      const level = Number(all[index]?.dataset.level || 0);
+      while (index + 1 < all.length && Number(all[index + 1].dataset.level || 0) > level) index++;
+      return index;
+    }
+    moveBefore(reference) {
+      const s = this.state, top = s.wrapper.getBoundingClientRect().top;
+      this.container.insertBefore(s.wrapper, reference);
+      for (const child of s.children) this.container.insertBefore(child, reference);
+      s.offsetY += top - s.wrapper.getBoundingClientRect().top;
+      this.transform();
+    }
+    clamp() {
+      const s = this.state, rect = s.wrapper.getBoundingClientRect(), top = this.header.getBoundingClientRect().bottom - 30;
+      if (rect.top < top) s.offsetY += top - rect.top;
+      else if (rect.bottom > this.win.innerHeight + 30) s.offsetY -= rect.bottom - this.win.innerHeight - 30;
+      this.transform();
+    }
+    checkSwap() {
+      const s = this.state, all = this.wrappers();
+      const visible = all.filter((el) => el === s.wrapper || !s.children.includes(el) && !el.hidden && el.style.display !== "none" && el.offsetParent !== null);
+      const index = visible.indexOf(s.wrapper), rect = s.wrapper.getBoundingClientRect(), midpoint = rect.top + rect.height / 2;
+      if (index > 0) {
+        const previous = visible[index - 1], box = previous.getBoundingClientRect();
+        if (midpoint < box.top + box.height / 2) {
+          this.moveBefore(previous);
+          return;
+        }
+      }
+      if (index < visible.length - 1) {
+        const next = visible[index + 1], box = next.getBoundingClientRect();
+        if (midpoint > box.top + box.height / 2) this.moveBefore(all[this.groupEnd(all, all.indexOf(next)) + 1] || null);
+      }
+    }
+    updateLevel() {
+      const s = this.state, all = this.wrappers(), index = all.indexOf(s.wrapper);
+      const level = s.rightShifted && index > 0 ? Number(all[index - 1].dataset.level || 0) + 1 : s.originalLevel;
+      s.pendingLevel = level;
+      s.wrapper.dataset.level = String(level);
+      s.wrapper.style.marginLeft = `${level * 24}px`;
+    }
+    update(point2) {
+      const s = this.state;
+      if (!s || s.settling) return;
+      s.offsetY += (point2.y - s.lastClientY) * 2;
+      s.lastClientY = point2.y;
+      this.transform();
+      this.clamp();
+      this.checkSwap();
+      if (point2.x - s.nestBaseX > 36 && !s.rightShifted) {
+        s.rightShifted = true;
+        s.nestBaseX = point2.x;
+      }
+      this.updateLevel();
+    }
+    snapOutOfDeeperRows() {
+      const s = this.state;
+      if (s.offsetY >= 0) return;
+      const all = this.wrappers(), index = all.indexOf(s.wrapper), end = index + s.children.length;
+      const above = index > 0 ? Number(all[index - 1].dataset.level || 0) : s.originalLevel;
+      const below = end < all.length - 1 ? Number(all[end + 1].dataset.level || 0) : s.originalLevel;
+      if (above <= s.originalLevel && below <= s.originalLevel) return;
+      for (let i = index - 1; i >= 0; i--) if (Number(all[i].dataset.level || 0) <= s.originalLevel) {
+        this.moveBefore(all[i]);
+        break;
+      }
+    }
+    autoScroll() {
+      const s = this.state;
+      if (!s || s.settling) return;
+      const rect = s.wrapper.getBoundingClientRect(), top = this.header.getBoundingClientRect().bottom;
+      const all = this.wrappers(), index = all.indexOf(s.wrapper);
+      let speed = 0;
+      if (rect.top < top && index > 0) speed = -Math.min((top - rect.top) / 5 + 2, 14);
+      else if (rect.bottom > this.win.innerHeight && index + s.children.length < all.length - 1) speed = Math.min((rect.bottom - this.win.innerHeight) / 5 + 2, 14);
+      if (speed) {
+        const before = this.win.scrollY;
+        this.win.scrollBy(0, speed);
+        s.offsetY += this.win.scrollY - before;
+        this.transform();
+        this.clamp();
+        this.checkSwap();
+        this.updateLevel();
+      }
+      this.raf = this.win.requestAnimationFrame(() => this.autoScroll());
+    }
+    stopAnimation() {
+      this.win.cancelAnimationFrame(this.raf);
+      this.raf = null;
+      clearTimeout(this.dropTimer);
+    }
+    cancel() {
+      this.stopAnimation();
+      const s = this.state;
+      if (!s) return;
+      this.state = null;
+      for (const node of s.originalNodes) this.container.appendChild(node);
+      for (const [el, before] of s.initial) {
+        el.dataset.level = before.level;
+        el.hidden = before.hidden;
+        if (before.style === null) el.removeAttribute("style");
+        else el.setAttribute("style", before.style);
+        el.classList.remove("is-dragging");
+        el.querySelector(".list-item")?.style.removeProperty("transition");
+      }
+      this.onRestored?.();
+    }
+    finish() {
+      const s = this.state;
+      if (!s || s.settling) return;
+      this.stopAnimation();
+      if (!s.rightShifted) this.snapOutOfDeeperRows();
+      const delta = s.pendingLevel - s.originalLevel;
+      for (const child of s.children) {
+        const level = Number(s.initial.get(child).level) + delta;
+        child.dataset.level = String(level);
+        child.style.marginLeft = `${level * 24}px`;
+        child.style.display = s.childDisplay.get(child);
+        child.style.transform = "";
+        child.style.transition = "transform 0.22s cubic-bezier(.4,0,.2,1)";
+      }
+      s.wrapper.querySelector(".list-item").style.transition = "";
+      s.wrapper.style.transition = "transform 0.22s cubic-bezier(.4,0,.2,1)";
+      s.wrapper.style.transform = "";
+      s.settling = true;
+      this.dropTimer = setTimeout(() => {
+        if (this.state !== s) return;
+        s.wrapper.classList.remove("is-dragging");
+        s.wrapper.style.transition = "";
+        for (const child of s.children) child.style.transition = "";
+        const arranged = deriveArrangedFromWrappers(this.wrappers());
+        this.state = null;
+        this.onDrop?.(s.wrapper.dataset.id, arranged);
+      }, 220);
+    }
+  };
+
   // src/v2/client/styles.js
   var clientStyles = `
 [hidden]{display:none!important}
@@ -1236,8 +1429,8 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-59866ee3d598b0af";
 .v02-edit-transcript{position:fixed;inset:0;z-index:2400;background:#0006;display:grid;place-items:center;padding:20px}
 .v02-edit-transcript section{width:min(500px,100%);background:white;padding:22px;border-radius:18px;display:grid;gap:14px}.v02-edit-transcript textarea{width:100%;min-height:140px;padding:12px;font:inherit}.v02-edit-transcript nav{display:flex;justify-content:flex-end;gap:10px}
 .v02-task-details{width:100%;min-height:90px;border:1px solid #ddd;padding:12px;border-radius:10px;font:inherit}.v02-search{padding:10px 12px;display:flex;gap:8px}.v02-search input{flex:1;min-width:0;border:1px solid #ddd;border-radius:10px;padding:9px;font:inherit}
-.v02-drag-target{border-top:3px solid #007aff}.v02-drag-nest{outline:2px solid #007aff}.v02-connection{font-size:12px;padding:6px 12px;background:#fff4d9;color:#684200}.v02-status-select{border:0;background:transparent;max-width:90px;font:inherit;color:inherit}
-.task-page-subtask{cursor:pointer}.v02-action-label{font-weight:600}.action-log-row{cursor:pointer}.list-item-wrapper{touch-action:pan-y}.v02-voice-target,.is-dragging{touch-action:none}
+.v02-connection{font-size:12px;padding:6px 12px;background:#fff4d9;color:#684200}.v02-status-select{border:0;background:transparent;max-width:90px;font:inherit;color:inherit}
+.task-page-subtask{cursor:pointer}.v02-action-label{font-weight:600}.action-log-row{cursor:pointer}.list-item-wrapper{touch-action:pan-y}
 button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3px}.v02-action-page h2{font-size:20px}.v02-action-page small{color:#555}
 `;
 
@@ -1340,6 +1533,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       this.connected = false;
       clearTimeout(this.pollTimer);
       this.gesture.cancel();
+      this.dragController?.cancel();
       this.realtime?.stop();
     }
     async resume(cursor = this.cursor) {
@@ -1361,7 +1555,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         }
         for (const effect of update.uiEffects || []) await this.navigate(effect.view || "list", effect);
         this.deferredRefresh ||= changed || update.reset || !this.document;
-        if (this.deferredRefresh && this.gesture.state === "idle" && !this.editorDirty && !this.transcriptEditor) {
+        if (this.deferredRefresh && this.gesture.state === "idle" && !this.dragController?.active && !this.editorDirty && !this.transcriptEditor) {
           await this.loadDocument();
           this.deferredRefresh = false;
         }
@@ -1495,6 +1689,16 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       const style = this.node("style", {}, clientStyles);
       this.dom.head.append(style);
       const root = this.$("app-root");
+      this.dragController = new DragController({
+        container: this.$("list-container"),
+        header: root.querySelector("header"),
+        window: this.win,
+        onDrop: (id, arranged) => {
+          this.applyCollapse();
+          void this.command("reorderItems", id, { arranged });
+        },
+        onRestored: () => this.applyCollapse()
+      });
       root.prepend(this.node("div", { id: "v02-connection", className: "v02-connection", role: "status", hidden: true }));
       root.append(this.node("div", { id: "v02-toast-stack", className: "v02-toast-stack", "aria-live": "polite" }));
       root.append(this.node("div", { id: "v02-transcript", className: "v02-transcript", hidden: true, "aria-live": "polite" }));
@@ -1548,6 +1752,14 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       for (const [id, menu] of Object.entries(menus)) if (this.$(id)) this.$(id).dataset.componentId = `menu:${menu}`;
       this.bindGestures(root);
       this.win.addEventListener("pagehide", () => this.disconnect());
+      const cancelInput = () => {
+        this.gesture.cancel();
+        this.dragController.cancel();
+      };
+      this.win.addEventListener("blur", cancelInput);
+      this.dom.addEventListener("visibilitychange", () => {
+        if (this.dom.visibilityState === "hidden") cancelInput();
+      });
       this.win.addEventListener("online", () => void this.resume());
     }
     render(document2) {
@@ -1780,7 +1992,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         const node = this.nodes.get(element.dataset.componentId);
         const taskId = node?.props.taskId || element.closest("[data-id]")?.dataset.id;
         this.pointerId = event.pointerId;
-        this.gesture.begin(point(event), { id: element.dataset.componentId, element, node, taskId, draggable: !!taskId });
+        this.gesture.begin(point(event), { id: element.dataset.componentId, element, node, taskId, draggable: !!taskId && this.viewContext.view === "list" });
       });
       this.dom.addEventListener("pointermove", (event) => {
         if (this.edgeStart) return;
@@ -1950,34 +2162,12 @@ ${text}`;
       const wrap = target.element.closest(".list-item-wrapper");
       if (!wrap) return;
       if (phase === "move") {
-        wrap.classList.add("is-dragging");
-        const candidates = [...this.$("list-container").querySelectorAll(".list-item-wrapper")].filter((el) => !el.hidden && el !== wrap);
-        this.dropTarget?.classList.remove("v02-drag-target", "v02-drag-nest");
-        this.dropTarget = candidates.find((el) => {
-          const rect = el.getBoundingClientRect();
-          return p.y >= rect.top && p.y <= rect.bottom;
-        }) || null;
-        this.dropTarget?.classList.add(delta.dx > 60 ? "v02-drag-nest" : "v02-drag-target");
-        if (p.y < 80) this.win.scrollBy?.(0, -12);
-        else if (p.y > this.win.innerHeight - 80) this.win.scrollBy?.(0, 12);
+        if (!this.dragController.active) this.dragController.start(wrap, p, { x: p.x - delta.dx, y: p.y - delta.dy });
+        else this.dragController.update(p);
         return;
       }
-      wrap.classList.remove("is-dragging");
-      const drop = this.dropTarget;
-      drop?.classList.remove("v02-drag-target", "v02-drag-nest");
-      this.dropTarget = null;
-      if (phase !== "end" || !drop) return;
-      if (delta.dx > 60) {
-        void this.command("setParent", target.taskId, { parentId: drop.dataset.id });
-        return;
-      }
-      const siblings = [...this.nodes.values()].filter((node) => node.type === "task" && node.props.parentId === target.node.props.parentId);
-      const destination = siblings.findIndex((node) => node.props.taskId === drop.dataset.id);
-      if (destination < 0) return;
-      const moving = siblings.find((node) => node.props.taskId === target.taskId);
-      const ordered = siblings.filter((node) => node !== moving);
-      ordered.splice(destination, 0, moving);
-      void this.command("reorderItems", target.taskId, { arranged: ordered.map((node, index) => ({ id: node.props.taskId, parentId: node.props.parentId ?? null, order: (index + 1) * 10 })) });
+      if (phase === "end") this.dragController.finish();
+      else this.dragController.cancel();
     }
     swipe(phase, target, p, delta) {
       if (!target.taskId) return;
@@ -2793,7 +2983,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-59866ee3d598b0af";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-7fae5c0a097bd9a4";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const realtime = createRealtimeVoiceAgent({

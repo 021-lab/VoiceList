@@ -2,6 +2,7 @@ import { BrowserASR } from '../../asr-browser.js';
 import { MockASR } from '../../asr-mock.js';
 import { deadlineDaysLabel, deadlineFromToday } from '../../task-deadline.js';
 import { GestureController } from './gesture-controller.js';
+import { DragController } from './drag-controller.js';
 import { clientStyles } from './styles.js';
 
 const statuses = ['Open', 'Focus', 'Pause', 'Done', 'Archive', 'Info'];
@@ -73,6 +74,7 @@ export class Client {
     this.connected = false;
     clearTimeout(this.pollTimer);
     this.gesture.cancel();
+    this.dragController?.cancel();
     this.realtime?.stop();
   }
   async resume(cursor = this.cursor) {
@@ -91,7 +93,7 @@ export class Client {
       }
       for (const effect of update.uiEffects || []) await this.navigate(effect.view || 'list', effect);
       this.deferredRefresh ||= changed || update.reset || !this.document;
-      if (this.deferredRefresh && this.gesture.state === 'idle' && !this.editorDirty && !this.transcriptEditor) { await this.loadDocument(); this.deferredRefresh = false; }
+      if (this.deferredRefresh && this.gesture.state === 'idle' && !this.dragController?.active && !this.editorDirty && !this.transcriptEditor) { await this.loadDocument(); this.deferredRefresh = false; }
       this.cursor = update.nextCursor ?? this.cursor;
       this.connection('');
     } catch { this.connection('Нет соединения. Команды будут отправлены при восстановлении связи.'); }
@@ -189,6 +191,8 @@ export class Client {
     this.mounted = true;
     const style = this.node('style', {}, clientStyles); this.dom.head.append(style);
     const root = this.$('app-root');
+    this.dragController = new DragController({ container: this.$('list-container'), header: root.querySelector('header'), window: this.win,
+      onDrop: (id, arranged) => { this.applyCollapse(); void this.command('reorderItems', id, { arranged }); }, onRestored: () => this.applyCollapse() });
     root.prepend(this.node('div', { id: 'v02-connection', className: 'v02-connection', role: 'status', hidden: true }));
     root.append(this.node('div', { id: 'v02-toast-stack', className: 'v02-toast-stack', 'aria-live': 'polite' }));
     root.append(this.node('div', { id: 'v02-transcript', className: 'v02-transcript', hidden: true, 'aria-live': 'polite' }));
@@ -228,6 +232,9 @@ export class Client {
     for (const [id, menu] of Object.entries(menus)) if (this.$(id)) this.$(id).dataset.componentId = `menu:${menu}`;
     this.bindGestures(root);
     this.win.addEventListener('pagehide', () => this.disconnect());
+    const cancelInput = () => { this.gesture.cancel(); this.dragController.cancel(); };
+    this.win.addEventListener('blur', cancelInput);
+    this.dom.addEventListener('visibilitychange', () => { if (this.dom.visibilityState === 'hidden') cancelInput(); });
     this.win.addEventListener('online', () => void this.resume());
   }
   render(document) {
@@ -402,7 +409,7 @@ export class Client {
       const node = this.nodes.get(element.dataset.componentId);
       const taskId = node?.props.taskId || element.closest('[data-id]')?.dataset.id;
       this.pointerId = event.pointerId;
-      this.gesture.begin(point(event), { id: element.dataset.componentId, element, node, taskId, draggable: !!taskId });
+      this.gesture.begin(point(event), { id: element.dataset.componentId, element, node, taskId, draggable: !!taskId && this.viewContext.view === 'list' });
     });
     this.dom.addEventListener('pointermove', (event) => {
       if (this.edgeStart) return;
@@ -493,23 +500,11 @@ export class Client {
   drag(phase, target, p, delta) {
     const wrap = target.element.closest('.list-item-wrapper'); if (!wrap) return;
     if (phase === 'move') {
-      wrap.classList.add('is-dragging');
-      const candidates = [...this.$('list-container').querySelectorAll('.list-item-wrapper')].filter((el) => !el.hidden && el !== wrap);
-      this.dropTarget?.classList.remove('v02-drag-target', 'v02-drag-nest');
-      this.dropTarget = candidates.find((el) => { const rect = el.getBoundingClientRect(); return p.y >= rect.top && p.y <= rect.bottom; }) || null;
-      this.dropTarget?.classList.add(delta.dx > 60 ? 'v02-drag-nest' : 'v02-drag-target');
-      if (p.y < 80) this.win.scrollBy?.(0, -12); else if (p.y > this.win.innerHeight - 80) this.win.scrollBy?.(0, 12);
+      if (!this.dragController.active) this.dragController.start(wrap, p, { x: p.x - delta.dx, y: p.y - delta.dy });
+      else this.dragController.update(p);
       return;
     }
-    wrap.classList.remove('is-dragging');
-    const drop = this.dropTarget; drop?.classList.remove('v02-drag-target', 'v02-drag-nest'); this.dropTarget = null;
-    if (phase !== 'end' || !drop) return;
-    if (delta.dx > 60) { void this.command('setParent', target.taskId, { parentId: drop.dataset.id }); return; }
-    const siblings = [...this.nodes.values()].filter((node) => node.type === 'task' && node.props.parentId === target.node.props.parentId);
-    const destination = siblings.findIndex((node) => node.props.taskId === drop.dataset.id); if (destination < 0) return;
-    const moving = siblings.find((node) => node.props.taskId === target.taskId);
-    const ordered = siblings.filter((node) => node !== moving); ordered.splice(destination, 0, moving);
-    void this.command('reorderItems', target.taskId, { arranged: ordered.map((node, index) => ({ id: node.props.taskId, parentId: node.props.parentId ?? null, order: (index + 1) * 10 })) });
+    if (phase === 'end') this.dragController.finish(); else this.dragController.cancel();
   }
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
