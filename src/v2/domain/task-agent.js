@@ -44,6 +44,7 @@ export class TaskAgent {
     const targetCommands = new Set(['addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem']);
     const parsedCommands = clone(commands).map(command => {
       if (targetCommands.has(command.command) && !taskIds.has(command.actId) && taskIds.has(modelContext.target)) command.actId = modelContext.target;
+      if (command.command === 'setStatus' && typeof command.payload === 'string') command.payload = { status: command.payload };
       return command;
     });
     return { answer, commands: parsedCommands };
