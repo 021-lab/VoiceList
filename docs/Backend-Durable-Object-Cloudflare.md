@@ -20,14 +20,18 @@
 необходимая для повторной доставки команд. Все подключённые вкладки получают
 новый полный снимок после каждого применённого изменения.
 
-Realtime-сессия идёт отдельным путём:
+Голосовая сессия идёт отдельным путём:
 
     Browser
-      -> POST /api/realtime/session (SDP + дерево задач)
-      -> Worker
-      -> OpenAI Realtime Calls API
-      -> SDP answer
-      -> Browser establishes WebRTC connection with OpenAI
+      -> POST /api/live/session (SDP)
+      -> Worker -> Durable Object
+      -> POST /v1/live/sessions (конфиг сессии + SDP)
+      -> SDP answer -> Browser устанавливает WebRTC с моделью
+      -> Durable Object открывает sideband WebSocket к той же сессии
+
+Sideband получает те же события, что и браузер: через него ведётся лог и
+исполняются вызовы инструментов. Подробности — в
+docs/GPT-Live-Responses-Integration.md.
 
 Worker не проксирует аудиопоток. Он создаёт сессию от имени приложения, передаёт
 скрытый контекст задач и хранит серверные настройки.
@@ -50,7 +54,7 @@ Pause, Done, Archive и Info.
         "actType": "task-or-list",
         "command": "addItem | addChild | editItem | setStatus | setParent | ...",
         "payload": {},
-        "source": "ui-or-openai-realtime"
+        "source": "ui-or-gpt-live"
       }
     }
 
@@ -59,9 +63,10 @@ Pause, Done, Archive и Info.
 идемпотентной. CloudflareDocumentClient хранит не подтверждённые команды в
 localStorage и повторяет их после переподключения.
 
-Команды, созданные голосовым агентом, идут тем же WebSocket-путём с
-source: openai-realtime. Это важно: голосовой агент не изменяет снимок в
-браузере напрямую и не использует отдельный HTTP write API.
+Команды, созданные голосовым агентом, идут тем же путём команд с
+source: gpt-live. Это важно: голосовой агент не изменяет снимок в браузере
+напрямую и не использует отдельный HTTP write API. Разница с прежней схемой в
+том, что вызов исполняет Durable Object, а не вкладка браузера.
 
 ## HTTP-маршруты
 
@@ -71,28 +76,28 @@ source: openai-realtime. Это важно: голосовой агент не �
 | GET /health | Проверка Worker; возвращает ok. |
 | GET /api/tasks/tree.json | Полное вложенное дерево из id, title, status и children. Это read-only API; голосовой UI не загружает через него дерево при старте. |
 | GET /api/tasks/frontier.json | Текущий фронтир, отсортированный по дедлайну. Каждая запись содержит parentTitle, taskId, taskTitle, status и deadline. |
-| GET /api/realtime/key/status | Состояние конфигурации OpenAI-ключа. |
-| POST /api/realtime/key | Одноразовое сохранение OpenAI API key по setup-токену. |
-| GET /api/realtime/prompt | Текущий системный промпт; если сохранённого нет, возвращает встроенный промпт. |
-| POST /api/realtime/prompt | Сохраняет пользовательский системный промпт для следующих голосовых сессий. |
-| POST /api/realtime/session | Создаёт SDP-ответ для OpenAI Realtime-сессии. |
+| GET /api/live/key/status | Состояние конфигурации OpenAI-ключа. |
+| POST /api/live/key | Одноразовое сохранение OpenAI API key. |
+| GET, PUT /api/live/settings | Промпты обоих слоёв и бэкенд-модель; пустое значение означает встроенное умолчание. |
+| GET /api/live/settings/history | История правок промптов с прежним и новым текстом. |
+| GET, POST /api/live/session | Состояние голосовой сессии и её создание по SDP-предложению. |
+| POST /api/live/session/stop | Завершение сессии и освобождение sideband. |
+| GET /api/live/log, /api/live/log/sessions | Лог событий сессий; требует LIVE_LOG_TOKEN и без него отвечает 403. |
 | GET /ws с Upgrade: websocket | Канал чтения и изменения документа. |
 | POST /reset | Только тестовый сброс; требует TEST_RESET_TOKEN. |
 
 Маршруты ключа, промпта и сессии отвечают с Cache-Control: no-store. Для
 создания сессии и настройки ключа Worker проверяет Origin, если он передан.
 
-## Realtime-конфигурация
+## Конфигурация голосовой сессии
 
-Браузер отправляет на /api/realtime/session SDP и компактное дерево:
-id, title, status, children. Worker передаёт его модели внутри системных
-инструкций как скрытый контекст. Модель не должна автоматически озвучивать
-дерево.
+Браузер отправляет на /api/live/session только SDP. Дерево задач собирает
+Durable Object и кладёт в инструкции голосового слоя плоской таблицей
+id, parent, статус, название. Модель не должна озвучивать дерево без просьбы.
 
-Целевая конфигурация этой ветки использует gpt-realtime-2.1, аудиовыход marin,
-русскую транскрибацию gpt-live-transcribe, near-field noise reduction и
-function tools для операций с задачами. Конкретный набор tools определён в
-worker/openai-realtime.js.
+Используется gpt-live-1 с аудиовыходом marin и делегированием типа responses:
+бэкенд-модель задаётся в настройках, инструменты объявлены в
+delegation.responses.tools. Набор определён в src/v2/domain/live-session.js.
 
 Read-only tool getFrontier используется для запросов «фронтир» и «что во
 фронтире». Браузер получает свежий результат через /api/tasks/frontier.json и
