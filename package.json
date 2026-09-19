@@ -13,6 +13,7 @@
     "build:cloudflare": "npm run prepare-preview && node scripts/prepare-cloudflare-assets.mjs",
     "build:v2": "VOICELIST_V02=1 node scripts/prepare-preview.mjs && node scripts/prepare-cloudflare-assets.mjs",
     "dev:v2": "wrangler dev --config wrangler.dev.jsonc --port 4511",
+    "dev:v2:test": "wrangler dev --config wrangler.dev.jsonc --port 4511 --var V02_TEST_MODEL:local-parser",
     "deploy:cloudflare": "npm run build:v2 && wrangler deploy --config wrangler.dev.jsonc",
     "test:v2:worker": "node tests/v2/worker-integration.mjs",
     "test:v2:browser": "playwright test --config tests/v2-browser/playwright.config.js",

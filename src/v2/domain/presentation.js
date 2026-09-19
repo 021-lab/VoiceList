@@ -24,7 +24,11 @@ export class Presentation {
     } else if (view === 'action') {
       const a = journal.actions().find(x => x.id === context.actionId);
       body = a ? node('action-page', 'action:' + a.id, {
-        ...a, title: a.label, sourceText: a.transcript || '', result: a.label, messages: journal.dialogue(a.id)
+        ...a, title: a.label, sourceText: a.transcript || '', result: a.label,
+        records: journal.chain(a.id).map(entry => entry.kind === 'text' ? {
+          id: entry.id, kind: 'text', corrects: entry.corrects || null, userText: entry.text,
+          answer: entry.answer || '', commands: clone(entry.commands || []), modelContext: clone(entry.modelContext || null)
+        } : { id: entry.id, kind: 'ui', corrects: entry.corrects || null, command: clone(entry.command) })
       }) : node('text', 'screen:missing', { text: 'Действие не найдено' });
     } else if (view === 'edit') {
       const item = byId.get(context.taskId);

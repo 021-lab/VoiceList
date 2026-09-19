@@ -12,14 +12,14 @@ export class CompatibilityPort {
   async applyCommand(command, { message = {} } = {}) {
     const clientKey = message.clientKey === 'mcp' ? 'mcp:' + crypto.randomUUID() : message.clientKey || 'server:' + crypto.randomUUID();
     const seq = message.clientKey === 'mcp' ? 1 : Number(message.seq) || 1;
-    const prior = this.runtime.journal.entries.find(e => e.type === 'input' && e.input.key.clientKey === clientKey && e.input.key.seq === seq);
+    const prior = this.runtime.journal.entries.find(e => e.key.clientKey === clientKey && e.key.seq === seq);
     const isAction = ['rollbackAction','commentLogEntry'].includes(command.command);
     const elementId = isAction ? 'action:' + command.actId : this.getTaskById(command.actId) ? 'task:' + command.actId : 'app';
-    const result = await this.runtime.executeAndWait({ key: { clientKey, seq }, context: prior?.input.context || {
+    const result = await this.runtime.executeAndWait({ key: { clientKey, seq }, context: prior?.context || {
       elementId, view: 'list', revision: this.runtime.graph.revision, ...(isAction ? { actionId: command.actId } : {})
     }, command });
-    return { seq, id: result.actions[0]?.id || null, status: result.error ? 'rejected' : 'applied',
-      reason: result.error?.message || null, newTarget: result.actions.find(a => a.target)?.target || command.actId || null };
+    return { seq, id: result.actions[0]?.id || result.requestId || null, status: result.error ? 'rejected' : 'applied',
+      reason: result.error?.message || null, newTarget: result.target || result.actions.find(a => a.target)?.target || command.actId || null };
   }
   async undoLastAction({ clientKey, seq, source } = {}) {
     const prior = this.runtime.journal.actions().filter(a => a.canRollback).at(-1);

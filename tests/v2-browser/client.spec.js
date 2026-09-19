@@ -52,18 +52,27 @@ test('actual server flow: create, edit, status, journal, correction chain rollba
   const current = page.locator(`.list-item-wrapper[data-id="${taskId}"]`);
   await expect(current).toContainText(renamed); await expect(current).toContainText('Details retained');
   await swipe(page, current.locator('.list-item'), 'Done'); await expect(current).toContainText('Done');
+  await page.evaluate(async (id) => {
+    const client = window.__voiceListClient;
+    const receipt = await client.submit({ text: 'это фокус', context: client.context({ id: `task:${id}` }) });
+    await client.waitForCompletion(receipt.requestId);
+  }, taskId);
+  await expect(current).toContainText('Focus');
   await page.locator('#view-toggle-btn').click();
-  const action = page.locator('.action-log-row').filter({ hasText: 'Статус изменён: Done' }).last();
+  const action = page.locator('.action-log-row').filter({ hasText: 'это фокус' }).last();
   await expect(action).toBeVisible(); await action.click();
   await expect(page.locator('#v02-action-page')).toBeVisible();
-  await page.locator('#action-correction-input').fill('сделай фокус');
+  await page.locator('#action-correction-input').fill('это открыто');
   await page.locator('.v02-correction-form button').click();
-  await expect(page.locator('.v02-message').last()).toContainText('Focus');
+  await expect(page.locator('.v02-journal-record')).toHaveCount(2);
+  await expect(page.locator('.v02-journal-record').last()).toContainText('это открыто');
+  await expect(page.locator('.v02-journal-record').last()).toContainText('Open');
   await page.locator('#action-rollback').click();
-  await expect(page.locator('.v02-message').last()).toContainText(/отмен|откат/i);
+  await expect(page.locator('.v02-journal-record')).toHaveCount(3);
+  await expect(page.locator('.v02-journal-record').last()).toContainText('rollbackAction');
   await page.locator('#action-close').click(); await expect(page.locator('#action-log-panel')).toBeVisible();
-  await page.locator('#view-toggle-btn').click(); await expect(current).toContainText('Open');
-  await page.reload(); await expect(current).toContainText(renamed); await expect(current).toContainText('Open');
+  await page.locator('#view-toggle-btn').click(); await expect(current).toContainText('Done');
+  await page.reload(); await expect(current).toContainText(renamed); await expect(current).toContainText('Done');
   expect(errors).toEqual([]);
 });
 

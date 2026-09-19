@@ -1,61 +1,116 @@
 import { clone, stable, fail } from './contracts.js';
 
+const commandLabel = command => command?.command || '';
+
+function normalizeLegacy(entries) {
+  if (!entries.some(entry => entry.type !== 'interaction')) return entries.map(clone);
+  const modern = entries.filter(entry => entry.type === 'interaction').map(clone);
+  const modernIds = new Set(modern.map(entry => entry.id));
+  const legacyResults = entries.filter(entry => entry.type === 'result');
+  const actionToRequest = new Map(legacyResults.map(entry => [entry.actionId, entry.requestId]));
+  for (const entry of legacyResults) if (entry.rootActionId && !actionToRequest.has(entry.rootActionId)) actionToRequest.set(entry.rootActionId, entry.requestId);
+  const migrated = entries.filter(entry => entry.type === 'input' && !modernIds.has(entry.id)).map(input => {
+    const commands = entries.filter(entry => entry.type === 'command' && entry.requestId === input.id);
+    const results = entries.filter(entry => entry.type === 'result' && entry.requestId === input.id);
+    const decision = { answer: results.map(entry => entry.reply).find(Boolean) || '', commands: commands.map(entry => clone(entry.command)) };
+    const corrects = actionToRequest.get(input.input.context?.actionId) || input.input.context?.actionId;
+    return {
+      id: input.id, cursor: input.cursor, at: input.at, type: 'interaction', key: clone(input.input.key),
+      context: clone(input.input.context), kind: input.input.text !== undefined ? 'text' : 'ui',
+      ...(input.input.text !== undefined ? { text: input.input.text } : { command: clone(input.input.command) }),
+      ...(corrects ? { corrects } : {}),
+      ...(input.input.text !== undefined ? {
+        modelContext: { legacy: true, text: input.input.text }, rawModelResponse: JSON.stringify(decision),
+        answer: decision.answer, commands: decision.commands,
+        versions: { contextBuilder: 'legacy', prompt: 'legacy', parser: 'legacy' }
+      } : {})
+    };
+  });
+  return [...modern, ...migrated].sort((a, b) => a.cursor - b.cursor);
+}
+
+/** Append-only interaction bus. Entries may only gain processing fields in place. */
 export class InteractionJournal {
-  constructor(entries = []) { this.entries = clone(entries); }
-  append(message) {
-    const entry = { ...clone(message), id: 'e' + (this.entries.length + 1), cursor: this.entries.length + 1, at: new Date().toISOString() };
+  constructor(entries = [], technical = {}) {
+    this.entries = normalizeLegacy(clone(entries));
+    this.technical = technical;
+  }
+  appendInteraction(input, { corrects } = {}) {
+    const cursor = Math.max(0, ...this.entries.map(entry => Number(entry.cursor) || 0)) + 1;
+    const entry = {
+      id: 'e' + cursor, cursor, at: new Date().toISOString(), type: 'interaction',
+      key: clone(input.key), context: clone(input.context), kind: input.text !== undefined ? 'text' : 'ui',
+      ...(input.text !== undefined ? { text: input.text } : { command: clone(input.command) }),
+      ...(corrects ? { corrects } : {})
+    };
     this.entries.push(entry);
     return clone(entry);
   }
-  read({ type, after = 0, limit = 100, requestId, actionId } = {}) {
-    return clone(this.entries.filter(e => e.cursor > after && (!type || e.type === type) && (!requestId || e.requestId === requestId) && (!actionId || e.actionId === actionId || e.rootActionId === actionId)).slice(0, Math.min(limit, 500)));
+  enrich(id, patch) {
+    const entry = this.entries.find(item => item.id === id);
+    if (!entry) fail('NOT_FOUND', 'Запись журнала не найдена');
+    for (const [key, value] of Object.entries(clone(patch))) {
+      if (entry[key] !== undefined && stable(entry[key]) !== stable(value)) fail('CONFLICT', 'Запись журнала уже обработана иначе');
+      entry[key] = value;
+    }
+    return clone(entry);
   }
-  get(id) { return clone(this.entries.find(e => e.id === id) || null); }
-  get cursor() { return this.entries.length; }
+  read({ after = 0, limit = 100 } = {}) {
+    return clone(this.entries.filter(entry => entry.cursor > after).slice(0, Math.min(limit, 500)));
+  }
+  get(id) { return clone(this.entries.find(entry => entry.id === id) || null); }
+  get cursor() { return Math.max(0, ...this.entries.map(entry => Number(entry.cursor) || 0)); }
   request(key, input) {
-    const prior = this.entries.find(e => e.type === 'input' && stable(e.input.key) === stable(key));
-    if (prior && stable(prior.input) !== stable(input)) fail('REQUEST_KEY_REUSED', 'Идентификатор запроса уже использован для другого ввода');
-    return clone(prior || null);
+    const prior = this.entries.find(entry => stable(entry.key) === stable(key));
+    if (!prior) return null;
+    const saved = { key: prior.key, context: prior.context, ...(prior.kind === 'text' ? { text: prior.text } : { command: prior.command }) };
+    if (stable(saved) !== stable(input)) fail('REQUEST_KEY_REUSED', 'Идентификатор запроса уже использован для другого ввода');
+    return clone(prior);
   }
-  pending() {
-    return this.entries.filter(e => e.type === 'input' && !this.entries.some(x => x.type === 'settled' && x.requestId === e.id)).map(clone);
+  rootFor(id) {
+    let entry = this.entries.find(item => item.id === id) || null;
+    const seen = new Set();
+    while (entry?.corrects && !seen.has(entry.id)) { seen.add(entry.id); entry = this.entries.find(item => item.id === entry.corrects) || entry; }
+    return clone(entry);
+  }
+  chain(id) {
+    const root = this.rootFor(id);
+    if (!root) fail('NOT_FOUND', 'Действие не найдено');
+    const connected = new Set([root.id]);
+    for (const entry of this.entries) if (entry.corrects && connected.has(entry.corrects)) connected.add(entry.id);
+    return clone(this.entries.filter(entry => connected.has(entry.id)).sort((a, b) => a.cursor - b.cursor));
+  }
+  processed(entry) {
+    return this.technical.harness?.[entry.id]?.status === 'complete' || Boolean(entry.versions && entry.rawModelResponse !== undefined);
+  }
+  action(entry) {
+    const execution = this.technical.executor?.[entry.id] || {};
+    const outcomes = execution.outcomes || [];
+    const target = [...outcomes].reverse().find(item => item.target)?.target || entry.commands?.find(command => command.actId)?.actId || null;
+    const error = execution.error || this.technical.harness?.[entry.id]?.error || null;
+    const rolledBack = Boolean(this.technical.undoneEntries?.[entry.id]);
+    const hasChanges = this.chain(entry.id).some(item => this.technical.executor?.[item.id]?.outcomes?.some(outcome => outcome.changes?.length));
+    const label = entry.answer || entry.commands?.map(commandLabel).filter(Boolean).join(', ') || entry.text;
+    return {
+      id: entry.id, actionId: entry.id, rootActionId: entry.id, requestId: entry.id,
+      label, text: label, status: error ? 'failed' : entry.commands?.length ? (execution.status === 'complete' ? 'applied' : 'pending') : 'needs-input',
+      createdAt: entry.at, transcript: entry.text, context: entry.context, command: entry.commands?.[0] || null,
+      target, error, rolledBack, canRollback: hasChanges && !rolledBack, sessionId: entry.key.clientKey, cursor: entry.cursor
+    };
   }
   actions() {
-    const results = this.entries.filter(e => e.type === 'result' && !e.silent && !['toggleCollapse', 'rollbackAction', 'undo'].includes(e.command?.command));
-    // Silent rollback outcomes still change the public state of their source
-    // actions even though they never become actions of their own.
-    const undone = new Set(this.entries.filter(e => e.type === 'result' && e.status === 'applied').flatMap(e => e.undoneIds || []));
-    return results.map(result => {
-      const request = this.get(result.requestId);
-      return {
-        id: result.actionId, actionId: result.actionId, rootActionId: result.rootActionId, requestId: result.requestId,
-        label: result.label, text: result.reply || result.label, status: result.status, createdAt: result.at,
-        transcript: request?.input?.text || request?.input?.command?.transcript || null,
-        context: request?.input?.context || null, command: result.command || null,
-        target: result.target, error: result.error || null, rolledBack: undone.has(result.actionId),
-        canRollback: result.status === 'applied' && Boolean(result.changes?.length) && !undone.has(result.actionId),
-        sessionId: result.sessionId, cursor: result.cursor
-      };
-    });
+    return this.entries.filter(entry => entry.kind === 'text' && !entry.corrects && this.processed(entry)).map(entry => this.action(entry));
   }
-  chain(actionId) {
-    const result = this.entries.find(e => e.type === 'result' && e.actionId === actionId);
-    if (!result) fail('NOT_FOUND', 'Действие не найдено');
-    const root = result.rootActionId || actionId;
-    const undone = new Set(this.entries.flatMap(e => e.status === 'applied' ? e.undoneIds || [] : []));
-    return this.entries.filter(e => e.type === 'result' && e.status === 'applied' && (e.rootActionId === root || e.actionId === root) && e.changes?.length && !undone.has(e.actionId)).map(clone);
+  pending() {
+    return clone(this.entries.filter(entry => ['pending', 'waiting'].includes(this.technical.harness?.[entry.id]?.status) || ['pending', 'waiting'].includes(this.technical.executor?.[entry.id]?.status)));
   }
   dialogue(actionId) {
-    const action = this.actions().find(a => a.id === actionId);
-    if (!action) return [];
-    const source = this.entries.find(e => e.type === 'result' && e.actionId === actionId);
-    const root = action.rootActionId || actionId;
-    const related = this.entries.filter(e => e.type === 'result' && (e.rootActionId === root || e.actionId === root));
-    const ids = new Set(related.map(e => e.requestId));
-    return this.entries.flatMap(e => {
-      if (e.type === 'input' && e.id !== source?.requestId && (ids.has(e.id) || e.input.context.actionId === root || e.input.context.actionId === actionId)) return [{ role: 'user', text: e.input.text || e.input.command?.transcript || e.input.command?.command || '', id: e.id }];
-      if (e.type === 'result' && (e.rootActionId === root || e.actionId === root)) return [{ role: 'assistant', text: e.reply || e.label, id: e.id }];
-      return [];
+    return this.chain(actionId).flatMap(entry => {
+      if (entry.kind === 'ui') return [{ role: 'user', text: commandLabel(entry.command), id: entry.id, kind: 'ui' }];
+      return [
+        { role: 'user', text: entry.text, id: entry.id, kind: 'text' },
+        ...(this.processed(entry) ? [{ role: 'assistant', text: entry.answer || entry.commands?.map(commandLabel).join(', ') || '', id: entry.id + ':answer' }] : [])
+      ];
     });
   }
 }

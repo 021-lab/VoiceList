@@ -1,28 +1,45 @@
 import { parseCommand, toCommand } from '../../command-resolver.js';
 import { findCandidates } from '../../resolver.js';
 import { adaptSnapshot } from '../../snapshot-adapter.js';
+import { clone, fail } from './contracts.js';
 
 export class TaskAgent {
   constructor({ resolveModel = null } = {}) { this.resolveModel = resolveModel; }
-  async run({ input, graph, journal }) {
-    if (input.command) return { commands: [input.command] };
-    const text = input.text.trim();
-    const original = input.context.actionId ? journal.actions().find(x => x.id === input.context.actionId) : null;
-    const target = original?.target || (input.context.elementId.startsWith('task:') ? input.context.elementId.slice(5) : null);
-    if (original && /^(отмени|откатить|откат|назад|undo)[.!\s]*$/iu.test(text)) {
-      return { commands: [{ command: 'rollbackAction', actId: original.id, actType: 'action', payload: {} }] };
-    }
-    const parsed = parseCommand(text, target);
+  buildContext({ entry, graph, journal }) {
+    const root = entry.corrects ? journal.rootFor(entry.corrects) : null;
+    const history = root ? journal.chain(root.id).filter(item => item.id !== entry.id).map(item => ({
+      id: item.id, corrects: item.corrects || null, kind: item.kind, text: item.text || null,
+      answer: item.answer || '', commands: clone(item.commands || (item.command ? [item.command] : []))
+    })) : [];
+    const target = [...history].reverse().flatMap(item => item.commands || []).find(command => command.actId)?.actId
+      || (entry.context.elementId.startsWith('task:') ? entry.context.elementId.slice(5) : null);
+    return {
+      text: entry.text, target, context: clone(entry.context), corrects: entry.corrects || null,
+      action: root ? { id: root.id, text: root.text, answer: root.answer || '', commands: clone(root.commands || []) } : null,
+      history, tasks: clone(graph.items), graphRevision: graph.revision, today: new Date().toISOString().slice(0, 10)
+    };
+  }
+  async invoke(modelContext) {
+    if (this.resolveModel) return this.resolveModel({ ...clone(modelContext), modelContext: clone(modelContext) });
+    const parsed = parseCommand(modelContext.text.trim(), modelContext.target);
     if (parsed.kind === 'one') {
-      const command = toCommand(parsed.hypothesis, target);
+      const command = toCommand(parsed.hypothesis, modelContext.target);
       if (command?.command === 'setParent') {
-        const candidates = findCandidates(parsed.hypothesis.tail, adaptSnapshot(graph.items));
-        if (candidates.length !== 1) return { reply: 'Уточните, в какую задачу перенести.' };
+        const candidates = findCandidates(parsed.hypothesis.tail, adaptSnapshot(modelContext.tasks));
+        if (candidates.length !== 1) return JSON.stringify({ answer: 'Уточните, в какую задачу перенести.', commands: [] });
         command.payload.parentId = candidates[0].id;
       }
-      if (command) return { commands: [command] };
+      if (command) return JSON.stringify({ answer: '', commands: [command] });
     }
-    if (this.resolveModel) return this.resolveModel({ text, target, graph, action: original, dialogue: original ? journal.dialogue(original.id) : [] });
-    return { reply: 'Не удалось однозначно понять команду. Уточните действие; свободный диалог станет доступен после настройки модели.' };
+    return JSON.stringify({ answer: 'Не удалось однозначно понять команду. Уточните действие.', commands: [] });
+  }
+  parse(raw) {
+    let value = raw;
+    if (typeof raw === 'string') { try { value = JSON.parse(raw); } catch { fail('INVALID_DECISION', 'Модель вернула некорректный ответ'); } }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
+    const answer = value.answer ?? value.reply ?? '';
+    const commands = value.commands ?? [];
+    if (typeof answer !== 'string' || !Array.isArray(commands) || commands.some(command => !command || typeof command.command !== 'string')) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
+    return { answer, commands: clone(commands) };
   }
 }

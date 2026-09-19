@@ -83,12 +83,12 @@ describe('server component Client', () => {
   });
   it('action page exposes correction dialog, rollback and close with same action identity', () => {
     create(); client.viewContext = { view: 'action', actionId: 'a1' };
-    const tree = documentTree([], 'action'); tree.root.children[1] = node('action-page', 'action:a1', { actionId: 'a1', title: 'Изменено', sourceText: 'назови иначе', result: 'Готово', canRollback: true, messages: [{ role: 'assistant', text: 'Что исправить?' }] });
+    const tree = documentTree([], 'action'); tree.root.children[1] = node('action-page', 'action:a1', { actionId: 'a1', title: 'Изменено', canRollback: true, records: [{ id: 'a1', kind: 'text', userText: 'назови иначе', answer: 'Что исправить?', commands: [], modelContext: { target: 'one' } }] });
     client.render(tree);
     expect(document.getElementById('action-correction-input')).toBeTruthy();
     expect(document.getElementById('action-rollback').disabled).toBe(false);
     expect(document.getElementById('action-close').textContent).toBe('Закрыть');
-    expect(document.querySelector('[data-role="assistant"]').textContent).toBe('Что исправить?');
+    expect(document.querySelector('.v02-model-answer').textContent).toContain('Что исправить?');
   });
   it('shows unknown component safely instead of executing arbitrary markup', () => {
     create().render(documentTree([node('script', 'unsafe', { html: '<script>bad()</script>' })]));

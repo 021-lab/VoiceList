@@ -18,7 +18,7 @@ async function run(command, context={}, text) {
 }
 const title='V02 integration '+clientKey;
 const created=await run({command:'addItem',actId:'list',payload:{line1:title,line2:'durable test'}});
-const id=created.receipt.actions[0].target; assert.ok(id);
+const id=created.receipt.target; assert.ok(id);
 const duplicate=await post(created.input); assert.equal(duplicate.requestId,created.receipt.requestId);
 const nodes=()=>doc().then(d=>d.root.children[1].children);
 assert.equal((await nodes()).filter(n=>n.props.line1===title).length,1);
@@ -28,11 +28,12 @@ const actionId=focused.receipt.actions[0].id;
 await run(null,{elementId:'action:'+actionId,actionId,view:'action'},'это сделано');
 assert.equal((await nodes()).find(n=>n.props.taskId===id).props.status,'Done');
 const details=await request('/api/v2/document?view=action&actionId='+actionId);
-assert.equal(details.root.children[1].props.messages.length,4);
+assert.equal(details.root.children[1].props.records.length,2);
 await run({command:'rollbackAction',actId:actionId,payload:{}},{elementId:'action:'+actionId,actionId,view:'action'});
 assert.equal((await nodes()).find(n=>n.props.taskId===id).props.status,'Open');
-const events=await request('/api/v2/updates?cursor='+initial.cursor+'&clientKey='+encodeURIComponent(clientKey));
-assert.ok(events.actions.some(a=>a.id===actionId&&a.rolledBack));
+const log=await request('/api/v2/document?view=log');
+const logged=log.root.children[1].children.find(node=>node.props.actionId===actionId);
+assert.equal(logged.props.rolledBack,true);
 const invalid=await fetch(base+'/api/v2/input',{method:'POST',headers:{'Content-Type':'application/json','Origin':'https://untrusted.invalid'},body:JSON.stringify(created.input)});
 assert.equal(invalid.status,403);
 const status=await request('/api/realtime/key/status');assert.equal(typeof status.configured,'boolean');assert.equal('apiKey' in status,false);

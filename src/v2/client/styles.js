@@ -10,6 +10,7 @@ export const clientStyles = `
 .v02-action-page{position:fixed;inset:0;background:#f0f2f5;z-index:1400;overflow:auto;padding-bottom:24px}
 .v02-action-body{max-width:760px;margin:auto;padding:18px;display:grid;gap:14px}
 .v02-action-card,.v02-message{background:#fff;padding:14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.v02-journal-record{display:grid;gap:8px}.v02-model-answer{width:100%;border:0;font:inherit;color:#1a1a2e;text-align:left;cursor:pointer}.v02-model-context{max-height:260px;overflow:auto;background:#e9edf3;padding:12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#303744}
 .v02-message[data-role=user]{background:#e7f1ff;margin-left:24px}.v02-message[data-role=assistant]{margin-right:24px}
 .v02-correction-form{display:flex;gap:8px;align-items:flex-end}.v02-correction-form textarea{flex:1;min-height:78px;border:1px solid #ccd0d5;border-radius:10px;padding:12px;font:inherit}
 .v02-correction-form button,.v02-primary{border:0;border-radius:10px;background:#007aff;color:white;padding:12px 16px;font:inherit;cursor:pointer}

@@ -113,7 +113,7 @@ export class Client {
         this.requests.delete(requestId);
         if (receipt.error) throw new Error(receipt.error.message || receipt.error);
         await this.loadDocument();
-        return { status: 'applied', newTarget: receipt.actions?.at(-1)?.target };
+        return { status: 'applied', newTarget: receipt.target || receipt.actions?.at(-1)?.target };
       }
       await this.resume();
       const result = this.outcomes.get(requestId);
@@ -329,7 +329,7 @@ export class Client {
     const p = component.props; const id = p.actionId || component.id.replace(/^action:/, '');
     this.seenActions.add(id);
     const row = this.node('div', { className: 'action-log-row', 'data-log-id': id, 'data-component-id': component.id, tabIndex: 0 });
-    row.append(this.node('div', { className: 'action-log-label' }, p.label || p.text || 'Действие'), this.node('div', { className: 'action-log-status' }, p.status || ''), this.node('div', { className: 'action-log-meta' }, p.createdAt || ''));
+    row.append(this.node('div', { className: 'action-log-label' }, p.transcript || p.text || 'Реплика пользователя'), this.node('div', { className: 'action-log-status' }, p.status || ''), this.node('div', { className: 'action-log-meta' }, p.createdAt || ''));
     row.onclick = () => this.navigate('action', { actionId: id });
     row.onkeydown = (event) => { if (event.key === 'Enter') row.click(); };
     return row;
@@ -343,10 +343,21 @@ export class Client {
     rollback.onclick = () => this.handleInput({ context: this.context(component), command: { command: 'rollbackAction', actId: p.actionId, actType: 'action', payload: { actionId: p.actionId } } });
     bar.append(close, rollback); page.append(bar);
     const body = this.node('div', { className: 'v02-action-body' });
-    body.append(this.node('h2', {}, p.title || p.label || 'Действие'), this.node('small', {}, 'Исходная команда'), this.node('div', { className: 'v02-action-card', 'data-component-id': component.id }, p.sourceText || p.text || 'Команда интерфейса'));
-    if (p.context) body.append(this.node('small', {}, typeof p.context === 'string' ? p.context : JSON.stringify(p.context)));
-    body.append(this.node('small', {}, 'Результат'), this.node('div', { className: 'v02-action-card', 'data-component-id': component.id }, typeof p.result === 'string' ? p.result : JSON.stringify(p.result || {})));
-    for (const message of p.messages || []) body.append(this.node('div', { className: 'v02-message', 'data-role': message.role }, message.text || ''));
+    body.append(this.node('h2', {}, p.title || p.label || 'Действие'));
+    for (const record of p.records || []) {
+      const block = this.node('section', { className: 'v02-journal-record', 'data-entry-id': record.id });
+      if (record.kind === 'text') {
+        block.append(this.node('small', {}, record.corrects ? 'Корректировка' : 'Реплика пользователя'), this.node('div', { className: 'v02-message', 'data-role': 'user' }, record.userText || ''));
+        const context = this.node('pre', { className: 'v02-model-context', hidden: true }, JSON.stringify(record.modelContext || {}, null, 2));
+        const structured = { ...(record.answer ? { answer: record.answer } : {}), ...(record.commands?.length ? { commands: record.commands } : {}) };
+        const answer = this.node('button', { className: 'v02-action-card v02-model-answer', type: 'button', 'aria-expanded': 'false' }, JSON.stringify(structured, null, 2));
+        answer.onclick = () => { context.hidden = !context.hidden; answer.setAttribute('aria-expanded', String(!context.hidden)); };
+        block.append(context, answer);
+      } else {
+        block.append(this.node('small', {}, record.corrects ? 'Корректировка интерфейса' : 'Команда интерфейса'), this.node('pre', { className: 'v02-action-card' }, JSON.stringify(record.command || {}, null, 2)));
+      }
+      body.append(block);
+    }
     const form = this.node('form', { className: 'v02-correction-form' });
     const input = this.node('textarea', { id: 'action-correction-input', placeholder: 'Что нужно исправить?', 'aria-label': 'Корректировка действия' });
     input.oninput = () => { this.editorDirty = !!input.value; };

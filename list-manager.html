@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-065a9e4dc03d48a3">
+<meta name="preview-build-hash" content="v02-04f1ad98b386555c">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -986,7 +986,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-065a9e4dc03d48a3";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-04f1ad98b386555c";
 </script>
 <script>
 (() => {
@@ -1426,6 +1426,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-065a9e4dc03d48a3";
 .v02-action-page{position:fixed;inset:0;background:#f0f2f5;z-index:1400;overflow:auto;padding-bottom:24px}
 .v02-action-body{max-width:760px;margin:auto;padding:18px;display:grid;gap:14px}
 .v02-action-card,.v02-message{background:#fff;padding:14px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.v02-journal-record{display:grid;gap:8px}.v02-model-answer{width:100%;border:0;font:inherit;color:#1a1a2e;text-align:left;cursor:pointer}.v02-model-context{max-height:260px;overflow:auto;background:#e9edf3;padding:12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#303744}
 .v02-message[data-role=user]{background:#e7f1ff;margin-left:24px}.v02-message[data-role=assistant]{margin-right:24px}
 .v02-correction-form{display:flex;gap:8px;align-items:flex-end}.v02-correction-form textarea{flex:1;min-height:78px;border:1px solid #ccd0d5;border-radius:10px;padding:12px;font:inherit}
 .v02-correction-form button,.v02-primary{border:0;border-radius:10px;background:#007aff;color:white;padding:12px 16px;font:inherit;cursor:pointer}
@@ -1588,7 +1589,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
           this.requests.delete(requestId);
           if (receipt.error) throw new Error(receipt.error.message || receipt.error);
           await this.loadDocument();
-          return { status: "applied", newTarget: receipt.actions?.at(-1)?.target };
+          return { status: "applied", newTarget: receipt.target || receipt.actions?.at(-1)?.target };
         }
         await this.resume();
         const result = this.outcomes.get(requestId);
@@ -1889,7 +1890,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       const id = p.actionId || component.id.replace(/^action:/, "");
       this.seenActions.add(id);
       const row = this.node("div", { className: "action-log-row", "data-log-id": id, "data-component-id": component.id, tabIndex: 0 });
-      row.append(this.node("div", { className: "action-log-label" }, p.label || p.text || "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435"), this.node("div", { className: "action-log-status" }, p.status || ""), this.node("div", { className: "action-log-meta" }, p.createdAt || ""));
+      row.append(this.node("div", { className: "action-log-label" }, p.transcript || p.text || "\u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"), this.node("div", { className: "action-log-status" }, p.status || ""), this.node("div", { className: "action-log-meta" }, p.createdAt || ""));
       row.onclick = () => this.navigate("action", { actionId: id });
       row.onkeydown = (event) => {
         if (event.key === "Enter") row.click();
@@ -1907,10 +1908,24 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       bar.append(close, rollback);
       page.append(bar);
       const body = this.node("div", { className: "v02-action-body" });
-      body.append(this.node("h2", {}, p.title || p.label || "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435"), this.node("small", {}, "\u0418\u0441\u0445\u043E\u0434\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430"), this.node("div", { className: "v02-action-card", "data-component-id": component.id }, p.sourceText || p.text || "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430"));
-      if (p.context) body.append(this.node("small", {}, typeof p.context === "string" ? p.context : JSON.stringify(p.context)));
-      body.append(this.node("small", {}, "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442"), this.node("div", { className: "v02-action-card", "data-component-id": component.id }, typeof p.result === "string" ? p.result : JSON.stringify(p.result || {})));
-      for (const message of p.messages || []) body.append(this.node("div", { className: "v02-message", "data-role": message.role }, message.text || ""));
+      body.append(this.node("h2", {}, p.title || p.label || "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435"));
+      for (const record of p.records || []) {
+        const block = this.node("section", { className: "v02-journal-record", "data-entry-id": record.id });
+        if (record.kind === "text") {
+          block.append(this.node("small", {}, record.corrects ? "\u041A\u043E\u0440\u0440\u0435\u043A\u0442\u0438\u0440\u043E\u0432\u043A\u0430" : "\u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"), this.node("div", { className: "v02-message", "data-role": "user" }, record.userText || ""));
+          const context = this.node("pre", { className: "v02-model-context", hidden: true }, JSON.stringify(record.modelContext || {}, null, 2));
+          const structured = { ...record.answer ? { answer: record.answer } : {}, ...record.commands?.length ? { commands: record.commands } : {} };
+          const answer = this.node("button", { className: "v02-action-card v02-model-answer", type: "button", "aria-expanded": "false" }, JSON.stringify(structured, null, 2));
+          answer.onclick = () => {
+            context.hidden = !context.hidden;
+            answer.setAttribute("aria-expanded", String(!context.hidden));
+          };
+          block.append(context, answer);
+        } else {
+          block.append(this.node("small", {}, record.corrects ? "\u041A\u043E\u0440\u0440\u0435\u043A\u0442\u0438\u0440\u043E\u0432\u043A\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430" : "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430"), this.node("pre", { className: "v02-action-card" }, JSON.stringify(record.command || {}, null, 2)));
+        }
+        body.append(block);
+      }
       const form = this.node("form", { className: "v02-correction-form" });
       const input = this.node("textarea", { id: "action-correction-input", placeholder: "\u0427\u0442\u043E \u043D\u0443\u0436\u043D\u043E \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C?", "aria-label": "\u041A\u043E\u0440\u0440\u0435\u043A\u0442\u0438\u0440\u043E\u0432\u043A\u0430 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F" });
       input.oninput = () => {
@@ -3010,7 +3025,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-065a9e4dc03d48a3";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-04f1ad98b386555c";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const realtime = createRealtimeVoiceAgent({

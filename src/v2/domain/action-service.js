@@ -1,44 +1,33 @@
-import { clone, fail, uiCommands, safeError } from './contracts.js';
+import { clone, fail, uiCommands } from './contracts.js';
 
+/** Executes journal commands. All outcomes belong to the private executor ledger. */
 export class ActionService {
-  constructor({ graph, journal }) { this.graph = graph; this.journal = journal; }
-  execute(commandEntryId, expectedRevision) {
-    const entry = this.journal.get(commandEntryId);
-    if (!entry || entry.type !== 'command') fail('NOT_FOUND', 'Команда журнала не найдена');
-    const prior = this.journal.entries.find(e => e.type === 'result' && e.actionId === commandEntryId);
+  constructor({ graph, journal, technical }) { Object.assign(this, { graph, journal, technical }); }
+  execute(entry, command, index) {
+    const key = `${entry.id}:${index}`;
+    const prior = this.technical.commandKeys?.[key];
     if (prior) return clone(prior);
-    const input = entry.command;
-    const isRollback = input.command === 'rollbackAction' || input.command === 'undo';
     let result;
-    try {
-      if ((expectedRevision ?? entry.expectedRevision) !== this.graph.revision) fail('CONFLICT', 'Документ изменился после подготовки команды');
-      if (isRollback) {
-        const actionId = input.command === 'undo'
-          ? this.journal.actions().filter(a => a.canRollback).at(-1)?.id : input.actId;
-        if (!actionId) fail('NOT_FOUND', 'Нечего откатывать');
-        const chain = this.journal.chain(actionId);
-        if (!chain.length) fail('ALREADY_ROLLED_BACK', 'Действие уже отменено или не меняет задачи');
-        result = { ...this.graph.rollback(chain), undoneIds: chain.map(x => x.actionId) };
-      } else if (uiCommands[input.command]) {
-        result = { label: 'Открыт экран', revision: this.graph.revision, changes: [], uiEffect: {
-          view: uiCommands[input.command], taskId: input.actId === 'list' ? null : input.actId,
-          query: input.payload?.query || '', mode: input.command === 'showAddModal' ? 'add' : 'edit',
-          parentId: input.payload?.parentId || null
-        } };
-      } else {
-        result = this.graph.apply([input], entry.expectedRevision);
-      }
-      return this.journal.append({
-        type: 'result', actionId: entry.id, requestId: entry.requestId, rootActionId: entry.rootActionId || entry.id,
-        sessionId: entry.sessionId, command: input, status: 'applied', ...result,
-        label: result.label || 'Готово', reply: entry.reply || '', silent: input.command === 'toggleCollapse' || isRollback
-      });
-    } catch (error) {
-      return this.journal.append({
-        type: 'result', actionId: entry.id, requestId: entry.requestId, rootActionId: entry.rootActionId || entry.id,
-        sessionId: entry.sessionId, command: input, status: 'failed', label: safeError(error).message,
-        error: safeError(error), changes: [], revision: this.graph.revision, silent: isRollback
-      });
+    if (command.command === 'rollbackAction' || command.command === 'undo') {
+      const root = this.journal.rootFor(entry.corrects || command.actId);
+      if (!root) fail('NOT_FOUND', 'Нечего откатывать');
+      if (this.technical.undoneEntries?.[root.id]) fail('ALREADY_ROLLED_BACK', 'Действие уже отменено');
+      const chain = this.journal.chain(root.id).filter(item => item.cursor < entry.cursor);
+      const outcomes = chain.flatMap(item => this.technical.executor?.[item.id]?.outcomes || []).filter(item => item.changes?.length);
+      if (!outcomes.length) fail('ALREADY_ROLLED_BACK', 'Действие не меняет задачи или уже отменено');
+      result = { ...this.graph.rollback(outcomes), undoneEntryIds: chain.map(item => item.id), rootId: root.id };
+    } else if (uiCommands[command.command]) {
+      result = { label: 'Открыт экран', revision: this.graph.revision, changes: [], target: command.actId || null, uiEffect: {
+        view: uiCommands[command.command], taskId: command.actId === 'list' ? null : command.actId,
+        query: command.payload?.query || '', mode: command.command === 'showAddModal' ? 'add' : 'edit',
+        parentId: command.payload?.parentId || null
+      } };
+    } else {
+      result = this.graph.apply([command], index === 0 ? entry.context.revision : this.graph.revision);
     }
+    const outcome = { key, command: clone(command), ...clone(result) };
+    this.technical.commandKeys ||= {};
+    this.technical.commandKeys[key] = clone(outcome);
+    return outcome;
   }
 }

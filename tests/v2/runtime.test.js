@@ -10,6 +10,8 @@ function input(seq, command, extra = {}) {
 }
 const status = value => ({command:'setStatus',actId:'milk1',payload:{status:value}});
 async function execute(runtime, value) {
+  value = structuredClone(value);
+  value.context.revision = runtime.graph.revision;
   const receipt = await runtime.executeAndWait(value);
   expect(receipt.status).toBe('completed');
   return receipt;
@@ -22,7 +24,9 @@ describe('v0.2 authoritative journal and graph projection', () => {
     expect(runtime.graph.read({id:'milk1'}).status).toBe('Open');
     await runtime.processPending();
     expect(runtime.graph.read({id:'milk1'}).status).toBe('Focus');
-    expect(runtime.journal.entries.map(e=>e.type)).toEqual(['input','command','result','settled']);
+    expect(runtime.journal.entries.map(e=>e.type)).toEqual(['interaction']);
+    expect(runtime.journal.entries[0]).not.toHaveProperty('result');
+    expect(runtime.journal.actions()).toHaveLength(0);
     const doc=runtime.getDocument({view:'list'});
     expect(doc.schemaVersion).toBe(1);
     expect(doc.root.children[1].children.find(n=>n.id==='task:milk1').props.status).toBe('Focus');
@@ -32,7 +36,7 @@ describe('v0.2 authoritative journal and graph projection', () => {
     const request=input(1,{command:'addItem',actId:'list',payload:{line1:'One'}});
     await Promise.all([runtime.submit(request),runtime.submit(request)]);
     await runtime.processPending();
-    await execute(runtime,request);
+    expect((await runtime.executeAndWait(request)).status).toBe('completed');
     expect(runtime.graph.read().items.filter(x=>x.line1==='One')).toHaveLength(1);
     await expect(runtime.submit({...request,command:status('Done')})).rejects.toMatchObject({code:'REQUEST_KEY_REUSED'});
   });
@@ -75,19 +79,19 @@ describe('v0.2 authoritative journal and graph projection', () => {
   it('rolls back an action and its corrections without deleting independent field edits', async () => {
     const runtime=new DocumentRuntime();
     const first=await execute(runtime,input(1,status('Focus')));
-    const id=first.actions[0].id;
+    const id=first.requestId;
     await execute(runtime,input(2,status('Done'),{actionId:id,elementId:'action:'+id}));
     await execute(runtime,input(3,{command:'editItem',actId:'milk1',payload:{line1:'Independent'}}));
     const rollback=await execute(runtime,input(4,{command:'rollbackAction',actId:id,payload:{}},{elementId:'action:'+id,actionId:id}));
     expect(rollback.error).toBe(null);
     expect(runtime.graph.read({id:'milk1'})).toMatchObject({status:'Open',line1:'Independent'});
-    expect(runtime.journal.actions().find(a=>a.id===id).rolledBack).toBe(true);
+    expect(runtime.state.technical.undoneEntries[id]).toBe(true);
   });
   it('fails targeted rollback if another action changed the same field', async () => {
     const runtime=new DocumentRuntime();
     const first=await execute(runtime,input(1,status('Focus')));
     await execute(runtime,input(2,status('Done')));
-    const rollback=await execute(runtime,input(3,{command:'rollbackAction',actId:first.actions[0].id,payload:{}}));
+    const rollback=await execute(runtime,input(3,{command:'rollbackAction',actId:first.requestId,payload:{}}));
     expect(rollback.error.code).toBe('CONFLICT');
     expect(runtime.graph.read({id:'milk1'}).status).toBe('Done');
   });
@@ -128,13 +132,14 @@ describe('v0.2 authoritative journal and graph projection', () => {
     expect(port.getTaskById('milk1').status).toBe('Focus');
     expect(port.getTaskSubgraph('milk1').status).toBe('found');
     expect(port.getTaskTitleTreeText()).toContain('milk1 >>');
-    expect(runtime.journal.actions()).toHaveLength(1);
+    expect(runtime.journal.actions()).toHaveLength(0);
   });
   it('forms editor, action, frontier, search and empty screen component documents', async () => {
     const runtime=new DocumentRuntime();
-    const receipt=await execute(runtime,input(1,status('Focus')));
+    const request=input(1,status('Open'));delete request.command;request.text='это фокус';
+    const receipt=await execute(runtime,request);
     expect(runtime.getDocument({view:'edit',taskId:'milk1'}).root.children[1].type).toBe('task-editor');
-    expect(runtime.getDocument({view:'action',actionId:receipt.actions[0].id}).root.children[1].props.messages).toHaveLength(2);
+    expect(runtime.getDocument({view:'action',actionId:receipt.actions[0].id}).root.children[1].props.records).toHaveLength(1);
     expect(runtime.getDocument({view:'frontier'}).root.children[1].type).toBe('task-list');
     expect(runtime.getDocument({view:'search',query:'хлеб'}).root.children[1].children.length).toBeGreaterThan(0);
     expect(runtime.getDocument({view:'settings'}).root.children[1].type).toBe('settings');

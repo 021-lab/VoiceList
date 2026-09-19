@@ -18,9 +18,14 @@ export class ListDocumentDO extends Agent {
     await this.scheduleEvery(60, 'recoverPending');
   }
   initializeRuntime(initialState) {
+    const resolveModel = this.env.V02_TEST_MODEL === 'local-parser' ? undefined : async context => resolveOpenAI({
+      ...context,
+      apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(),
+      model: this.env.AGENT_MODEL || 'gpt-4.1-mini'
+    });
     this.runtime = new DocumentRuntime({
       initialState, persist: state => this.runtimeStorage.save(state), scheduler: this,
-      resolveModel: async context => resolveOpenAI({ ...context, apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(), model: this.env.AGENT_MODEL || 'gpt-4.1-mini' })
+      resolveModel
     });
     this.port = new CompatibilityPort(this.runtime);
   }
@@ -44,7 +49,7 @@ export class ListDocumentDO extends Agent {
   async cancelInputSchedule(id) { return this.runtime.harness.cancelSchedule(id); }
   async scheduledTrigger(input, schedule) {
     const clientKey = 'schedule:' + schedule.id, seq = Math.max(1, Number(schedule.time) || 1);
-    const existing = this.runtime.journal.entries.find(e => e.type === 'input' && e.input.key.clientKey === clientKey && e.input.key.seq === seq);
+    const existing = this.runtime.journal.entries.find(e => e.key.clientKey === clientKey && e.key.seq === seq);
     if (!existing) await this.runtime.submit({ ...input, key: {clientKey,seq}, context: {...input.context,revision:this.runtime.graph.revision} });
     await this.processPending();
   }
@@ -62,7 +67,7 @@ export class ListDocumentDO extends Agent {
       else if (message.type === 'utterance') {
         const receipt = await this.runtime.executeAndWait({key:{clientKey:message.clientKey,seq:message.seq},
           context:{elementId:message.target ? 'task:'+message.target : 'app',view:'list',revision:this.runtime.graph.revision},text:message.transcript});
-        ack = {seq:message.seq,status:receipt.error?'rejected':'applied',reason:receipt.error?.message,id:receipt.actions[0]?.id,newTarget:receipt.actions[0]?.target};
+        ack = {seq:message.seq,status:receipt.error?'rejected':'applied',reason:receipt.error?.message,id:receipt.actions[0]?.id,newTarget:receipt.target || receipt.actions[0]?.target};
       } else fail('INVALID_INPUT','Неизвестный тип сообщения');
       connection.send(JSON.stringify({type:'ack',ack}));
       this.broadcastState();
