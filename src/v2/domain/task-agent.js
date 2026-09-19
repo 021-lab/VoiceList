@@ -38,8 +38,20 @@ export class TaskAgent {
     if (typeof raw === 'string') { try { value = JSON.parse(raw); } catch { fail('INVALID_DECISION', 'Модель вернула некорректный ответ'); } }
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
     const answer = value.answer ?? value.reply ?? '';
-    const commands = value.commands ?? [];
+    let commands = value.commands ?? [];
     if (typeof answer !== 'string' || !Array.isArray(commands) || commands.length > 10 || commands.some(command => !command || typeof command.command !== 'string')) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
+    if (!commands.length && typeof modelContext.text === 'string') {
+      const deterministic = parseCommand(modelContext.text.trim(), modelContext.target);
+      if (deterministic.kind === 'one') {
+        const command = toCommand(deterministic.hypothesis, modelContext.target);
+        if (command?.command === 'setParent') {
+          const candidates = findCandidates(deterministic.hypothesis.tail, adaptSnapshot(modelContext.tasks || []));
+          if (candidates.length === 1) command.payload.parentId = candidates[0].id;
+          else commands = [];
+        }
+        if (command?.command !== 'setParent' || command.payload.parentId) commands = command ? [command] : [];
+      }
+    }
     const taskIds = new Set((modelContext.tasks || []).map(task => task.id));
     const targetCommands = new Set(['addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem']);
     const parsedCommands = clone(commands).map(command => {
