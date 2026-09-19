@@ -33,13 +33,19 @@ export class TaskAgent {
     }
     return JSON.stringify({ answer: 'Не удалось однозначно понять команду. Уточните действие.', commands: [] });
   }
-  parse(raw) {
+  parse(raw, modelContext = {}) {
     let value = raw;
     if (typeof raw === 'string') { try { value = JSON.parse(raw); } catch { fail('INVALID_DECISION', 'Модель вернула некорректный ответ'); } }
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
     const answer = value.answer ?? value.reply ?? '';
     const commands = value.commands ?? [];
-    if (typeof answer !== 'string' || !Array.isArray(commands) || commands.some(command => !command || typeof command.command !== 'string')) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
-    return { answer, commands: clone(commands) };
+    if (typeof answer !== 'string' || !Array.isArray(commands) || commands.length > 10 || commands.some(command => !command || typeof command.command !== 'string')) fail('INVALID_DECISION', 'Модель вернула некорректный ответ');
+    const taskIds = new Set((modelContext.tasks || []).map(task => task.id));
+    const targetCommands = new Set(['addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem']);
+    const parsedCommands = clone(commands).map(command => {
+      if (targetCommands.has(command.command) && !taskIds.has(command.actId) && taskIds.has(modelContext.target)) command.actId = modelContext.target;
+      return command;
+    });
+    return { answer, commands: parsedCommands };
   }
 }

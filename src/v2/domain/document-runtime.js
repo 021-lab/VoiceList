@@ -123,7 +123,7 @@ export class DocumentRuntime {
     let raw;
     try {
       raw = await this.harness.invoke(prepared.modelContext);
-      const parsed = this.harness.parse(raw);
+      const parsed = this.harness.parse(raw, prepared.modelContext);
       await this.transaction(({ journal, technical }) => {
         if (technical.harness[entry.id]?.status !== 'pending') return;
         journal.enrich(entry.id, { rawModelResponse: clone(raw), answer: parsed.answer, commands: parsed.commands });

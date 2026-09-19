@@ -100,6 +100,9 @@ describe('v0.2 InteractionJournal bus comprehensive contract', () => {
     expect(parser.parse('{"answer":"ok"}')).toEqual({ answer: 'ok', commands: [] });
     expect(parser.parse('{"commands":[{"command":"showList"}]}')).toEqual({ answer: '', commands: [{ command: 'showList' }] });
     expect(parser.parse('{"answer":"ok","commands":[{"command":"showList"}]}')).toEqual({ answer: 'ok', commands: [{ command: 'showList' }] });
+    expect(parser.parse('{"commands":[{"command":"setStatus","actId":"hallucinated","payload":{"status":"Focus"}}]}', {
+      target: 'milk1', tasks: [{ id: 'milk1' }]
+    }).commands[0].actId).toBe('milk1');
 
     const answerOnlyRuntime = new DocumentRuntime({ resolveModel: async ({ text }) => text === 'root answer'
       ? '{"answer":"only an answer"}'
