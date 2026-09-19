@@ -7,7 +7,7 @@ export class LiveLog {
     this.storage = storage;
     this.sql = storage.sql;
     this.sql.exec(`CREATE TABLE IF NOT EXISTS vl_live_events (
-      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      seq INTEGER PRIMARY KEY,
       live_session_id TEXT NOT NULL,
       at TEXT NOT NULL,
       offset_ms INTEGER,

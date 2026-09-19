@@ -16,6 +16,7 @@
     "deploy:cloudflare": "npm run build:v2 && wrangler deploy --config wrangler.dev.jsonc",
     "test:v2:worker": "node tests/v2/worker-integration.mjs",
     "test:v2:browser": "playwright test --config tests/v2-browser/playwright.config.js",
+    "smoke:live": "node scripts/live-smoke.mjs",
     "serve:test": "node scripts/static-server.mjs"
   },
   "devDependencies": {

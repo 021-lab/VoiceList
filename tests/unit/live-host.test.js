@@ -85,7 +85,26 @@ describe('logging', () => {
     const types = context.rows.map(row => row.event.type);
     expect(types).toContain('session.started');
     expect(types).toContain('session.input_transcript.delta');
-    expect(context.rows.every(row => row.sessionId === 'live_1')).toBe(true);
+    // Everything from the session itself is keyed by its id; only the record of the attempt
+    // predates the id, which is the point of writing it before the call goes out.
+    expect(context.rows.filter(row => row.event.type !== 'vl.session.requested').every(row => row.sessionId === 'live_1')).toBe(true);
+    expect(context.rows[0].event.type).toBe('vl.session.requested');
+  });
+
+  it('records an attempt that never reaches OpenAI', async () => {
+    const failing = harness();
+    failing.host.fetchImpl = async () => { throw new Error('network down'); };
+    await expect(failing.host.start({ sdp: 'offer-sdp' })).rejects.toThrow(/GPT-Live/);
+    const types = failing.rows.map(row => row.event.type);
+    expect(types).toEqual(['vl.session.requested', 'vl.session.unreachable']);
+    expect(failing.rows.at(-1).event.error.message).toBe('network down');
+  });
+
+  it('records the detail when GPT-Live rejects the session', async () => {
+    const rejected = harness({ createOk: false });
+    await expect(rejected.host.start({ sdp: 'offer-sdp' })).rejects.toThrow();
+    const failure = rejected.rows.find(row => row.event.type === 'vl.session.create_failed');
+    expect(failure.event).toMatchObject({ status: 400, detail: 'nope' });
   });
 
   it('drops audio bytes and streamed text deltas', async () => {
@@ -224,6 +243,15 @@ describe('stopping', () => {
     expect(context.socket.sent.some(message => message.type === 'session.close')).toBe(true);
     expect(context.socket.closed).toBe(true);
     expect(context.host.active).toBe(false);
+  });
+
+  it('still attributes the sideband close to its session', async () => {
+    const context = harness();
+    await context.host.start({ sdp: 'offer-sdp' });
+    await context.host.stop('client');
+    context.socket.emit('close', {});
+    const closed = context.rows.find(row => row.event.type === 'vl.sideband.closed');
+    expect(closed.sessionId).toBe('live_1');
   });
 
   it('lets go when the session reports itself closed', async () => {

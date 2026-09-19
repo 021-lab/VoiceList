@@ -13,7 +13,7 @@ export async function readBoundedJson(response, limit = 128000) {
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   try { return JSON.parse(new TextDecoder().decode(bytes)); } catch { fail('INVALID_INPUT', 'Некорректный JSON'); }
 }
-export async function resolveOpenAI({ apiKey, model = 'gpt-4.1-mini', modelContext, fetchImpl = fetch }) {
+export async function resolveOpenAI({ apiKey, model = 'gpt-4.1-mini', modelContext, fetchImpl = (...args) => fetch(...args) }) {
   if (!apiKey) return JSON.stringify({ answer: 'Для свободных команд настройте OpenAI-ключ в Настройках.', commands: [] });
   const response = await fetchImpl('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },

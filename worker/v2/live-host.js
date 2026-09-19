@@ -16,7 +16,7 @@ const PROMPT_TOOLS = new Set(['getVoicePrompt', 'getBackendPrompt', 'setVoicePro
  *  browser. That is what makes a server-side log possible at all — with the media path
  *  alone the worker never sees an event past the SDP exchange. */
 export class LiveHost {
-  constructor({ log, settings, services, apiKey, fetchImpl = fetch, sessionsUrl = OPENAI_LIVE_SESSIONS_URL, store = true, now = () => new Date() }) {
+  constructor({ log, settings, services, apiKey, fetchImpl = (...args) => fetch(...args), sessionsUrl = OPENAI_LIVE_SESSIONS_URL, store = true, now = () => new Date() }) {
     this.log = log;
     this.settings = settings;
     this.services = services;
@@ -33,8 +33,10 @@ export class LiveHost {
 
   stamp() { return this.now().toISOString(); }
 
-  record(event, direction = 'in') {
-    try { this.log.append(event, { sessionId: this.sessionId, direction, at: this.stamp() }); } catch { /* the log must never break the call */ }
+  /** The session id is passed explicitly where the handler outlives the session, so a
+   *  closing event is still attributed rather than landing under an empty id. */
+  record(event, direction = 'in', sessionId = this.sessionId) {
+    try { this.log.append(event, { sessionId, direction, at: this.stamp() }); } catch { /* the log must never break the call */ }
   }
 
   send(message) {
@@ -57,17 +59,32 @@ export class LiveHost {
     ]);
     const config = buildLiveSessionConfig({ items, voicePrompt, backendPrompt, backendModel, store: this.store });
 
-    const created = await this.fetchImpl(this.sessionsUrl, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session: config, transport: { type: 'webrtc', sdp } })
-    });
-    if (!created.ok) {
-      const detail = (await created.text()).slice(0, 1_000);
-      this.record({ type: 'vl.session.create_failed', status: created.status, detail }, 'out');
-      fail('MODEL_UNAVAILABLE', `GPT-Live отклонил сессию (${created.status})`);
+    // Every attempt leaves a trace, including one that never reaches OpenAI: an attempt
+    // missing from the log would be indistinguishable from one that was never made.
+    this.record({ type: 'vl.session.requested', backendModel: backendModel || DEFAULT_BACKEND_MODEL, store: this.store, sdpChars: sdp.length }, 'out');
+
+    let created;
+    try {
+      created = await this.fetchImpl(this.sessionsUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: config, transport: { type: 'webrtc', sdp } })
+      });
+    } catch (error) {
+      this.record({ type: 'vl.session.unreachable', error: { name: error?.name, message: error?.message } }, 'out');
+      fail('MODEL_UNAVAILABLE', `Не удалось обратиться к GPT-Live: ${error?.message || 'сеть недоступна'}`);
     }
-    const payload = await created.json();
+    if (!created.ok) {
+      const detail = await created.text().catch(() => '');
+      this.record({ type: 'vl.session.create_failed', status: created.status, detail: detail.slice(0, 2_000) }, 'out');
+      fail('MODEL_UNAVAILABLE', `GPT-Live отклонил сессию (${created.status}): ${detail.slice(0, 300)}`);
+    }
+    let payload;
+    try { payload = await created.json(); }
+    catch (error) {
+      this.record({ type: 'vl.session.unreadable', error: { message: error?.message } }, 'out');
+      fail('MODEL_UNAVAILABLE', 'GPT-Live вернул нечитаемый ответ');
+    }
     const id = String(payload?.session?.id || '');
     const answer = String(payload?.transport?.sdp || '');
     if (!id || !answer) fail('MODEL_UNAVAILABLE', 'GPT-Live не вернул идентификатор сессии');
@@ -107,8 +124,8 @@ export class LiveHost {
     }
     this.session.socket = socket;
     socket.addEventListener('message', event => { this.receive(event.data); });
-    socket.addEventListener('close', () => { this.record({ type: 'vl.sideband.closed' }, 'out'); this.session = null; });
-    socket.addEventListener('error', () => { this.record({ type: 'vl.sideband.error' }, 'out'); });
+    socket.addEventListener('close', () => { this.record({ type: 'vl.sideband.closed' }, 'out', id); this.session = null; });
+    socket.addEventListener('error', () => { this.record({ type: 'vl.sideband.error' }, 'out', id); });
   }
 
   receive(raw) {

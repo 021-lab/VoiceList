@@ -33,7 +33,7 @@ function normalizeState(initialState, seed) {
 
 /** Platform-independent coordinator. Model I/O always happens outside persistence transactions. */
 export class DocumentRuntime {
-  constructor({ initialState, seed = seedState, persist = async () => {}, resolveModel, fetchImpl = fetch, scheduler } = {}) {
+  constructor({ initialState, seed = seedState, persist = async () => {}, resolveModel, fetchImpl = (...args) => fetch(...args), scheduler } = {}) {
     this.seed = seed; this.persist = persist; this.fetchImpl = fetchImpl;
     this.state = normalizeState(initialState, seed);
     this.harness = new AgentHarness({ agent: new TaskAgent({ resolveModel }), scheduler });
