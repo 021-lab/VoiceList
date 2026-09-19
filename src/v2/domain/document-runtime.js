@@ -28,7 +28,7 @@ function normalizeState(initialState, seed) {
       for (const result of legacyResults) for (const id of result.undoneIds || []) technical.undoneEntries[id] = true;
     }
   }
-  return { graph: clone(initialState?.graph || new TaskGraph({}, seed).read()), entries: journal.entries, technical };
+  return { graph: clone(new TaskGraph(initialState?.graph || {}, seed).read()), entries: journal.entries, technical };
 }
 
 /** Platform-independent coordinator. Model I/O always happens outside persistence transactions. */

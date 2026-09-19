@@ -2,6 +2,25 @@ import { createInterpreter } from '../../list-interpreter.js';
 import { clone, fail, stable, statuses, graphCommands } from './contracts.js';
 
 const inbox = { id: 'inbox', parentId: null, order: 0, status: 'Open', line1: 'Входящие', line2: '', collapsed: false, tags: [] };
+export const FIRST_TASK_ID_SEQUENCE = 1000;
+
+/** Ids are base36 counter values: short enough for a voice model to repeat back verbatim.
+ *  The counter is stored rather than derived from the highest existing id, because deleting
+ *  the highest task would otherwise hand its id to the next one while the journal still
+ *  references it. Legacy ids share the base36 alphabet, so a taken candidate is skipped. */
+export function createIdAllocator(start) {
+  let sequence = Math.max(FIRST_TASK_ID_SEQUENCE, Number(start) || FIRST_TASK_ID_SEQUENCE);
+  return {
+    allocate(existingIds) {
+      for (;;) {
+        const candidate = sequence.toString(36);
+        sequence += 1;
+        if (candidate !== inbox.id && !existingIds.has(candidate)) return candidate;
+      }
+    },
+    get sequence() { return sequence; }
+  };
+}
 export function validateItems(items) {
   const byId = new Map(items.map(item => [item.id, item]));
   if (byId.size !== items.length || !byId.has('inbox')) fail('INVALID_GRAPH', 'Некорректные ID задач');
@@ -30,15 +49,17 @@ export class TaskGraph {
     this.items = clone(state.items || seed.snapshot?.items || []);
     if (!this.items.some(x => x.id === 'inbox')) this.items.unshift(clone(inbox));
     this.revision = state.revision || 0;
+    this.nextId = Math.max(FIRST_TASK_ID_SEQUENCE, Number(state.nextId) || FIRST_TASK_ID_SEQUENCE);
     validateItems(this.items);
   }
   read(query = {}) {
     if (query.id) return clone(this.items.find(x => x.id === query.id) || null);
-    return { items: clone(this.items), revision: this.revision };
+    return { items: clone(this.items), revision: this.revision, nextId: this.nextId };
   }
   apply(commands, expectedRevision = this.revision) {
     if (expectedRevision !== this.revision) fail('CONFLICT', 'Документ изменился. Повторите команду в актуальном контексте.');
     const before = clone(this.items);
+    const allocator = createIdAllocator(this.nextId);
     let next = clone(before), label = '';
     for (const input of commands) {
       const { command, actId, payload = {} } = input;
@@ -52,7 +73,7 @@ export class TaskGraph {
         if (!Array.isArray(payload.arranged) || payload.arranged.some(x => !next.some(n => n.id === x.id) || Object.keys(x).some(k => !['id','order','parentId'].includes(k)) || !Number.isFinite(x.order))) fail('INVALID_INPUT', 'Некорректное перемещение');
         if (payload.arranged.some(x => x.id === 'inbox' && x.parentId != null)) fail('PROTECTED', 'Входящие остаются в корне');
       }
-      const interpreter = createInterpreter({ createItemId: () => crypto.randomUUID(), createLogId: () => 'draft' });
+      const interpreter = createInterpreter({ createItemId: existingIds => allocator.allocate(existingIds), createLogId: () => 'draft' });
       const result = interpreter.execute({ snapshot: { items: next }, actionLog: [] }, input);
       if (!result.patch?.length) fail('INVALID_INPUT', 'Команда не изменила документ');
       for (const patch of result.patch) {
@@ -63,7 +84,7 @@ export class TaskGraph {
       label = result.logEntryDraft?.label || '';
     }
     const changes = changesBetween(before, next);
-    if (changes.length) { this.items = next; this.revision += 1; }
+    if (changes.length) { this.items = next; this.revision += 1; this.nextId = allocator.sequence; }
     return { changes, revision: this.revision, label, target: next.find(x => !before.some(b => b.id === x.id))?.id || commands.at(-1)?.actId || null };
   }
   rollback(outcomes) {
@@ -85,6 +106,8 @@ export class TaskGraph {
     }
     const next = [...map.values()]; validateItems(next);
     const changes = changesBetween(before, next);
+    // The counter never rewinds on rollback: a rolled-back id must not be handed out again
+    // while the journal still references it.
     if (changes.length) { this.items = next; this.revision += 1; }
     return { changes, revision: this.revision, label: 'Действие и корректировки отменены', target: outcomes[0]?.target || null };
   }

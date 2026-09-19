@@ -12,8 +12,9 @@ export class RuntimeStorage {
     const meta = this.sql.exec("SELECT value FROM vl_meta WHERE id = 'revision'").toArray()[0];
     if (!meta) return undefined;
     const technical = this.sql.exec("SELECT value FROM vl_technical WHERE id = 'state'").toArray()[0];
+    const nextId = this.sql.exec("SELECT value FROM vl_meta WHERE id = 'nextId'").toArray()[0];
     return {
-      graph: { revision: meta.value, items: this.sql.exec('SELECT value FROM vl_projection ORDER BY rowid').toArray().map(row => JSON.parse(row.value)) },
+      graph: { revision: meta.value, nextId: nextId?.value, items: this.sql.exec('SELECT value FROM vl_projection ORDER BY rowid').toArray().map(row => JSON.parse(row.value)) },
       entries: this.sql.exec('SELECT value FROM vl_journal ORDER BY cursor').toArray().map(row => JSON.parse(row.value)),
       technical: technical ? JSON.parse(technical.value) : undefined
     };
@@ -26,6 +27,7 @@ export class RuntimeStorage {
       }
       for (const item of state.graph.items) this.sql.exec('INSERT INTO vl_projection (id,value) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value WHERE value != excluded.value', item.id, JSON.stringify(item));
       this.sql.exec("INSERT INTO vl_meta (id,value) VALUES ('revision',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value WHERE value != excluded.value", state.graph.revision);
+      if (Number.isFinite(state.graph.nextId)) this.sql.exec("INSERT INTO vl_meta (id,value) VALUES ('nextId',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value WHERE value != excluded.value", state.graph.nextId);
       const cursors = new Set(state.entries.map(entry => entry.cursor));
       for (const row of this.sql.exec('SELECT cursor FROM vl_journal').toArray()) if (!cursors.has(row.cursor)) this.sql.exec('DELETE FROM vl_journal WHERE cursor = ?', row.cursor);
       for (const entry of state.entries) this.sql.exec('INSERT INTO vl_journal (cursor,value) VALUES (?,?) ON CONFLICT(cursor) DO UPDATE SET value=excluded.value WHERE value != excluded.value', entry.cursor, JSON.stringify(entry));
