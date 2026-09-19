@@ -334,27 +334,85 @@ export class Client {
     row.onkeydown = (event) => { if (event.key === 'Enter') row.click(); };
     return row;
   }
+  renderCommandCard(view, { onReveal, contextId } = {}) {
+    const interactive = typeof onReveal === 'function';
+    const card = this.node(interactive ? 'button' : 'div', {
+      className: `v02-command-card${interactive ? ' v02-context-trigger' : ''}`,
+      ...(interactive ? { type: 'button', 'aria-expanded': 'false', 'aria-controls': contextId } : {}),
+      'data-command-type': view?.type || 'unknown'
+    });
+    const heading = this.node('span', { className: 'v02-command-heading' }, view?.actionLabel || 'Неизвестная команда');
+    card.append(heading);
+    if (view?.targetLabel) card.append(this.node('span', { className: 'v02-command-target' }, view.targetLabel));
+    for (const field of view?.fields || []) {
+      const row = this.node('span', { className: 'v02-command-field' });
+      row.append(this.node('span', { className: 'v02-command-field-label' }, field.label), this.node('span', { className: 'v02-command-field-value' }, field.value));
+      card.append(row);
+    }
+    if (interactive) card.onclick = onReveal;
+    return card;
+  }
   renderActionPage(component) {
     const p = component.props;
-    const page = this.node('section', { id: 'v02-action-page', className: 'v02-action-page', 'data-component-id': component.id, 'aria-label': 'Действие' });
+    const page = this.node('section', { id: 'v02-action-page', className: 'v02-action-page', 'data-component-id': component.id, 'aria-label': 'История действия' });
     const bar = this.node('div', { className: 'task-page-bar' });
     const close = this.node('button', { id: 'action-close', className: 'task-page-close' }, 'Закрыть'); close.onclick = () => this.close();
-    const rollback = this.node('button', { id: 'action-rollback', className: 'task-page-save', disabled: p.canRollback === false }, 'Откатить');
+    const rollback = this.node('button', { id: 'action-rollback', className: 'task-page-save', disabled: p.canRollback === false }, p.rolledBack ? 'Откат выполнен' : 'Откатить');
     rollback.onclick = () => this.handleInput({ context: this.context(component), command: { command: 'rollbackAction', actId: p.actionId, actType: 'action', payload: { actionId: p.actionId } } });
     bar.append(close, rollback); page.append(bar);
     const body = this.node('div', { className: 'v02-action-body' });
-    body.append(this.node('h2', {}, p.title || p.label || 'Действие'));
-    for (const record of p.records || []) {
+    body.append(this.node('h2', {}, 'История действия'));
+    for (const [recordIndex, record] of (p.records || []).entries()) {
       const block = this.node('section', { className: 'v02-journal-record', 'data-entry-id': record.id });
       if (record.kind === 'text') {
-        block.append(this.node('small', {}, record.corrects ? 'Корректировка' : 'Реплика пользователя'), this.node('div', { className: 'v02-message', 'data-role': 'user' }, record.userText || ''));
-        const context = this.node('pre', { className: 'v02-model-context', hidden: true }, JSON.stringify(record.modelContext || {}, null, 2));
-        const structured = { ...(record.answer ? { answer: record.answer } : {}), ...(record.commands?.length ? { commands: record.commands } : {}) };
-        const answer = this.node('button', { className: 'v02-action-card v02-model-answer', type: 'button', 'aria-expanded': 'false' }, JSON.stringify(structured, null, 2));
-        answer.onclick = () => { context.hidden = !context.hidden; answer.setAttribute('aria-expanded', String(!context.hidden)); };
-        block.append(context, answer);
+        block.append(this.node('small', { className: 'v02-record-marker' }, record.corrects ? 'Корректировка' : 'Исходная команда'));
+        block.append(this.node('div', { className: 'v02-section-label' }, 'Команда пользователя'));
+        block.append(this.node('div', { className: 'v02-message', 'data-role': 'user' }, record.userText || ''));
+
+        const contextId = `v02-model-context-${recordIndex}`;
+        const hasContext = record.modelContext != null;
+        const disclosure = this.node('button', {
+          className: 'v02-context-disclosure', type: 'button', 'aria-expanded': 'false', 'aria-controls': contextId,
+          disabled: !hasContext
+        });
+        const disclosureLabel = this.node('span', {}, hasContext ? 'Контекст модели' : 'Контекст модели недоступен');
+        const disclosureState = this.node('span', { className: 'v02-context-state', 'aria-hidden': 'true' }, hasContext ? 'Показать ›' : '');
+        disclosure.append(disclosureLabel, disclosureState);
+        const context = this.node('pre', { id: contextId, className: 'v02-model-context', hidden: true }, hasContext ? JSON.stringify(record.modelContext, null, 2) : '');
+        const revealers = [];
+        const toggleContext = () => {
+          if (!hasContext) return;
+          context.hidden = !context.hidden;
+          const expanded = !context.hidden;
+          disclosure.setAttribute('aria-expanded', String(expanded));
+          disclosureState.textContent = expanded ? 'Скрыть ⌄' : 'Показать ›';
+          for (const control of revealers) control.setAttribute('aria-expanded', String(expanded));
+        };
+        disclosure.onclick = toggleContext;
+        block.append(disclosure, context);
+
+        const output = this.node('div', { className: 'v02-model-output' });
+        if (record.answer) {
+          output.append(this.node('div', { className: 'v02-section-label' }, 'Ответ модели'));
+          const answer = this.node('button', {
+            className: 'v02-action-card v02-model-answer v02-context-trigger', type: 'button',
+            'aria-expanded': 'false', 'aria-controls': contextId
+          }, record.answer);
+          answer.onclick = toggleContext; revealers.push(answer); output.append(answer);
+        }
+        if (record.commandViews?.length) {
+          output.append(this.node('div', { className: 'v02-section-label' }, 'Действия модели'));
+          const commands = this.node('div', { className: 'v02-command-list' });
+          for (const view of record.commandViews) {
+            const card = this.renderCommandCard(view, { onReveal: toggleContext, contextId });
+            revealers.push(card); commands.append(card);
+          }
+          output.append(commands);
+        }
+        if (output.children.length) block.append(output);
       } else {
-        block.append(this.node('small', {}, record.corrects ? 'Корректировка интерфейса' : 'Команда интерфейса'), this.node('pre', { className: 'v02-action-card' }, JSON.stringify(record.command || {}, null, 2)));
+        block.append(this.node('small', { className: 'v02-record-marker' }, record.corrects ? 'Корректировка интерфейса' : 'Команда интерфейса'));
+        block.append(this.renderCommandCard(record.commandView));
       }
       body.append(block);
     }

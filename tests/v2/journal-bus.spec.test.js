@@ -64,7 +64,7 @@ describe('v0.2 InteractionJournal bus comprehensive contract', () => {
     const client = new Client({ document: dom.window.document, storage: dom.window.sessionStorage, fetch: async () => { throw new Error('unused'); }, pollMs: 0 });
     client.renderActionPage(actionPage);
     const answer = dom.window.document.querySelector('.v02-model-answer');
-    const savedContext = answer.previousElementSibling;
+    const savedContext = answer.closest('.v02-model-output').previousElementSibling;
     expect(savedContext.classList.contains('v02-model-context')).toBe(true);
     expect(savedContext.hidden).toBe(true);
     answer.click();

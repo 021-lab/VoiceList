@@ -66,10 +66,10 @@ test('actual server flow: create, edit, status, journal, correction chain rollba
   await page.locator('.v02-correction-form button').click();
   await expect(page.locator('.v02-journal-record')).toHaveCount(2);
   await expect(page.locator('.v02-journal-record').last()).toContainText('это открыто');
-  await expect(page.locator('.v02-journal-record').last()).toContainText('Open');
+  await expect(page.locator('.v02-journal-record').last()).toContainText('Открыта');
   await page.locator('#action-rollback').click();
   await expect(page.locator('.v02-journal-record')).toHaveCount(3);
-  await expect(page.locator('.v02-journal-record').last()).toContainText('rollbackAction');
+  await expect(page.locator('.v02-journal-record').last()).toContainText('Откатить действие и все его корректировки');
   await page.locator('#action-close').click(); await expect(page.locator('#action-log-panel')).toBeVisible();
   await page.locator('#view-toggle-btn').click(); await expect(current).toContainText('Done');
   await page.reload(); await expect(current).toContainText(renamed); await expect(current).toContainText('Done');

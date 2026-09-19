@@ -5,6 +5,87 @@ import { adaptSnapshot } from '../../snapshot-adapter.js';
 import { clone, views } from './contracts.js';
 const node = (type, id, props = {}, children = []) => ({ type, id, props, children });
 const statusOrder = ['Focus', 'Open', 'Pause', 'Info', 'Done', 'Archive'];
+const statusLabels = { Open: 'Открыта', Focus: 'В фокусе', Pause: 'На паузе', Done: 'Выполнена', Archive: 'В архиве', Info: 'Информация' };
+const commandLabels = {
+  addItem: 'Добавить задачу', addChild: 'Добавить подзадачу', editItem: 'Изменить задачу',
+  setStatus: 'Изменить статус', setParent: 'Изменить вложенность', setTags: 'Изменить теги',
+  setDeadline: 'Изменить срок', toggleCollapse: 'Свернуть или развернуть задачу',
+  deleteItem: 'Удалить задачу', reorderItems: 'Изменить порядок задач',
+  importWorkflowyTree: 'Импортировать дерево задач',
+  rollbackAction: 'Откатить действие и все его корректировки', undo: 'Откатить действие и все его корректировки',
+  showList: 'Открыть список', showFrontier: 'Открыть фронтир', showActionLog: 'Открыть журнал действий',
+  showSearch: 'Открыть поиск', showAddModal: 'Открыть создание задачи', showEditModal: 'Открыть редактирование задачи',
+  showNestModal: 'Открыть изменение вложенности', viewItem: 'Открыть задачу',
+  showSettings: 'Открыть настройки', showDialogues: 'Открыть диалоги'
+};
+const fieldLabels = {
+  line1: 'Название', line2: 'Описание', status: 'Статус', parentId: 'Родительская задача',
+  tag: 'Тег', tags: 'Теги', deadline: 'Срок', query: 'Запрос', title: 'Название', actionId: 'Действие'
+};
+
+function textValue(value, byId) {
+  if (value == null || value === '') return 'Не задано';
+  if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
+  if (typeof value === 'string') return statusLabels[value] || byId.get(value)?.line1 || value;
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(item => textValue(item, byId)).join(', ');
+  if (typeof value === 'object') return Object.entries(value).map(([key, item]) => `${fieldLabels[key] || key}: ${textValue(item, byId)}`).join('; ');
+  return String(value);
+}
+
+function targetLabel(command, byId) {
+  const target = byId.get(command?.actId);
+  if (target) return target.line1;
+  if (!command?.actId || command.actId === 'list') return 'Список задач';
+  if (['rollbackAction', 'undo'].includes(command.command)) return 'Текущее действие';
+  return `Элемент ${command.actId}`;
+}
+
+function countTree(tree) {
+  if (!tree || typeof tree !== 'object') return 0;
+  return 1 + (Array.isArray(tree.children) ? tree.children.reduce((sum, child) => sum + countTree(child), 0) : 0);
+}
+
+function commandFields(command, byId) {
+  const payload = command?.payload || {};
+  if (command?.command === 'setStatus') return [{ label: 'Новый статус', value: textValue(payload.status, byId) }];
+  if (command?.command === 'setParent') return [{ label: 'Новый родитель', value: payload.parentId == null ? 'Корень списка' : textValue(payload.parentId, byId) }];
+  if (command?.command === 'setTags') return [{ label: 'Тег', value: textValue(payload.tag ?? payload.tags, byId) }];
+  if (command?.command === 'setDeadline') return [{ label: 'Новый срок', value: textValue(payload.deadline, byId) }];
+  if (command?.command === 'showSearch') return [{ label: 'Поисковый запрос', value: textValue(payload.query, byId) }];
+  if (command?.command === 'reorderItems') {
+    const arranged = Array.isArray(payload.arranged) ? payload.arranged : [];
+    return arranged.map((item, index) => ({
+      label: byId.get(item.id)?.line1 || `Элемент ${index + 1}`,
+      value: `${item.parentId == null ? 'Корень списка' : `в ${textValue(item.parentId, byId)}`}, позиция ${Number(item.order) || index + 1}`
+    }));
+  }
+  if (command?.command === 'importWorkflowyTree') return [{
+    label: 'Дерево', value: `${payload.tree?.title || 'Без названия'} · ${countTree(payload.tree)} элементов`
+  }];
+  if (['rollbackAction', 'undo', 'toggleCollapse', 'deleteItem'].includes(command?.command)) return [];
+  return Object.entries(payload)
+    .filter(([key]) => key !== 'actionId')
+    .map(([key, value]) => ({ label: fieldLabels[key] || key, value: textValue(value, byId) }));
+}
+
+function commandView(command, byId) {
+  return {
+    type: command?.command || 'unknown',
+    actionLabel: commandLabels[command?.command] || `Команда «${command?.command || 'неизвестна'}»`,
+    targetLabel: targetLabel(command, byId),
+    fields: commandFields(command, byId)
+  };
+}
+
+function recordTaskIndex(entry, currentById) {
+  const contextual = new Map(currentById);
+  for (const task of entry?.modelContext?.tasks || []) {
+    if (task?.id) contextual.set(task.id, task);
+  }
+  return contextual;
+}
+
 export class Presentation {
   compose(graph, journal, context = {}) {
     const view = views.includes(context.view) ? context.view : 'list';
@@ -24,11 +105,22 @@ export class Presentation {
     } else if (view === 'action') {
       const a = journal.actions().find(x => x.id === context.actionId);
       body = a ? node('action-page', 'action:' + a.id, {
-        ...a, title: a.label, sourceText: a.transcript || '', result: a.label,
-        records: journal.chain(a.id).map(entry => entry.kind === 'text' ? {
-          id: entry.id, kind: 'text', corrects: entry.corrects || null, userText: entry.text,
-          answer: entry.answer || '', commands: clone(entry.commands || []), modelContext: clone(entry.modelContext || null)
-        } : { id: entry.id, kind: 'ui', corrects: entry.corrects || null, command: clone(entry.command) })
+        ...a, title: 'История действия',
+        records: journal.chain(a.id).map(entry => {
+          if (entry.kind === 'text') {
+            const recordById = recordTaskIndex(entry, byId);
+            return {
+              id: entry.id, kind: 'text', corrects: entry.corrects || null, userText: entry.text,
+              answer: entry.answer || '', commands: clone(entry.commands || []),
+              commandViews: (entry.commands || []).map(command => commandView(command, recordById)),
+              modelContext: clone(entry.modelContext || null)
+            };
+          }
+          return {
+            id: entry.id, kind: 'ui', corrects: entry.corrects || null, command: clone(entry.command),
+            commandView: commandView(entry.command, byId)
+          };
+        })
       }) : node('text', 'screen:missing', { text: 'Действие не найдено' });
     } else if (view === 'edit') {
       const item = byId.get(context.taskId);
