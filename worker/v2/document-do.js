@@ -5,6 +5,9 @@ import { CompatibilityPort } from './compatibility.js';
 import { handleMcpRequest } from './mcp.js';
 import { resolveOpenAI } from './model.js';
 import { RuntimeStorage } from './runtime-storage.js';
+import { LiveLog } from './live-log.js';
+import { LiveHost } from './live-host.js';
+import { LiveSettings } from '../../src/v2/domain/live-settings.js';
 import { taskTreeFromItems } from '../task-tree.js';
 import { taskFrontierFromItems } from '../task-frontier.js';
 
@@ -13,6 +16,8 @@ export class ListDocumentDO extends Agent {
   static options = { sendIdentityOnConnect: false };
   async onStart() {
     this.runtimeStorage = new RuntimeStorage(this.ctx.storage);
+    this.liveLog = new LiveLog(this.ctx.storage);
+    this.liveSettings = new LiveSettings(this.ctx.storage);
     this.initializeRuntime(this.runtimeStorage.load());
     // Durable wake-up recovers the append/enqueue gap or an exhausted SDK queue retry.
     await this.scheduleEvery(60, 'recoverPending');
@@ -76,7 +81,41 @@ export class ListDocumentDO extends Agent {
   broadcastState() {
     const payload = JSON.stringify({type:'state',state:this.port.getSnapshot()});
     for (const connection of this.getConnections()) { try { connection.send(payload); } catch {} }
+    // An edit made by hand has to reach the voice layer too, not only its own tool calls.
+    if (this.live?.active) this.live.syncSnapshot().catch(() => {});
   }
+
+  liveHost() {
+    if (!this.live) this.live = new LiveHost({
+      log: this.liveLog,
+      settings: this.liveSettings,
+      apiKey: this.env.OPENAI_API_KEY || '',
+      store: this.env.LIVE_STORE !== 'off',
+      services: {
+        readItems: async () => this.runtime.graph.read().items,
+        readFrontier: async () => this.getTaskFrontier(),
+        applyCommand: async (command, message) => this.port.applyCommand(command, {message})
+      }
+    });
+    return this.live;
+  }
+  async startLiveSession(body) {
+    const host = this.liveHost();
+    if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();
+    const result = await host.start({sdp:String(body?.sdp || '')});
+    this.broadcastState();
+    return result;
+  }
+  async stopLiveSession() { return this.live ? this.live.stop('client') : false; }
+  liveSessionStatus() { return {active:Boolean(this.live?.active),sessionId:this.live?.sessionId || ''}; }
+  readLiveLog(query) { return {entries:this.liveLog.read(query),stats:this.liveLog.stats()}; }
+  listLiveSessions(limit) { return {sessions:this.liveLog.sessions(limit),stats:this.liveLog.stats()}; }
+  readLiveSettings() { return this.liveSettings.read(); }
+  writeLivePrompt(target, body) { return this.liveSettings.writePrompt(target,{mode:body?.mode,text:body?.text,source:'settings'}); }
+  resetLivePrompt(target) { return this.liveSettings.resetPrompt(target); }
+  restoreLivePrompt(target, at) { return this.liveSettings.restorePrompt(target,at); }
+  livePromptHistory() { return this.liveSettings.history(); }
+  setLiveBackendModel(model) { return this.liveSettings.setBackendModel(model); }
   async onRequest(request) {
     if (new URL(request.url).pathname === '/mcp') {
       const response = await handleMcpRequest(request, this.port); this.broadcastState(); return response;

@@ -33,7 +33,7 @@ __INLINE_CSS__
     <div class="dialogues-header">
       <div>
         <h2>Диалоги</h2>
-        <p>Текст голосовых сессий хранится только в этом браузере.</p>
+        <p>Реплики текущего разговора. Полная запись сессий хранится на сервере.</p>
       </div>
       <button id="dialogues-close" class="dialogues-close" type="button" aria-label="Закрыть диалоги">×</button>
     </div>
@@ -59,21 +59,39 @@ __INLINE_CSS__
 	        <h2>Настройки</h2>
 	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
 	      </div>
-	      <section class="settings-section" aria-labelledby="openai-key-heading">
-	        <h3 id="openai-key-heading">OpenAI Realtime</h3>
-	        <p class="settings-help">Ключ сохраняется на сервере для голосового агента и никогда не показывается после сохранения.</p>
+	      <section class="settings-section" aria-labelledby="live-heading">
+	        <h3 id="live-heading">Голос GPT-Live</h3>
+	        <p class="settings-help">Ключ хранится на сервере и после сохранения не показывается. Промпты и модель применяются со следующей голосовой сессии.</p>
 	        <label class="settings-field" id="openai-key-field">
 	          <span>OpenAI API key</span>
 	          <input type="password" id="openai-key-input" placeholder="sk-…" autocomplete="off" autocapitalize="none" spellcheck="false">
 	        </label>
 	        <button id="openai-key-save" class="settings-primary" type="button">Сохранить ключ на сервере</button>
 	        <div id="openai-key-status" class="settings-status" aria-live="polite"></div>
+
 	        <label class="settings-field" style="margin-top: 18px;">
-	          <span>Системный промпт голосового агента</span>
-	          <textarea id="openai-prompt-input" placeholder="Введите новый системный промпт для realtime-сессии"></textarea>
+	          <span>Промпт голосового слоя</span>
+	          <textarea id="live-voice-prompt" rows="10" placeholder="Роль, манера речи и условия обращения к бэкенду"></textarea>
 	        </label>
-	        <button id="openai-prompt-save" class="settings-primary" type="button">Сохранить промпт на сервере</button>
-	        <div id="openai-prompt-status" class="settings-status" aria-live="polite"></div>
+	        <p class="settings-help">Таблицу задач дописывает сервер при старте сессии, её здесь редактировать не нужно.</p>
+	        <button id="live-voice-prompt-save" class="settings-primary" type="button">Сохранить</button>
+	        <button id="live-voice-prompt-reset" class="settings-secondary" type="button">Вернуть встроенный</button>
+	        <div id="live-voice-prompt-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Промпт бэкенд-модели</span>
+	          <textarea id="live-backend-prompt" rows="10" placeholder="Процедуры работы с задачами и правила выбора инструмента"></textarea>
+	        </label>
+	        <button id="live-backend-prompt-save" class="settings-primary" type="button">Сохранить</button>
+	        <button id="live-backend-prompt-reset" class="settings-secondary" type="button">Вернуть встроенный</button>
+	        <div id="live-backend-prompt-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Бэкенд-модель</span>
+	          <input type="text" id="live-backend-model" placeholder="gpt-5.6-luna" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="live-backend-model-save" class="settings-primary" type="button">Сохранить</button>
+	        <div id="live-backend-model-status" class="settings-status" aria-live="polite"></div>
 	      </section>
 	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
 	        <h3 id="workflowy-heading">Workflowy</h3>

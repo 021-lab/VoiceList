@@ -2,8 +2,8 @@ import { getAgentByName } from 'agents';
 import { LIST_MANAGER_HTML } from '../generated-html.js';
 import { ListDocumentDO } from './document-do.js';
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from '../openai-key-setup.js';
-import { getDefaultRealtimeSystemPrompt, handleOpenAIRealtimeSession } from '../openai-realtime.js';
 import { isMcpHostAllowed } from './mcp.js';
+import { PROMPT_TARGETS } from '../../src/v2/domain/live-settings.js';
 import { readBoundedJson } from './model.js';
 import { safeError } from '../../src/v2/domain/contracts.js';
 export { ListDocumentDO };
@@ -28,15 +28,32 @@ export default {
       if (url.pathname === '/api/v2/updates' && request.method === 'GET') return json(await stub.follow(Number(url.searchParams.get('cursor')||0),url.searchParams.get('clientKey')||''));
       if (url.pathname === '/ws') return stub.fetch(request);
       if (url.pathname === '/mcp') return stub.mcpRequest(request);
-      if (url.pathname === '/api/realtime/key/status') return handleOpenAIKeyStatus({configured:await stub.isOpenAIKeyConfigured(),setupAvailable:!await stub.isOpenAIKeyConfigured()});
-      if (url.pathname === '/api/realtime/key') return handleOpenAIKeySetup(request,{configureKey:key=>stub.configureOpenAIApiKey(key)});
-      if (url.pathname === '/api/realtime/prompt') {
-        if (request.method === 'GET') return json({prompt:await stub.getOpenAISystemPrompt() || getDefaultRealtimeSystemPrompt()});
-        if (request.method === 'POST') {const body=await readBoundedJson(request,16000);if(typeof body.prompt!=='string')return json({error:'Invalid prompt'},400);await stub.configureOpenAISystemPrompt(body.prompt);return json({configured:true});}
+      if (url.pathname === '/api/live/key/status') return handleOpenAIKeyStatus({configured:await stub.isOpenAIKeyConfigured(),setupAvailable:!await stub.isOpenAIKeyConfigured()});
+      if (url.pathname === '/api/live/key') return handleOpenAIKeySetup(request,{configureKey:key=>stub.configureOpenAIApiKey(key)});
+      if (url.pathname === '/api/live/session') {
+        if (request.method === 'POST') return json(await stub.startLiveSession(await readBoundedJson(request,200000)),201);
+        if (request.method === 'GET') return json(await stub.liveSessionStatus());
       }
-      if (url.pathname === '/api/realtime/session') return handleOpenAIRealtimeSession(request,env,{apiKey:env.OPENAI_API_KEY||await stub.getOpenAIApiKey(),systemPrompt:await stub.getOpenAISystemPrompt()});
-      if (url.pathname === '/api/realtime/diagnostics' && request.method === 'POST') {await stub.recordRealtimeDiagnostics(await readBoundedJson(request,4096));return json({recorded:true},202);}
-      if (url.pathname === '/api/realtime/diagnostics' && request.method === 'GET' && env.REALTIME_DIAGNOSTICS_TOKEN && request.headers.get('X-VoiceList-Diagnostics-Token') === env.REALTIME_DIAGNOSTICS_TOKEN) return json({entries:await stub.getRealtimeDiagnostics()});
+      if (url.pathname === '/api/live/session/stop' && request.method === 'POST') return json({stopped:await stub.stopLiveSession()});
+      if (url.pathname === '/api/live/settings') {
+        if (request.method === 'GET') return json(await stub.readLiveSettings());
+        if (request.method === 'PUT') {
+          const body = await readBoundedJson(request,32000);
+          if (typeof body.backendModel === 'string') return json(await stub.setLiveBackendModel(body.backendModel));
+          if (!PROMPT_TARGETS.includes(body.target)) return json({error:'Unknown prompt target'},400);
+          if (body.action === 'reset') return json(await stub.resetLivePrompt(body.target));
+          if (body.action === 'restore') return json(await stub.restoreLivePrompt(body.target,String(body.at||'')));
+          return json(await stub.writeLivePrompt(body.target,body));
+        }
+      }
+      if (url.pathname === '/api/live/settings/history' && request.method === 'GET') return json({history:await stub.livePromptHistory()});
+      // The log holds spoken transcripts, so reading it is closed by a token and fails shut
+      // when none is configured.
+      if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
+        if (!env.LIVE_LOG_TOKEN || request.headers.get('X-VoiceList-Log-Token') !== env.LIVE_LOG_TOKEN) return json({error:'Log token required'},403);
+        if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
+        if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));
+      }
       if (url.pathname === '/api/tasks/tree.json') return json({tasks:await stub.getTaskTree()});
       if (url.pathname === '/api/tasks/frontier.json') return json({frontier:await stub.getTaskFrontier()});
       if (url.pathname === '/api/tasks/tree.txt') return new Response(await stub.getTaskTitleTreeText(),{headers:{'Content-Type':'text/plain;charset=utf-8','Cache-Control':'no-store'}});

@@ -1,5 +1,5 @@
 import { Client } from './client.js';
-import { createRealtimeVoiceAgent } from '../../realtime-voice-agent.js';
+import { createLiveVoice } from './live-voice.js';
 
 async function bootstrap() {
   const client = new Client();
@@ -7,28 +7,25 @@ async function bootstrap() {
   document.documentElement.dataset.previewBuildHash = typeof __PREVIEW_BUILD_HASH__ === 'undefined' ? 'v02-dev' : __PREVIEW_BUILD_HASH__;
   await client.connect();
   const $ = (id) => document.getElementById(id);
-  const realtime = createRealtimeVoiceAgent({
+
+  // Voice is thin here on purpose: the browser only carries audio, while the session's
+  // events, its log and every tool call live on the server behind the sideband connection.
+  const live = createLiveVoice({
     voiceButton: $('realtime-voice-btn'), voiceStatus: $('realtime-voice-status'),
-    dialoguesButton: $('dialogues-tab-btn'), dialoguesPanel: $('dialogues-panel'), dialoguesList: $('dialogues-list'), dialoguesClose: $('dialogues-close'),
-    openAIKeyInput: $('openai-key-input'), openAIKeyField: $('openai-key-field'), openAIKeySaveButton: $('openai-key-save'), openAIKeyStatus: $('openai-key-status'),
-    openAIPromptInput: $('openai-prompt-input'), openAIPromptSaveButton: $('openai-prompt-save'), openAIPromptStatus: $('openai-prompt-status'),
-    settingsOverlay: $('settings-overlay'), rootPanel: $('app-root'), navigationButtons: [$('frontier-tab-btn'), $('view-toggle-btn')],
-    getTaskState: () => client.getTaskState(),
-    fetchImpl: async (url, options) => {
-      if (url === '/api/realtime/session' && options?.method === 'POST') {
-        const { tasks } = await client.request('/api/tasks/tree.json');
-        options = { ...options, body: JSON.stringify({ ...JSON.parse(options.body), taskTree: tasks }) };
-      }
-      return fetch(url, options);
-    },
-    executeTaskCommand: async (command) => {
-      const receipt = await client.submit({ command, context: client.context(command.actId ? { id: `task:${command.actId}` } : null) });
-      if (receipt.status === 'accepted') return client.waitForCompletion(receipt.requestId);
-      return { status: 'applied', newTarget: receipt.newTarget || command.actId };
+    dialoguesButton: $('dialogues-tab-btn'), dialoguesPanel: $('dialogues-panel'),
+    dialoguesList: $('dialogues-list'), dialoguesClose: $('dialogues-close'),
+    rootPanel: $('app-root'), onCloseDialogues: () => client.navigate('list'),
+    settingsElements: {
+      keyInput: $('openai-key-input'), keyField: $('openai-key-field'), keySave: $('openai-key-save'), keyStatus: $('openai-key-status'),
+      voicePromptInput: $('live-voice-prompt'), voicePromptSave: $('live-voice-prompt-save'), voicePromptReset: $('live-voice-prompt-reset'), voicePromptStatus: $('live-voice-prompt-status'),
+      backendPromptInput: $('live-backend-prompt'), backendPromptSave: $('live-backend-prompt-save'), backendPromptReset: $('live-backend-prompt-reset'), backendPromptStatus: $('live-backend-prompt-status'),
+      backendModelInput: $('live-backend-model'), backendModelSave: $('live-backend-model-save'), backendModelStatus: $('live-backend-model-status')
     }
   });
-  client.realtime = realtime;
-  window.__realtimeVoiceAgent = realtime;
+  client.realtime = live;
+  window.__liveVoice = live;
+  $('settings-btn')?.addEventListener('click', () => { live.settings.load(); });
+  await live.settings.load();
 }
 
 bootstrap().catch((error) => {

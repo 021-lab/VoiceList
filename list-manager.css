@@ -648,6 +648,33 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .settings-primary:disabled {
   opacity: 0.55;
 }
+.settings-secondary {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #fff;
+  color: #444;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.settings-secondary[hidden] { display: none; }
+.dialogues-empty {
+  color: #777;
+  font-size: 14px;
+  padding: 12px 0;
+}
+.dialogue-message {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.dialogue-user { background: #eef2f7; color: #1a1a2e; }
+.dialogue-assistant { background: #e8f3ec; color: #14432a; }
 .settings-status {
   min-height: 18px;
   margin-top: 10px;

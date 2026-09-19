@@ -5,7 +5,6 @@ import { seedState } from '../list-data.js';
 import { LIST_MANAGER_HTML } from './generated-html.js';
 import { createDocumentCore } from './list-document-core.js';
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from './openai-key-setup.js';
-import { getDefaultRealtimeSystemPrompt, handleOpenAIRealtimeSession } from './openai-realtime.js';
 import { taskFrontierFromItems } from './task-frontier.js';
 import { taskTreeFromItems } from './task-tree.js';
 
@@ -685,29 +684,6 @@ export default {
       return handleOpenAIKeySetup(request, {
         configureKey: (apiKey) => documentStub(env).configureOpenAIApiKey(apiKey)
       });
-    }
-
-    if (url.pathname === '/api/realtime/prompt') {
-      if (request.method === 'GET') {
-        const prompt = await documentStub(env).getOpenAISystemPrompt();
-        return json({ prompt: prompt || getDefaultRealtimeSystemPrompt() });
-      }
-      if (request.method === 'POST') {
-        const body = await readRequestJson(request);
-        if (!body || typeof body.prompt !== 'string') return json({ error: 'Invalid prompt' }, { status: 400 });
-        await documentStub(env).configureOpenAISystemPrompt(body.prompt);
-        return json({ configured: true });
-      }
-      return json({ error: 'Method not allowed' }, { status: 405 });
-    }
-
-    if (url.pathname === '/api/realtime/session') {
-      const [storedApiKey, systemPrompt] = await Promise.all([
-        env.OPENAI_API_KEY ? Promise.resolve('') : documentStub(env).getOpenAIApiKey(),
-        documentStub(env).getOpenAISystemPrompt()
-      ]);
-      const apiKey = env.OPENAI_API_KEY || storedApiKey;
-      return handleOpenAIRealtimeSession(request, env, { apiKey, systemPrompt });
     }
 
     if (url.pathname === '/api/realtime/diagnostics') {

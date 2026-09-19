@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-563c3df8fbefb48f">
+<meta name="preview-build-hash" content="v02-b6647f028cb393b0">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -656,6 +656,33 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .settings-primary:disabled {
   opacity: 0.55;
 }
+.settings-secondary {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #fff;
+  color: #444;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.settings-secondary[hidden] { display: none; }
+.dialogues-empty {
+  color: #777;
+  font-size: 14px;
+  padding: 12px 0;
+}
+.dialogue-message {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.dialogue-user { background: #eef2f7; color: #1a1a2e; }
+.dialogue-assistant { background: #e8f3ec; color: #14432a; }
 .settings-status {
   min-height: 18px;
   margin-top: 10px;
@@ -884,7 +911,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
     <div class="dialogues-header">
       <div>
         <h2>Диалоги</h2>
-        <p>Текст голосовых сессий хранится только в этом браузере.</p>
+        <p>Реплики текущего разговора. Полная запись сессий хранится на сервере.</p>
       </div>
       <button id="dialogues-close" class="dialogues-close" type="button" aria-label="Закрыть диалоги">×</button>
     </div>
@@ -910,21 +937,39 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	        <h2>Настройки</h2>
 	        <button id="settings-close" class="settings-close" type="button" aria-label="Закрыть">×</button>
 	      </div>
-	      <section class="settings-section" aria-labelledby="openai-key-heading">
-	        <h3 id="openai-key-heading">OpenAI Realtime</h3>
-	        <p class="settings-help">Ключ сохраняется на сервере для голосового агента и никогда не показывается после сохранения.</p>
+	      <section class="settings-section" aria-labelledby="live-heading">
+	        <h3 id="live-heading">Голос GPT-Live</h3>
+	        <p class="settings-help">Ключ хранится на сервере и после сохранения не показывается. Промпты и модель применяются со следующей голосовой сессии.</p>
 	        <label class="settings-field" id="openai-key-field">
 	          <span>OpenAI API key</span>
 	          <input type="password" id="openai-key-input" placeholder="sk-…" autocomplete="off" autocapitalize="none" spellcheck="false">
 	        </label>
 	        <button id="openai-key-save" class="settings-primary" type="button">Сохранить ключ на сервере</button>
 	        <div id="openai-key-status" class="settings-status" aria-live="polite"></div>
+
 	        <label class="settings-field" style="margin-top: 18px;">
-	          <span>Системный промпт голосового агента</span>
-	          <textarea id="openai-prompt-input" placeholder="Введите новый системный промпт для realtime-сессии"></textarea>
+	          <span>Промпт голосового слоя</span>
+	          <textarea id="live-voice-prompt" rows="10" placeholder="Роль, манера речи и условия обращения к бэкенду"></textarea>
 	        </label>
-	        <button id="openai-prompt-save" class="settings-primary" type="button">Сохранить промпт на сервере</button>
-	        <div id="openai-prompt-status" class="settings-status" aria-live="polite"></div>
+	        <p class="settings-help">Таблицу задач дописывает сервер при старте сессии, её здесь редактировать не нужно.</p>
+	        <button id="live-voice-prompt-save" class="settings-primary" type="button">Сохранить</button>
+	        <button id="live-voice-prompt-reset" class="settings-secondary" type="button">Вернуть встроенный</button>
+	        <div id="live-voice-prompt-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Промпт бэкенд-модели</span>
+	          <textarea id="live-backend-prompt" rows="10" placeholder="Процедуры работы с задачами и правила выбора инструмента"></textarea>
+	        </label>
+	        <button id="live-backend-prompt-save" class="settings-primary" type="button">Сохранить</button>
+	        <button id="live-backend-prompt-reset" class="settings-secondary" type="button">Вернуть встроенный</button>
+	        <div id="live-backend-prompt-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Бэкенд-модель</span>
+	          <input type="text" id="live-backend-model" placeholder="gpt-5.6-luna" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="live-backend-model-save" class="settings-primary" type="button">Сохранить</button>
+	        <div id="live-backend-model-status" class="settings-status" aria-live="polite"></div>
 	      </section>
 	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
 	        <h3 id="workflowy-heading">Workflowy</h3>
@@ -986,7 +1031,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-563c3df8fbefb48f";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-b6647f028cb393b0";
 </script>
 <script>
 (() => {
@@ -2325,810 +2370,320 @@ ${text}`;
     }
   };
 
-  // src/realtime-voice-agent.js
-  var DIALOGUES_STORAGE_KEY = "voicelist.realtime-dialogues.v1";
-  var OPENAI_KEY_STATUS_ENDPOINT = "/api/realtime/key/status";
-  var OPENAI_KEY_SETUP_ENDPOINT = "/api/realtime/key";
-  var OPENAI_PROMPT_ENDPOINT = "/api/realtime/prompt";
-  var REALTIME_DIAGNOSTICS_ENDPOINT = "/api/realtime/diagnostics";
-  var TASK_FRONTIER_ENDPOINT = "/api/tasks/frontier.json";
-  var MAX_DIALOGUES = 30;
-  var MAX_MESSAGES_PER_DIALOGUE = 240;
-  function createPreparedRealtimeTransport(RTCPeerConnectionCtor = globalThis.RTCPeerConnection) {
-    if (!RTCPeerConnectionCtor) return null;
-    let peerConnection = null;
-    try {
-      peerConnection = new RTCPeerConnectionCtor();
-      return {
-        peerConnection,
-        channel: peerConnection.createDataChannel("oai-events")
-      };
-    } catch {
-      try {
-        peerConnection?.close();
-      } catch {
-      }
-      return null;
-    }
-  }
-  var TOOL_RESULT_REPLY_INSTRUCTIONS = [
-    "The task operation result is now available in the function_call_output.",
-    "Do not continue any previous sentence.",
-    "Answer only from that result, in one short Russian sentence."
-  ].join(" ");
-  var FRONTIER_RESULT_REPLY_INSTRUCTIONS = [
-    "The current VoiceList frontier is now available in the function_call_output.",
-    "Answer briefly in Russian and enumerate taskTitle values in the returned order.",
-    "If the frontier is empty, say that there are no tasks in the frontier.",
-    "Mention parentTitle, status, or deadline only if the user asked for those details."
-  ].join(" ");
-  var ALLOWED_STATUSES = /* @__PURE__ */ new Set(["Open", "Focus", "Pause", "Done", "Archive", "Info"]);
-  function parseStoredDialogues(storage) {
-    try {
-      const value = JSON.parse(storage.getItem(DIALOGUES_STORAGE_KEY) || "[]");
-      return Array.isArray(value) ? value : [];
-    } catch {
-      return [];
-    }
-  }
-  function isoNow(now) {
-    const value = now();
-    return (value instanceof Date ? value : new Date(value)).toISOString();
-  }
-  function persistDialogues(storage, dialogues) {
-    storage.setItem(DIALOGUES_STORAGE_KEY, JSON.stringify(dialogues.slice(0, MAX_DIALOGUES)));
-  }
-  function createDialogueRepository({
-    storage,
-    now = () => /* @__PURE__ */ new Date(),
-    createId = () => crypto.randomUUID()
-  }) {
-    let dialogues = parseStoredDialogues(storage);
-    function update(id, updater) {
-      dialogues = dialogues.map((dialogue) => dialogue.id === id ? updater(dialogue) : dialogue);
-      persistDialogues(storage, dialogues);
-    }
-    return {
-      start() {
-        const dialogue = {
-          id: createId(),
-          startedAt: isoNow(now),
-          endedAt: null,
-          messages: []
-        };
-        dialogues = [dialogue, ...dialogues].slice(0, MAX_DIALOGUES);
-        persistDialogues(storage, dialogues);
-        return dialogue.id;
-      },
-      append(dialogueId, { role, text, eventId = null }) {
-        const cleanText = String(text || "").trim();
-        if (!cleanText) return;
-        const messageAt = isoNow(now);
-        update(dialogueId, (dialogue) => {
-          if (eventId && dialogue.messages.some((message) => message.eventId === eventId)) return dialogue;
-          const lastMessage = dialogue.messages.at(-1);
-          if (lastMessage?.role === role && lastMessage.text === cleanText && Math.abs(new Date(lastMessage.at).getTime() - new Date(messageAt).getTime()) < 2e3) {
-            return dialogue;
-          }
-          return {
-            ...dialogue,
-            messages: [...dialogue.messages, {
-              id: createId(),
-              eventId,
-              at: messageAt,
-              role,
-              text: cleanText
-            }].slice(-MAX_MESSAGES_PER_DIALOGUE)
-          };
-        });
-      },
-      finish(dialogueId) {
-        update(dialogueId, (dialogue) => ({ ...dialogue, endedAt: dialogue.endedAt || isoNow(now) }));
-      },
-      list() {
-        return structuredClone(dialogues);
-      }
-    };
-  }
-  function taskTreeFromState(state) {
-    const items = state?.snapshot?.items;
-    if (!Array.isArray(items)) return [];
-    const nodes = /* @__PURE__ */ new Map();
-    for (const item of items) {
-      const id = String(item?.id || "");
-      if (!id) continue;
-      nodes.set(id, {
-        id,
-        title: String(item?.line1 || ""),
-        status: String(item?.status || "Open"),
-        children: []
-      });
-    }
-    const roots = [];
-    for (const item of items) {
-      const id = String(item?.id || "");
-      const node = nodes.get(id);
-      if (!node) continue;
-      const parent = item?.parentId == null ? null : nodes.get(String(item.parentId));
-      if (parent) parent.children.push(node);
-      else roots.push(node);
-    }
-    return roots;
-  }
-  async function fetchTaskFrontier(fetchImpl = fetch, endpoint = TASK_FRONTIER_ENDPOINT) {
-    const response = await fetchImpl(endpoint, { headers: { Accept: "application/json" } });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `Frontier HTTP ${response.status}`);
-    if (!Array.isArray(data.frontier)) throw new Error("Frontier response is invalid");
-    return data.frontier.slice(0, 2e3).map((item) => ({
-      parentTitle: String(item?.parentTitle || ""),
-      taskId: String(item?.taskId || ""),
-      taskTitle: String(item?.taskTitle || ""),
-      status: String(item?.status || "Open"),
-      deadline: item?.deadline == null ? null : String(item.deadline)
-    })).filter((item) => item.taskId && item.taskTitle);
-  }
-  function requireText(value, label) {
-    const text = String(value || "").trim();
-    if (!text) throw new Error(`${label} is required`);
-    return text;
-  }
-  function withTranscript(input, transcript) {
-    const cleanTranscript = String(transcript || "").trim();
-    return cleanTranscript ? { ...input, transcript: cleanTranscript } : input;
-  }
-  function taskInputFromToolCall(name, rawArguments, { transcript = "" } = {}) {
-    let args;
-    try {
-      args = typeof rawArguments === "string" ? JSON.parse(rawArguments || "{}") : rawArguments || {};
-    } catch {
-      throw new Error("Tool arguments are not valid JSON");
-    }
-    if (name === "addItem") {
-      return withTranscript({
-        actId: "list",
-        actType: "list",
-        command: "addItem",
-        payload: { line1: requireText(args.line1, "line1") },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    if (name === "addChild") {
-      return withTranscript({
-        actId: requireText(args.parentId, "parentId"),
-        actType: "task",
-        command: "addChild",
-        payload: { line1: requireText(args.line1, "line1") },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    if (name === "addInfo") {
-      return withTranscript({
-        actId: requireText(args.parentId, "parentId"),
-        actType: "task",
-        command: "addChild",
-        payload: { line1: requireText(args.line1, "line1"), status: "Info" },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    if (name === "setStatus") {
-      const status = String(args.status || "");
-      if (!ALLOWED_STATUSES.has(status)) throw new Error("Unsupported task status");
-      return withTranscript({
-        actId: requireText(args.taskId, "taskId"),
-        actType: "task",
-        command: "setStatus",
-        payload: { status },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    if (name === "setDeadline") {
-      return withTranscript({
-        actId: requireText(args.taskId, "taskId"),
-        actType: "task",
-        command: "setDeadline",
-        payload: { deadline: requireText(args.deadline, "deadline") },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    if (name === "editItem") {
-      return withTranscript({
-        actId: requireText(args.taskId, "taskId"),
-        actType: "task",
-        command: "editItem",
-        payload: { line1: requireText(args.line1, "line1") },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    if (name === "setParent") {
-      return withTranscript({
-        actId: requireText(args.taskId, "taskId"),
-        actType: "task",
-        command: "setParent",
-        payload: { parentId: args.parentId == null ? null : requireText(args.parentId, "parentId") },
-        source: "openai-realtime"
-      }, transcript);
-    }
-    throw new Error(`Unsupported task operation: ${name}`);
-  }
-  function operationLabel(input) {
-    if (input.command === "addItem") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
-    if (input.command === "addChild" && input.payload.status === "Info") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F: ${input.payload.line1}`;
-    if (input.command === "addChild") return `\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u0434\u0437\u0430\u0434\u0430\u0447\u0430: ${input.payload.line1}`;
-    if (input.command === "setStatus") return `\u0421\u0442\u0430\u0442\u0443\u0441 ${input.actId}: ${input.payload.status}`;
-    if (input.command === "setDeadline") return `\u0414\u0435\u0434\u043B\u0430\u0439\u043D ${input.actId}: ${input.payload.deadline}`;
-    if (input.command === "editItem") return `\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}: ${input.payload.line1}`;
-    if (input.command === "setParent") return `\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 ${input.actId}`;
-    return input.command;
-  }
-  function roleLabel(role) {
-    if (role === "user") return "\u0412\u044B";
-    if (role === "assistant") return "\u0410\u0433\u0435\u043D\u0442";
-    if (role === "tool") return "\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0435";
-    return "\u0421\u0438\u0441\u0442\u0435\u043C\u0430";
-  }
-  function formatStartedAt(value) {
-    return new Intl.DateTimeFormat("ru-RU", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(new Date(value));
-  }
-  function createRealtimeVoiceAgent({
+  // src/v2/client/live-voice.js
+  var LIVE_SESSION_ENDPOINT = "/api/live/session";
+  var LIVE_SESSION_STOP_ENDPOINT = "/api/live/session/stop";
+  var LIVE_KEY_STATUS_ENDPOINT = "/api/live/key/status";
+  var LIVE_KEY_ENDPOINT = "/api/live/key";
+  var LIVE_SETTINGS_ENDPOINT = "/api/live/settings";
+  var MAX_VISIBLE_TURNS = 240;
+  function createLiveVoice({
     voiceButton,
     voiceStatus,
     dialoguesButton,
     dialoguesPanel,
     dialoguesList,
     dialoguesClose,
-    openAIKeyInput,
-    openAIKeyField,
-    openAIKeySaveButton,
-    openAIKeyStatus,
-    openAIPromptInput,
-    openAIPromptSaveButton,
-    openAIPromptStatus,
-    settingsOverlay,
     rootPanel,
-    navigationButtons = [],
-    getTaskState,
-    executeTaskCommand,
-    endpoint = "/api/realtime/session",
-    keyStatusEndpoint = OPENAI_KEY_STATUS_ENDPOINT,
-    keySetupEndpoint = OPENAI_KEY_SETUP_ENDPOINT,
-    promptEndpoint = OPENAI_PROMPT_ENDPOINT,
-    diagnosticsEndpoint = REALTIME_DIAGNOSTICS_ENDPOINT,
-    frontierEndpoint = TASK_FRONTIER_ENDPOINT,
+    onCloseDialogues,
+    settingsElements = {},
     fetchImpl = fetch,
-    mediaDevices = navigator.mediaDevices,
-    RTCPeerConnectionCtor = globalThis.RTCPeerConnection,
-    documentLike = document,
-    windowLike = globalThis.window,
-    storage = localStorage,
-    now = () => /* @__PURE__ */ new Date(),
-    monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(),
-    createId = () => crypto.randomUUID(),
-    AbortControllerCtor = globalThis.AbortController
-  }) {
-    const repository = createDialogueRepository({ storage, now, createId });
-    let active = null;
-    let keyConfigured = null;
-    let keySetupAvailable = false;
-    let promptConfigured = false;
-    let preparedTransport = null;
-    function setKeyStatus(message, tone = "") {
-      if (!openAIKeyStatus) return;
-      openAIKeyStatus.textContent = message;
-      openAIKeyStatus.classList.toggle("success", tone === "success");
-      openAIKeyStatus.classList.toggle("error", tone === "error");
-    }
-    function setPromptStatus(message, tone = "") {
-      if (!openAIPromptStatus) return;
-      openAIPromptStatus.textContent = message;
-      openAIPromptStatus.classList.toggle("success", tone === "success");
-      openAIPromptStatus.classList.toggle("error", tone === "error");
-    }
-    function renderKeySettings() {
-      if (!openAIKeyInput || !openAIKeySaveButton) return;
-      const locked = keyConfigured === true;
-      if (openAIKeyField) openAIKeyField.hidden = locked;
-      openAIKeySaveButton.hidden = locked;
-      openAIKeySaveButton.disabled = !keySetupAvailable;
-      if (locked) setKeyStatus("\u041A\u043B\u044E\u0447 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u0438 \u0433\u043E\u0442\u043E\u0432 \u043A \u0440\u0430\u0431\u043E\u0442\u0435.", "success");
-      else if (keySetupAvailable) setKeyStatus("\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u043B\u044E\u0447 OpenAI. \u041E\u043D \u0431\u0443\u0434\u0435\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.");
-      else if (keyConfigured === false) setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043A\u043B\u044E\u0447\u0430 \u0441\u0435\u0439\u0447\u0430\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443.", "error");
-    }
-    function renderPromptSettings() {
-      if (!openAIPromptInput || !openAIPromptSaveButton) return;
-      openAIPromptSaveButton.disabled = false;
-      setPromptStatus(promptConfigured ? "\u041F\u0440\u043E\u043C\u043F\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435." : "\u0417\u0434\u0435\u0441\u044C \u043C\u043E\u0436\u043D\u043E \u0437\u0430\u0434\u0430\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0430\u0433\u0435\u043D\u0442\u0430.", promptConfigured ? "success" : "");
-    }
-    function openKeySettings() {
-      settingsOverlay?.classList.add("open");
-      settingsOverlay?.setAttribute("aria-hidden", "false");
-      renderKeySettings();
-      if (keyConfigured !== true) openAIKeyInput?.focus();
-    }
-    async function refreshKeyStatus() {
-      try {
-        const response = await fetchImpl(keyStatusEndpoint, { headers: { Accept: "application/json" } });
-        if (!response.ok) return;
-        const status = await response.json();
-        keyConfigured = Boolean(status.configured);
-        keySetupAvailable = Boolean(status.setupAvailable);
-        renderKeySettings();
-      } catch {
+    documentRef = document,
+    windowRef = window,
+    peerFactory = (config) => new RTCPeerConnection(config),
+    mediaDevices = navigator.mediaDevices
+  } = {}) {
+    let session = null;
+    let turns = [];
+    const setStatus = (text, state) => {
+      if (voiceStatus) {
+        voiceStatus.textContent = text || "";
+        voiceStatus.hidden = !text;
       }
-    }
-    async function refreshPrompt() {
-      try {
-        const response = await fetchImpl(promptEndpoint, { headers: { Accept: "application/json" } });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (openAIPromptInput) openAIPromptInput.value = String(data.prompt || "");
-        promptConfigured = true;
-        renderPromptSettings();
-      } catch {
+      if (voiceButton) {
+        voiceButton.dataset.state = state;
+        voiceButton.setAttribute("aria-pressed", String(state === "live"));
       }
-    }
-    async function saveOpenAIKey() {
-      const apiKey = String(openAIKeyInput?.value || "").trim();
-      if (!apiKey.startsWith("sk-") || apiKey.length < 20 || /\s/.test(apiKey)) {
-        setKeyStatus("\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043A\u043B\u044E\u0447: \u043E\u043D \u0434\u043E\u043B\u0436\u0435\u043D \u043D\u0430\u0447\u0438\u043D\u0430\u0442\u044C\u0441\u044F \u0441 sk-.", "error");
-        return;
-      }
-      if (!keySetupAvailable) {
-        setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043A\u043B\u044E\u0447\u0430 \u0441\u0435\u0439\u0447\u0430\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443.", "error");
-        return;
-      }
-      openAIKeySaveButton.disabled = true;
-      setKeyStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E \u043A\u043B\u044E\u0447 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435\u2026");
-      try {
-        const response = await fetchImpl(keySetupEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey })
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-        openAIKeyInput.value = "";
-        keyConfigured = true;
-        keySetupAvailable = false;
-        renderKeySettings();
-      } catch (error) {
-        setKeyStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u043B\u044E\u0447.", "error");
-        openAIKeySaveButton.disabled = false;
-      }
-    }
-    async function saveOpenAIPrompt() {
-      const prompt = String(openAIPromptInput?.value || "").trim();
-      openAIPromptSaveButton.disabled = true;
-      setPromptStatus("\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435\u2026");
-      try {
-        const response = await fetchImpl(promptEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt })
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-        promptConfigured = true;
-        renderPromptSettings();
-      } catch (error) {
-        setPromptStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442.", "error");
-        openAIPromptSaveButton.disabled = false;
-      }
-    }
-    function renderDialogues() {
-      dialoguesList.replaceChildren();
-      const dialogues = repository.list();
-      if (!dialogues.length) {
-        const empty = documentLike.createElement("p");
+    };
+    function renderTurns() {
+      if (!dialoguesList) return;
+      dialoguesList.textContent = "";
+      if (!turns.length) {
+        const empty = documentRef.createElement("p");
         empty.className = "dialogues-empty";
-        empty.textContent = "\u0417\u0434\u0435\u0441\u044C \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0440\u0430\u0441\u0448\u0438\u0444\u0440\u043E\u0432\u043A\u0438 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u044B\u0445 \u0441\u0435\u0441\u0441\u0438\u0439.";
+        empty.textContent = "\u0420\u0435\u043F\u043B\u0438\u043A\u0438 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u0432\u043E \u0432\u0440\u0435\u043C\u044F \u0440\u0430\u0437\u0433\u043E\u0432\u043E\u0440\u0430. \u041F\u043E\u043B\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0445\u0440\u0430\u043D\u0438\u0442\u0441\u044F \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.";
         dialoguesList.append(empty);
         return;
       }
-      for (const dialogue of dialogues) {
-        const card = documentLike.createElement("article");
-        card.className = "dialogue-card";
-        const heading = documentLike.createElement("h3");
-        heading.textContent = formatStartedAt(dialogue.startedAt);
-        card.append(heading);
-        if (!dialogue.messages.length) {
-          const empty = documentLike.createElement("p");
-          empty.className = "dialogue-message system";
-          empty.textContent = "\u041D\u0435\u0442 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D\u043D\u044B\u0445 \u0440\u0435\u043F\u043B\u0438\u043A.";
-          card.append(empty);
-        }
-        for (const message of dialogue.messages) {
-          const row = documentLike.createElement("p");
-          row.className = `dialogue-message ${message.role}`;
-          const label = documentLike.createElement("strong");
-          label.textContent = `${roleLabel(message.role)}: `;
-          row.append(label, documentLike.createTextNode(message.text));
-          card.append(row);
-        }
-        dialoguesList.append(card);
+      for (const turn of turns) {
+        const row = documentRef.createElement("div");
+        row.className = `dialogue-message dialogue-${turn.role}`;
+        row.textContent = turn.text;
+        dialoguesList.append(row);
       }
+      dialoguesList.scrollTop = dialoguesList.scrollHeight;
     }
-    function setDialoguesOpen(open) {
-      rootPanel.dataset.dialoguesOpen = open ? "true" : "false";
-      dialoguesPanel.hidden = !open;
-      dialoguesButton.classList.toggle("active", open);
-      dialoguesButton.setAttribute("aria-pressed", String(open));
-      if (open) renderDialogues();
+    function appendFragment(role, delta) {
+      const text = String(delta || "");
+      if (!text.trim()) return;
+      const last = turns.at(-1);
+      if (last && last.role === role) last.text = `${last.text}${text}`;
+      else turns = [...turns, { role, text }].slice(-MAX_VISIBLE_TURNS);
+      renderTurns();
     }
-    function setVoiceState(state, message) {
-      voiceButton.dataset.state = state;
-      voiceButton.setAttribute("aria-pressed", String(state === "active" || state === "connecting"));
-      voiceButton.setAttribute("aria-label", state === "idle" ? "\u041D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433" : "\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
-      voiceStatus.textContent = message || "";
-      voiceStatus.hidden = !message;
-    }
-    function elapsed(from, to) {
-      if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
-      return Math.max(0, Math.round(to - from));
-    }
-    function reportVoiceDiagnostics(session, outcome) {
-      const profile = session.profile;
-      if (!profile || profile.reported) return;
-      profile.reported = true;
-      const finishedAt = monotonicNow();
-      const payload = {
-        outcome,
-        prewarmedTransport: profile.prewarmedTransport,
-        totalMs: elapsed(profile.startedAt, finishedAt),
-        microphoneMs: elapsed(profile.startedAt, profile.microphoneReadyAt),
-        offerMs: elapsed(profile.microphoneReadyAt, profile.offerReadyAt),
-        localDescriptionMs: elapsed(profile.offerReadyAt, profile.localDescriptionReadyAt),
-        sessionRequestMs: elapsed(profile.sessionRequestStartedAt, profile.sessionResponseAt),
-        remoteDescriptionMs: elapsed(profile.sessionResponseAt, profile.remoteDescriptionReadyAt),
-        dataChannelMs: elapsed(profile.remoteDescriptionReadyAt, profile.channelOpenedAt),
-        failedStage: outcome === "error" ? profile.failedStage : null
-      };
-      void Promise.resolve().then(() => fetchImpl(diagnosticsEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        keepalive: true
-      })).catch(() => {
-      });
-    }
-    function append(role, text, eventId = null) {
-      if (!active) return;
-      repository.append(active.dialogueId, { role, text, eventId });
-      if (rootPanel.dataset.dialoguesOpen === "true") renderDialogues();
-    }
-    function clientEventId(prefix) {
-      return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    }
-    function sendRealtimeEvent(session, event, { ignoreError = false } = {}) {
-      if (session.channel?.readyState !== "open") return false;
-      if (ignoreError && event.event_id) session.ignoredErrorEventIds.add(event.event_id);
-      session.channel.send(JSON.stringify(event));
-      return true;
-    }
-    function cancelRealtimeSpeech(session) {
-      sendRealtimeEvent(session, { type: "response.cancel", event_id: clientEventId("cancel-tool") }, { ignoreError: true });
-      sendRealtimeEvent(session, { type: "output_audio_buffer.clear", event_id: clientEventId("clear-tool-audio") }, { ignoreError: true });
-    }
-    async function handleToolCall(item) {
-      const session = active;
-      if (!session || session.toolCalls.has(item.call_id)) return;
-      session.toolCalls.add(item.call_id);
-      let output;
-      let applied = false;
-      let replyInstructions = TOOL_RESULT_REPLY_INSTRUCTIONS;
+    function handleEvent(raw) {
+      let event;
       try {
-        if (item.name === "getFrontier") {
-          replyInstructions = FRONTIER_RESULT_REPLY_INSTRUCTIONS;
-          const frontier = await fetchTaskFrontier(fetchImpl, frontierEndpoint);
-          repository.append(session.dialogueId, {
-            role: "tool",
-            text: `\u041F\u043E\u043B\u0443\u0447\u0435\u043D \u0444\u0440\u043E\u043D\u0442\u0438\u0440: ${frontier.length} \u0437\u0430\u0434\u0430\u0447`,
-            eventId: `tool-${item.call_id}`
-          });
-          output = { status: "ok", frontier };
-        } else {
-          const input = taskInputFromToolCall(item.name, item.arguments, {
-            transcript: session.latestUserTranscript
-          });
-          const ack = await executeTaskCommand(input);
-          if (ack?.status && ack.status !== "applied") throw new Error(ack.reason || "Task operation was rejected");
-          repository.append(session.dialogueId, {
-            role: "tool",
-            text: `Tool ${item.name}(${item.arguments || "{}"}): ${operationLabel(input)}`,
-            eventId: `tool-${item.call_id}`
-          });
-          output = { status: "applied", operation: input.command, target: ack?.newTarget || input.actId };
-          applied = true;
-        }
-      } catch (error) {
-        repository.append(session.dialogueId, {
-          role: "system",
-          text: `\u041E\u0448\u0438\u0431\u043A\u0430 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0437\u0430\u0434\u0430\u0447\u0438: ${error.message}`,
-          eventId: `tool-error-${item.call_id}`
+        event = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (event.type === "session.input_transcript.delta") appendFragment("user", event.delta);
+      else if (event.type === "session.output_transcript.delta") appendFragment("assistant", event.delta);
+      else if (event.type === "session.started") setStatus("\u0421\u043B\u0443\u0448\u0430\u044E", "live");
+      else if (event.type === "session.closed") stop();
+    }
+    async function start() {
+      if (session) return;
+      setStatus("\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u2026", "connecting");
+      let media;
+      try {
+        media = await mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        setStatus("\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443", "idle");
+        return;
+      }
+      const peer = peerFactory({});
+      const audio = documentRef.createElement("audio");
+      audio.autoplay = true;
+      audio.hidden = true;
+      documentRef.body.append(audio);
+      session = { peer, media, audio, channel: null };
+      peer.addEventListener("track", (event) => {
+        audio.srcObject = event.streams[0];
+      });
+      for (const track of media.getTracks()) peer.addTrack(track, media);
+      const channel = peer.createDataChannel("oai-events");
+      session.channel = channel;
+      channel.addEventListener("message", (event) => handleEvent(event.data));
+      channel.addEventListener("close", () => stop());
+      try {
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        const response = await fetchImpl(LIVE_SESSION_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sdp: offer.sdp })
         });
-        output = { status: "rejected", reason: error.message };
-      }
-      if (rootPanel.dataset.dialoguesOpen === "true") renderDialogues();
-      if (active !== session || session.channel?.readyState !== "open") return;
-      if (applied) cancelRealtimeSpeech(session);
-      sendRealtimeEvent(session, {
-        type: "conversation.item.create",
-        item: {
-          type: "function_call_output",
-          call_id: item.call_id,
-          output: JSON.stringify(output)
-        }
-      });
-      sendRealtimeEvent(session, {
-        type: "response.create",
-        response: {
-          instructions: replyInstructions
-        }
-      });
-    }
-    function transcriptFromAssistantItem(item) {
-      if (item?.type !== "message" || item?.role !== "assistant" || !Array.isArray(item.content)) return "";
-      return item.content.map((part) => part.transcript || part.text || "").filter(Boolean).join(" ").trim();
-    }
-    async function handleRealtimeEvent(event) {
-      if (!active || !event?.type) return;
-      if (event.type === "conversation.item.input_audio_transcription.completed") {
-        active.latestUserTranscript = String(event.transcript || "").trim();
-        append("user", event.transcript, event.event_id || `user-${event.item_id || event.content_index || ""}`);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error?.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0447\u0430\u0442\u044C \u0441\u0435\u0441\u0441\u0438\u044E");
+        await peer.setRemoteDescription({ type: "answer", sdp: payload.sdp });
+        session.id = payload.sessionId;
+        setStatus("\u0421\u043B\u0443\u0448\u0430\u044E", "live");
+      } catch (error) {
+        teardown();
+        setStatus(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0447\u0430\u0442\u044C \u0441\u0435\u0441\u0441\u0438\u044E", "idle");
         return;
       }
-      if (event.type === "response.output_audio_transcript.done" || event.type === "response.audio_transcript.done" || event.type === "response.output_text.done") {
-        append("assistant", event.transcript || event.text, event.event_id || `assistant-${event.response_id || ""}-${event.output_index || 0}`);
-        return;
-      }
-      if (event.type === "response.output_item.done") {
-        if (event.item?.type === "function_call") {
-          await handleToolCall(event.item);
-          return;
-        }
-        const transcript = transcriptFromAssistantItem(event.item);
-        append("assistant", transcript, event.event_id || `assistant-item-${event.item?.id || ""}`);
-        return;
-      }
-      if (event.type === "error") {
-        const clientEventId2 = event.error?.event_id || event.event_id || null;
-        if (clientEventId2 && active.ignoredErrorEventIds.delete(clientEventId2)) return;
-        append("system", event.error?.message || "\u041E\u0448\u0438\u0431\u043A\u0430 OpenAI Realtime", event.event_id || null);
-      }
+      turns = [];
+      renderTurns();
     }
-    function cleanupVoiceSession(session) {
-      session.abortController?.abort();
+    function teardown() {
+      if (!session) return;
       try {
         session.channel?.close();
       } catch {
       }
       try {
-        session.peerConnection?.close();
+        session.peer.close();
       } catch {
       }
-      for (const track of session.mediaStream?.getTracks?.() || []) track.stop();
-      if (session.audioElement) {
-        session.audioElement.srcObject = null;
-        session.audioElement.remove();
-      }
-    }
-    function prepareVoiceTransport() {
-      if (!preparedTransport) preparedTransport = createPreparedRealtimeTransport(RTCPeerConnectionCtor);
-    }
-    function takePreparedVoiceTransport() {
-      const transport = preparedTransport || createPreparedRealtimeTransport(RTCPeerConnectionCtor);
-      preparedTransport = null;
-      return transport;
-    }
-    function cleanupPreparedVoiceTransport() {
-      try {
-        preparedTransport?.channel?.close();
-      } catch {
+      for (const track of session.media?.getTracks() || []) {
+        try {
+          track.stop();
+        } catch {
+        }
       }
       try {
-        preparedTransport?.peerConnection?.close();
+        session.audio.remove();
       } catch {
       }
-      preparedTransport = null;
+      session = null;
     }
-    function stopVoice() {
-      const session = active;
+    function stop() {
       if (!session) return;
-      reportVoiceDiagnostics(session, "cancelled");
-      active = null;
-      cleanupVoiceSession(session);
-      repository.finish(session.dialogueId);
-      renderDialogues();
-      setVoiceState("idle", "");
+      const wasLive = Boolean(session.id);
+      teardown();
+      setStatus("", "idle");
+      if (wasLive) fetchImpl(LIVE_SESSION_STOP_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {
+      });
     }
-    async function startVoice() {
-      const dialogueId = repository.start();
-      const session = {
-        dialogueId,
-        abortController: new AbortControllerCtor(),
-        peerConnection: null,
-        mediaStream: null,
-        audioElement: null,
-        channel: null,
-        ignoredErrorEventIds: /* @__PURE__ */ new Set(),
-        toolCalls: /* @__PURE__ */ new Set(),
-        latestUserTranscript: "",
-        profile: {
-          startedAt: monotonicNow(),
-          prewarmedTransport: Boolean(preparedTransport),
-          microphoneReadyAt: null,
-          offerReadyAt: null,
-          localDescriptionReadyAt: null,
-          sessionRequestStartedAt: null,
-          sessionResponseAt: null,
-          remoteDescriptionReadyAt: null,
-          channelOpenedAt: null,
-          failedStage: null,
-          reported: false
-        }
-      };
-      active = session;
-      renderDialogues();
-      setVoiceState("connecting", "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u2026");
-      try {
-        if (!RTCPeerConnectionCtor || !mediaDevices?.getUserMedia) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
-        session.mediaStream = await mediaDevices.getUserMedia({ audio: true });
-        session.profile.microphoneReadyAt = monotonicNow();
-        if (active !== session) return cleanupVoiceSession(session);
-        const transport = takePreparedVoiceTransport();
-        if (!transport) throw new Error("\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0440\u0435\u0436\u0438\u043C \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u043E\u043C");
-        const { peerConnection: pc, channel } = transport;
-        session.peerConnection = pc;
-        const audio = documentLike.createElement("audio");
-        audio.autoplay = true;
-        audio.playsInline = true;
-        audio.hidden = true;
-        documentLike.body.append(audio);
-        session.audioElement = audio;
-        pc.ontrack = (event) => {
-          audio.srcObject = event.streams[0];
-        };
-        for (const track of session.mediaStream.getTracks()) pc.addTrack(track, session.mediaStream);
-        session.channel = channel;
-        channel.addEventListener("open", () => {
-          if (active === session) {
-            session.profile.channelOpenedAt = monotonicNow();
-            setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
-            reportVoiceDiagnostics(session, "active");
-          }
-        });
-        channel.addEventListener("message", (message) => {
-          try {
-            void handleRealtimeEvent(JSON.parse(message.data));
-          } catch {
-            append("system", "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \u043D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u043E\u0435 \u0441\u043E\u0431\u044B\u0442\u0438\u0435 Realtime");
-          }
-        });
-        channel.addEventListener("close", () => {
-          if (active === session) stopVoice();
-        });
-        const offer = await pc.createOffer();
-        session.profile.offerReadyAt = monotonicNow();
-        await pc.setLocalDescription(offer);
-        session.profile.localDescriptionReadyAt = monotonicNow();
-        session.profile.sessionRequestStartedAt = monotonicNow();
-        const response = await fetchImpl(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sdp: offer.sdp,
-            taskTree: taskTreeFromState(getTaskState())
-          }),
-          signal: session.abortController.signal
-        });
-        session.profile.sessionResponseAt = monotonicNow();
-        if (!response.ok) {
-          const detail = await response.json().catch(() => ({}));
-          throw new Error(detail.error || `Realtime HTTP ${response.status}`);
-        }
-        await pc.setRemoteDescription({ type: "answer", sdp: await response.text() });
-        session.profile.remoteDescriptionReadyAt = monotonicNow();
-        if (active === session && channel.readyState === "open") setVoiceState("active", "\u0421\u043B\u0443\u0448\u0430\u044E");
-      } catch (error) {
-        if (active !== session || error.name === "AbortError") return;
-        session.profile.failedStage = session.profile.microphoneReadyAt == null ? "microphone" : session.profile.sessionResponseAt == null ? "session" : "transport";
-        reportVoiceDiagnostics(session, "error");
-        append("system", error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043D\u0430\u0447\u0430\u0442\u044C \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0439 \u0434\u0438\u0430\u043B\u043E\u0433");
-        stopVoice();
-        setVoiceState("error", "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F");
-      }
+    function toggle() {
+      if (session) stop();
+      else start();
     }
-    voiceButton.addEventListener("click", () => {
-      if (active) stopVoice();
-      else if (keyConfigured === false) openKeySettings();
-      else void startVoice();
+    function openDialogues() {
+      if (!dialoguesPanel) return;
+      dialoguesPanel.hidden = false;
+      if (rootPanel) rootPanel.dataset.dialoguesOpen = "true";
+      dialoguesButton?.classList.add("active");
+      dialoguesButton?.setAttribute("aria-pressed", "true");
+      renderTurns();
+    }
+    function closeDialogues() {
+      if (!dialoguesPanel) return;
+      dialoguesPanel.hidden = true;
+      if (rootPanel) rootPanel.dataset.dialoguesOpen = "false";
+      dialoguesButton?.classList.remove("active");
+      dialoguesButton?.setAttribute("aria-pressed", "false");
+    }
+    voiceButton?.addEventListener("click", toggle);
+    dialoguesClose?.addEventListener("click", () => {
+      closeDialogues();
+      onCloseDialogues?.();
     });
-    openAIKeySaveButton?.addEventListener("click", () => {
-      void saveOpenAIKey();
+    documentRef.addEventListener("visibilitychange", () => {
+      if (documentRef.visibilityState === "hidden") stop();
     });
-    openAIPromptSaveButton?.addEventListener("click", () => {
-      void saveOpenAIPrompt();
-    });
-    openAIKeyInput?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        void saveOpenAIKey();
-      }
-    });
-    dialoguesButton.addEventListener("click", () => {
-      setDialoguesOpen(rootPanel.dataset.dialoguesOpen !== "true");
-    });
-    dialoguesClose.addEventListener("click", () => setDialoguesOpen(false));
-    for (const button of navigationButtons) button?.addEventListener("click", () => setDialoguesOpen(false));
-    documentLike.addEventListener("visibilitychange", () => {
-      if (documentLike.visibilityState === "hidden") stopVoice();
-      if (documentLike.visibilityState === "hidden") cleanupPreparedVoiceTransport();
-    });
-    windowLike?.addEventListener("pagehide", () => {
-      stopVoice();
-      cleanupPreparedVoiceTransport();
-    });
-    setVoiceState("idle", "");
-    setDialoguesOpen(false);
-    renderDialogues();
-    void Promise.all([refreshKeyStatus(), refreshPrompt()]);
-    prepareVoiceTransport();
-    return {
-      renderDialogues,
-      start: startVoice,
-      stop: stopVoice,
-      refreshKeyStatus,
-      openDialogues() {
-        setDialoguesOpen(true);
-      }
+    windowRef.addEventListener("pagehide", () => stop());
+    const settings = createSettingsPanel({ ...settingsElements, fetchImpl });
+    return { start, stop, toggle, openDialogues, closeDialogues, settings, get active() {
+      return Boolean(session);
+    }, get turns() {
+      return turns.slice();
+    } };
+  }
+  function createSettingsPanel({
+    keyInput,
+    keyField,
+    keySave,
+    keyStatus,
+    voicePromptInput,
+    voicePromptSave,
+    voicePromptReset,
+    voicePromptStatus,
+    backendPromptInput,
+    backendPromptSave,
+    backendPromptReset,
+    backendPromptStatus,
+    backendModelInput,
+    backendModelSave,
+    backendModelStatus,
+    fetchImpl = fetch
+  } = {}) {
+    const say = (element, text) => {
+      if (element) element.textContent = text;
     };
+    async function call(url, options) {
+      const response = await fetchImpl(url, options);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error?.message || payload?.error || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C");
+      return payload;
+    }
+    async function load() {
+      try {
+        const [key, settings] = await Promise.all([
+          call(LIVE_KEY_STATUS_ENDPOINT, {}),
+          call(LIVE_SETTINGS_ENDPOINT, {})
+        ]);
+        if (keyField) keyField.hidden = key.configured;
+        if (keySave) keySave.hidden = key.configured;
+        say(keyStatus, key.configured ? "\u041A\u043B\u044E\u0447 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D." : "\u041A\u043B\u044E\u0447 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D.");
+        if (voicePromptInput) voicePromptInput.value = settings.voicePrompt;
+        if (backendPromptInput) backendPromptInput.value = settings.backendPrompt;
+        if (backendModelInput) backendModelInput.value = settings.backendModel;
+        say(voicePromptStatus, settings.defaults.voicePrompt ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." : "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0441\u0432\u043E\u044F \u0440\u0435\u0434\u0430\u043A\u0446\u0438\u044F.");
+        say(backendPromptStatus, settings.defaults.backendPrompt ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." : "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0441\u0432\u043E\u044F \u0440\u0435\u0434\u0430\u043A\u0446\u0438\u044F.");
+        say(backendModelStatus, settings.defaults.backendModel ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043C\u043E\u0434\u0435\u043B\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E." : "\u0417\u0430\u0434\u0430\u043D\u0430 \u0441\u0432\u043E\u044F \u043C\u043E\u0434\u0435\u043B\u044C.");
+        return settings;
+      } catch (error) {
+        say(keyStatus, error.message);
+        return null;
+      }
+    }
+    const put = (body) => call(LIVE_SETTINGS_ENDPOINT, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    async function savePrompt(target, input, status) {
+      try {
+        await put({ target, mode: "replace", text: input?.value || "" });
+        say(status, "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E. \u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u0441\u044F \u0441\u043E \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0441\u0435\u0441\u0441\u0438\u0438.");
+      } catch (error) {
+        say(status, error.message);
+      }
+    }
+    async function resetPrompt(target, input, status) {
+      try {
+        const result = await put({ target, action: "reset" });
+        if (input) input.value = result.prompt;
+        say(status, "\u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0451\u043D \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442.");
+      } catch (error) {
+        say(status, error.message);
+      }
+    }
+    keySave?.addEventListener("click", async () => {
+      try {
+        await call(LIVE_KEY_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: keyInput?.value || "" }) });
+        say(keyStatus, "\u041A\u043B\u044E\u0447 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D.");
+        if (keyInput) keyInput.value = "";
+        await load();
+      } catch (error) {
+        say(keyStatus, error.message);
+      }
+    });
+    voicePromptSave?.addEventListener("click", () => savePrompt("voice", voicePromptInput, voicePromptStatus));
+    voicePromptReset?.addEventListener("click", () => resetPrompt("voice", voicePromptInput, voicePromptStatus));
+    backendPromptSave?.addEventListener("click", () => savePrompt("backend", backendPromptInput, backendPromptStatus));
+    backendPromptReset?.addEventListener("click", () => resetPrompt("backend", backendPromptInput, backendPromptStatus));
+    backendModelSave?.addEventListener("click", async () => {
+      try {
+        const result = await put({ backendModel: backendModelInput?.value || "" });
+        say(backendModelStatus, result.usingDefault ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043C\u043E\u0434\u0435\u043B\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E." : `\u041C\u043E\u0434\u0435\u043B\u044C: ${result.backendModel}. \u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u0441\u044F \u0441\u043E \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0441\u0435\u0441\u0441\u0438\u0438.`);
+      } catch (error) {
+        say(backendModelStatus, error.message);
+      }
+    });
+    return { load };
   }
 
   // src/v2/client/entry.js
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-563c3df8fbefb48f";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-b6647f028cb393b0";
     await client.connect();
     const $ = (id) => document.getElementById(id);
-    const realtime = createRealtimeVoiceAgent({
+    const live = createLiveVoice({
       voiceButton: $("realtime-voice-btn"),
       voiceStatus: $("realtime-voice-status"),
       dialoguesButton: $("dialogues-tab-btn"),
       dialoguesPanel: $("dialogues-panel"),
       dialoguesList: $("dialogues-list"),
       dialoguesClose: $("dialogues-close"),
-      openAIKeyInput: $("openai-key-input"),
-      openAIKeyField: $("openai-key-field"),
-      openAIKeySaveButton: $("openai-key-save"),
-      openAIKeyStatus: $("openai-key-status"),
-      openAIPromptInput: $("openai-prompt-input"),
-      openAIPromptSaveButton: $("openai-prompt-save"),
-      openAIPromptStatus: $("openai-prompt-status"),
-      settingsOverlay: $("settings-overlay"),
       rootPanel: $("app-root"),
-      navigationButtons: [$("frontier-tab-btn"), $("view-toggle-btn")],
-      getTaskState: () => client.getTaskState(),
-      fetchImpl: async (url, options) => {
-        if (url === "/api/realtime/session" && options?.method === "POST") {
-          const { tasks } = await client.request("/api/tasks/tree.json");
-          options = { ...options, body: JSON.stringify({ ...JSON.parse(options.body), taskTree: tasks }) };
-        }
-        return fetch(url, options);
-      },
-      executeTaskCommand: async (command) => {
-        const receipt = await client.submit({ command, context: client.context(command.actId ? { id: `task:${command.actId}` } : null) });
-        if (receipt.status === "accepted") return client.waitForCompletion(receipt.requestId);
-        return { status: "applied", newTarget: receipt.newTarget || command.actId };
+      onCloseDialogues: () => client.navigate("list"),
+      settingsElements: {
+        keyInput: $("openai-key-input"),
+        keyField: $("openai-key-field"),
+        keySave: $("openai-key-save"),
+        keyStatus: $("openai-key-status"),
+        voicePromptInput: $("live-voice-prompt"),
+        voicePromptSave: $("live-voice-prompt-save"),
+        voicePromptReset: $("live-voice-prompt-reset"),
+        voicePromptStatus: $("live-voice-prompt-status"),
+        backendPromptInput: $("live-backend-prompt"),
+        backendPromptSave: $("live-backend-prompt-save"),
+        backendPromptReset: $("live-backend-prompt-reset"),
+        backendPromptStatus: $("live-backend-prompt-status"),
+        backendModelInput: $("live-backend-model"),
+        backendModelSave: $("live-backend-model-save"),
+        backendModelStatus: $("live-backend-model-status")
       }
     });
-    client.realtime = realtime;
-    window.__realtimeVoiceAgent = realtime;
+    client.realtime = live;
+    window.__liveVoice = live;
+    $("settings-btn")?.addEventListener("click", () => {
+      live.settings.load();
+    });
+    await live.settings.load();
   }
   bootstrap().catch((error) => {
     console.error("VoiceList v0.2 failed to start", error);
