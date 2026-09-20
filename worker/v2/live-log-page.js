@@ -26,6 +26,7 @@ export const LIVE_LOG_PAGE = `<!DOCTYPE html>
   .row:hover { background:var(--panel); }
   .row.plain { cursor:default; }
   .row.plain:hover { background:transparent; }
+  .row.context .gist { color:var(--muted); }
   .at { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
   .dir { font-weight:700; }
   .dir.in { color:var(--in); }
@@ -56,6 +57,11 @@ function gist(entry) {
   const item = inner.item || {};
   switch (entry.type) {
     case 'vl.speech': return [p.role === 'user' ? 'речь' : 'ответ', p.text || ''];
+    case 'vl.delegation': {
+      const context = (p.context || []).map(turn => (turn.role === 'user' ? '👤 ' : '🤖 ') + turn.text).join('  ·  ');
+      return ['спросили бэкенд', context || '(без контекста)'];
+    }
+    case 'vl.backend_text': return ['ответил бэкенд', p.text || ''];
     case 'session.delegation.created': return ['делегирование', (p.delegation?.target || '') + (p.delegation?.offset_ms != null ? ' · ' + Math.round(p.delegation.offset_ms / 1000) + ' c' : '')];
     case 'session.started': return ['сессия началась', p.session?.model || ''];
     case 'session.closed': return ['сессия закрыта', p.reason || ''];
@@ -65,7 +71,7 @@ function gist(entry) {
     case 'session.instructions.appended': return ['инструкции приняты', ''];
     case 'session.update': return ['обновление сессии', short(JSON.stringify(p.session || {}), 90)];
     case 'response.create': return ['продолжить ответ', ''];
-    case 'response.item.create': return ['результат вызова', short(item.output || '', 120)];
+    case 'response.item.create': return ['результат вызова', short((p.item || item).output || '', 160)];
     case 'vl.session.requested': return ['запрос сессии', 'модель ' + (p.backendModel || '')];
     case 'vl.session.created': return ['сессия создана', (p.requested?.backendModel || '') + ' · store ' + p.requested?.store];
     case 'vl.session.create_failed': return ['GPT-Live отклонил', short(p.detail || '', 140)];
@@ -92,10 +98,10 @@ function render() {
   if (!shown.length) { list.innerHTML = '<li class="empty">Записей нет.</li>'; return; }
   for (const entry of shown) {
     const [kind, detail] = gist(entry);
-    const speech = entry.type === 'vl.speech';
+    const speech = entry.type === 'vl.speech' || entry.type === 'vl.backend_text';
     const li = document.createElement('li');
     const row = document.createElement('div');
-    row.className = speech ? 'row plain' : 'row';
+    row.className = speech ? 'row plain' : (entry.type === 'vl.delegation' ? 'row context' : 'row');
     row.innerHTML = '<span class="at"></span><span class="dir"></span><span class="gist"></span>';
     row.querySelector('.at').textContent = entry.at.slice(11, 19);
     const dir = row.querySelector('.dir');
