@@ -94,7 +94,7 @@ export class LiveHost {
     const answer = String(payload?.transport?.sdp || '');
     if (!id || !answer) fail('MODEL_UNAVAILABLE', 'GPT-Live не вернул идентификатор сессии');
 
-    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, backendText: null, pending: [], closing: false };
+    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false };
 
     // The session record carries the prompt versions and the model name: an entry from last
     // week cannot be read without knowing which text drove the model then. The response is
@@ -157,44 +157,7 @@ export class LiveHost {
     this.session.speech = null;
     const text = speech.text.trim();
     if (!text) return;
-    // Turns since the last delegation, not a rolling window: a window mixes the request that
-    // is being made now with one that was already answered.
-    this.session.pending = [...(this.session.pending || []), { role: speech.role, text }].slice(-12);
     this.record({ type: 'vl.speech', role: speech.role, text, start_ms: speech.startMs, end_ms: speech.endMs });
-  }
-
-  /** The backend's own words arrive as a stream too, and they are what the log has to show
-   *  beside the delegation that asked for them. Assembled the same way speech is. */
-  bufferBackendText(event) {
-    if (!this.session) return;
-    const delegationId = event?.delegation_id || this.session.backendText?.delegationId || null;
-    if (!this.session.backendText || this.session.backendText.delegationId !== delegationId) {
-      this.flushBackendText();
-      this.session.backendText = { delegationId, text: '' };
-    }
-    this.session.backendText.text += String(event?.event?.delta ?? '');
-  }
-
-  flushBackendText() {
-    const pending = this.session?.backendText;
-    if (!pending) return;
-    this.session.backendText = null;
-    const text = pending.text.trim();
-    if (!text) return;
-    this.record({ type: 'vl.backend_text', delegation_id: pending.delegationId, text });
-  }
-
-  /** What actually caused this delegation. The framework does not expose the input it sent to
-   *  the backend — a response.created carries the model, tools and settings but neither the
-   *  instructions nor the input — so the closest true thing is the exchange since the previous
-   *  delegation. Assistant turns that open the window belong to the exchange that just ended,
-   *  so they are dropped. */
-  takeContext() {
-    const turns = this.session?.pending || [];
-    if (this.session) this.session.pending = [];
-    let start = 0;
-    while (start < turns.length && turns[start].role !== 'user') start += 1;
-    return turns.slice(start);
   }
 
   /** The literal context the voice layer handed the backend.
@@ -246,15 +209,13 @@ export class LiveHost {
     const inner = event?.event;
     if (event?.type === 'session.input_transcript.delta') this.bufferSpeech('user', event);
     else if (event?.type === 'session.output_transcript.delta') this.bufferSpeech('assistant', event);
-    else if (inner?.type === 'response.output_text.delta') this.bufferBackendText(event);
     else if (event?.type === 'session.delegation.created') {
       this.flushSpeech();
-      this.record({ type: 'vl.delegation', delegation: event.delegation, offset_ms: event.offset_ms, context: this.takeContext(), raw: event });
+      this.record({ type: 'vl.delegation', delegation: event.delegation, offset_ms: event.offset_ms, raw: event });
     }
     else {
       // Delegation events arrive wrapped in response.event, so the skip list has to be applied
       // to the inner type as well — otherwise every streamed delta is kept after all.
-      if (inner?.type === 'response.completed') this.flushBackendText();
       if (isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none')) this.record(event);
       if (inner?.type === 'response.created') {
         this.fetchBackendInput(event?.delegation_id || null, inner.response).catch(() => {});
@@ -264,7 +225,7 @@ export class LiveHost {
   }
 
   async dispatch(event) {
-    if (event?.type === 'session.closed') { this.flushSpeech(); this.flushBackendText(); this.session = null; return; }
+    if (event?.type === 'session.closed') { this.flushSpeech(); this.session = null; return; }
     if (event?.type !== 'response.event') return;
     const inner = event.event;
     if (inner?.type !== 'response.output_item.done') return;
@@ -330,7 +291,6 @@ export class LiveHost {
   async stop(reason = 'client') {
     if (!this.session) return false;
     this.flushSpeech();
-    this.flushBackendText();
     this.send({ type: 'session.close' });
     this.record({ type: 'vl.session.stopped', reason }, 'out');
     try { this.session.socket?.close(); } catch { /* already gone */ }

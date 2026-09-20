@@ -28,6 +28,10 @@ export const LIVE_LOG_PAGE = `<!DOCTYPE html>
   .row.plain:hover { background:transparent; }
   .row.context .gist { color:var(--muted); }
   .row.bad .gist { color:#c04040; font-weight:600; }
+  .row.model { background:rgba(37,99,235,0.06); }
+  .row.model .kind { color:var(--out); font-weight:700; }
+  .row.model .gist { font-weight:500; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .row.model { background:rgba(122,167,255,0.10); } }
   .at { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
   .dir { font-weight:700; }
   .dir.in { color:var(--in); }
@@ -88,12 +92,8 @@ function gist(entry) {
   const item = inner.item || {};
   switch (entry.type) {
     case 'vl.speech': return [p.role === 'user' ? 'речь' : 'ответ', p.text || ''];
-    case 'vl.delegation': {
-      const context = (p.context || []).map(turn => (turn.role === 'user' ? '👤 ' : '🤖 ') + turn.text).join('  ·  ');
-      return ['спросили бэкенд', context || '(без контекста)'];
-    }
-    case 'vl.backend_text': return ['ответил бэкенд', p.text || ''];
-    case 'vl.backend_input': { const texts = (p.items || []).map(itemText).filter(Boolean); return ['контекст в бэкенд', texts[texts.length - 1] || '']; }
+    case 'vl.delegation': return ['голос позвал модель', ''];
+    case 'vl.backend_input': { const texts = (p.items || []).map(itemText).filter(Boolean); return ['КОНТЕКСТ → модели', texts[texts.length - 1] || '(пусто)']; }
     case 'vl.backend_input.failed': return ['контекст не прочитан', p.detail || p.error?.message || ('HTTP ' + p.status)];
     case 'session.delegation.created': return ['делегирование', (p.delegation?.target || '') + (p.delegation?.offset_ms != null ? ' · ' + Math.round(p.delegation.offset_ms / 1000) + ' c' : '')];
     case 'session.started': return ['сессия началась', p.session?.model || ''];
@@ -116,6 +116,7 @@ function gist(entry) {
     case 'vl.dispatch.failed': return ['ошибка обработки', p.error?.message || ''];
     case 'error': return ['ОШИБКА', p.error?.message || short(JSON.stringify(p), 200)];
   }
+  if (entry.type.endsWith('response.output_text.done')) return ['ОТВЕТ ← модели', inner.text || ''];
   if (entry.type.endsWith('response.output_item.done') && item.type === 'function_call') return ['вызов ' + item.name, short(item.arguments || '', 140)];
   if (entry.type.endsWith('response.created')) return ['ответ модели начат', ''];
   if (entry.type.endsWith('response.completed')) return ['ответ модели готов', ''];
@@ -135,7 +136,8 @@ function render() {
     const speech = entry.type === 'vl.speech' || entry.type === 'vl.backend_text';
     const li = document.createElement('li');
     const row = document.createElement('div');
-    row.className = speech ? 'row plain' : entry.type === 'vl.delegation' ? 'row context' : entry.type === 'error' ? 'row bad' : 'row';
+    const model = entry.type === 'vl.backend_input' || entry.type.endsWith('response.output_text.done');
+    row.className = [speech ? 'row plain' : 'row', model ? 'model' : '', entry.type === 'vl.delegation' ? 'context' : '', entry.type === 'error' ? 'bad' : ''].filter(Boolean).join(' ');
     row.innerHTML = '<span class="at"></span><span class="dir"></span><span class="gist"></span>';
     row.querySelector('.at').textContent = entry.at.slice(11, 19);
     const dir = row.querySelector('.dir');
