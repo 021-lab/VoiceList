@@ -1,11 +1,10 @@
 // End-to-end check of a deployed GPT-Live path: a real WebRTC offer from Chromium, a real
 // session against the worker, and the events the sideband recorded for it.
-// Run: LIVE_LOG_TOKEN=... node scripts/live-smoke.mjs
+// Run: node scripts/live-smoke.mjs
 import { createServer } from 'node:http';
 import { chromium } from '@playwright/test';
 
 const BASE = process.env.LIVE_SMOKE_BASE || 'https://vlist-v02-dev.smileme.ai';
-const TOKEN = process.env.LIVE_LOG_TOKEN || '';
 
 // A local page, because getUserMedia needs a trustworthy origin. The browser only produces
 // the offer and consumes the answer; every call to the deployed worker goes through Node,
@@ -69,14 +68,12 @@ if (created.ok) {
   const status = await (await fetch(`${BASE}/api/live/session`)).json();
   console.log('сессия на сервере:', JSON.stringify(status));
 
-  if (TOKEN) {
-    const log = await (await fetch(`${BASE}/api/live/log?limit=60`, { headers: { 'X-VoiceList-Log-Token': TOKEN } })).json();
-    const mine = log.entries.filter(entry => entry.liveSessionId === payload.sessionId);
-    console.log(`лог этой сессии: ${mine.length} записей из ${log.stats.events}`);
-    for (const entry of mine.slice(0, 30)) {
-      const text = entry.payload?.delta || entry.payload?.reason || entry.payload?.error?.message || '';
-      console.log(`  seq=${entry.seq} ${entry.direction} ${entry.type} ${String(text).slice(0, 80)}`);
-    }
+  const log = await (await fetch(`${BASE}/api/live/log?limit=60`)).json();
+  const mine = log.entries.filter(entry => entry.liveSessionId === payload.sessionId);
+  console.log(`лог этой сессии: ${mine.length} записей из ${log.stats.events}`);
+  for (const entry of mine.slice(0, 30)) {
+    const text = entry.payload?.delta || entry.payload?.reason || entry.payload?.error?.message || '';
+    console.log(`  seq=${entry.seq} ${entry.direction} ${entry.type} ${String(text).slice(0, 80)}`);
   }
   const stopped = await (await fetch(`${BASE}/api/live/session/stop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
   console.log('остановка:', JSON.stringify(stopped));

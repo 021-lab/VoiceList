@@ -132,7 +132,9 @@ export class LiveHost {
     let event;
     try { event = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)); }
     catch { this.record({ type: 'vl.event.unparsed', raw: String(raw).slice(0, 2_000) }); return; }
-    if (isLoggableEvent(event?.type)) this.record(event);
+    // Delegation events arrive wrapped in response.event, so the skip list has to be applied
+    // to the inner type as well — otherwise every streamed delta is kept after all.
+    if (isLoggableEvent(event?.type) && isLoggableEvent(event?.event?.type ?? 'none')) this.record(event);
     this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
   }
 

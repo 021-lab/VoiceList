@@ -82,7 +82,7 @@ source: gpt-live. Это важно: голосовой агент не изме
 | GET /api/live/settings/history | История правок промптов с прежним и новым текстом. |
 | GET, POST /api/live/session | Состояние голосовой сессии и её создание по SDP-предложению. |
 | POST /api/live/session/stop | Завершение сессии и освобождение sideband. |
-| GET /api/live/log, /api/live/log/sessions | Лог событий сессий; требует LIVE_LOG_TOKEN и без него отвечает 403. |
+| GET /api/live/log, /api/live/log/sessions | Лог событий сессий; читается открыто. |
 | GET /ws с Upgrade: websocket | Канал чтения и изменения документа. |
 | POST /reset | Только тестовый сброс; требует TEST_RESET_TOKEN. |
 

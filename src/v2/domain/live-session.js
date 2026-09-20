@@ -236,12 +236,15 @@ export function readFunctionCall(event) {
   return { callId: String(callId), name: String(name), arguments: args && typeof args === 'object' ? args : {} };
 }
 
-/** Audio bytes were ruled out, and streamed text deltas are superseded by the finished
- *  item; everything else the framework emits is kept. */
+/** Audio bytes were ruled out, and a streamed delta is superseded by the finished item;
+ *  everything else the framework emits is kept. Discrete events stay, deltas go. */
 const SKIPPED_EVENT_TYPES = new Set([
   'session.output_audio.delta',
   'session.input_audio.append',
-  'response.output_text.delta'
+  'response.output_text.delta',
+  'response.function_call_arguments.delta',
+  'response.output_audio.delta',
+  'response.audio.delta'
 ]);
 
 export const isLoggableEvent = (type) => Boolean(type) && !SKIPPED_EVENT_TYPES.has(type);

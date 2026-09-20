@@ -47,10 +47,9 @@ export default {
         }
       }
       if (url.pathname === '/api/live/settings/history' && request.method === 'GET') return json({history:await stub.livePromptHistory()});
-      // The log holds spoken transcripts, so reading it is closed by a token and fails shut
-      // when none is configured.
+      // The log reads openly, by decision: it is the working record of what the framework
+      // returned, and gating it behind a token got in the way of reading it.
       if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
-        if (!env.LIVE_LOG_TOKEN || request.headers.get('X-VoiceList-Log-Token') !== env.LIVE_LOG_TOKEN) return json({error:'Log token required'},403);
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
         if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));
       }
