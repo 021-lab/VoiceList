@@ -50,6 +50,12 @@ export class LiveLog {
     ).toArray().map(row => ({ liveSessionId: row.live_session_id, events: row.events, startedAt: row.started_at, lastAt: row.last_at }));
   }
 
+  clear() {
+    const before = this.stats();
+    this.sql.exec('DELETE FROM vl_live_events');
+    return { cleared: before.events };
+  }
+
   /** Size is reported rather than enforced: retention was deliberately left manual. */
   stats() {
     const row = this.sql.exec('SELECT COUNT(*) AS events, SUM(LENGTH(payload)) AS bytes FROM vl_live_events').toArray()[0] || {};

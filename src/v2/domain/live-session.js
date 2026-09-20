@@ -108,6 +108,12 @@ export const DEFAULT_VOICE_PROMPT = `
 о текущем состоянии задачи, который виден из таблицы, и на короткое уточнение.
 Не отвечай по существу, пока бэкенд не вернул результат, и не придумывай результат.
 
+Названия задач бывают числами. «Задача сорок пять» — это название «45», а не номер по
+порядку. Сначала ищи в таблице задачу с таким названием и только потом говори, что её нет.
+
+В таблице нет завершённых и архивных задач. Если задачи в ней не видно, не утверждай, что
+её не существует: скажи, что в текущем списке её нет, и предложи проверить завершённые.
+
 Изменение промпта — отдельный случай. Никогда не меняй промпт как побочное следствие
 другой просьбы. Сначала проговори вслух, что именно изменится, и дождись подтверждения.
 `.trim();
@@ -196,10 +202,30 @@ export const LIVE_TOOLS = [
 
 export const LIVE_TOOL_NAMES = LIVE_TOOLS.map(tool => tool.name);
 
-/** The snapshot is appended by us, never by the editor: a prompt that lost its table would
- *  leave the voice layer unable to resolve a name, and that reads as a worse model. */
+/** The voice layer cannot hold tools of its own — GPT-Live delegates reasoning and tool use
+ *  by design — so what it gets instead is the list of what the backend can do for it. It is
+ *  generated from the tool schemas, so the two cannot drift apart. */
+export function describeCapabilities(tools = LIVE_TOOLS) {
+  return tools.map(tool => `- ${tool.name}(${Object.keys(tool.parameters?.properties || {}).join(', ')}) — ${tool.description}`).join('\n');
+}
+
+/** Capabilities first, then the prompt, then the table. The model should know what can be
+ *  asked for before it reads how to behave, and the snapshot is appended by us rather than
+ *  by the editor: a prompt that lost its table could not resolve a spoken name, and that
+ *  reads as a worse model rather than as a consequence of the edit. */
 export function composeVoiceInstructions(voicePrompt, snapshot) {
-  return `${String(voicePrompt || '').trim()}\n\n<tasks>\n${snapshot}\n</tasks>`;
+  return [
+    '<capabilities>',
+    'Эти операции выполняются по твоей просьбе через бэкенд. Своих инструментов у тебя нет.',
+    describeCapabilities(),
+    '</capabilities>',
+    '',
+    String(voicePrompt || '').trim(),
+    '',
+    '<tasks>',
+    snapshot,
+    '</tasks>'
+  ].join('\n');
 }
 
 export function buildLiveSessionConfig({ items = [], voicePrompt, backendPrompt, backendModel, store = true } = {}) {

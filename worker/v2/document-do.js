@@ -109,6 +109,7 @@ export class ListDocumentDO extends Agent {
   async stopLiveSession() { return this.live ? this.live.stop('client') : false; }
   liveSessionStatus() { return {active:Boolean(this.live?.active),sessionId:this.live?.sessionId || ''}; }
   readLiveLog(query) { return {entries:this.liveLog.read(query),stats:this.liveLog.stats()}; }
+  clearLiveLog() { return this.liveLog.clear(); }
   listLiveSessions(limit) { return {sessions:this.liveLog.sessions(limit),stats:this.liveLog.stats()}; }
   readLiveSettings() { return this.liveSettings.read(); }
   writeLivePrompt(target, body) { return this.liveSettings.writePrompt(target,{mode:body?.mode,text:body?.text,source:'settings'}); }

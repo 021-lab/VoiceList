@@ -1,5 +1,6 @@
 import { getAgentByName } from 'agents';
 import { LIST_MANAGER_HTML } from '../generated-html.js';
+import { LIVE_LOG_PAGE } from './live-log-page.js';
 import { ListDocumentDO } from './document-do.js';
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from '../openai-key-setup.js';
 import { isMcpHostAllowed } from './mcp.js';
@@ -13,6 +14,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/health') return new Response('ok\n',{headers:{'Cache-Control':'no-store'}});
+    if (url.pathname === '/live-log') return new Response(LIVE_LOG_PAGE,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
     if (['/','/index.html','/list-manager.html'].includes(url.pathname)) return new Response(LIST_MANAGER_HTML,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
     if (request.method !== 'GET' && request.method !== 'OPTIONS') {
       const origin = request.headers.get('Origin');
@@ -49,6 +51,8 @@ export default {
       if (url.pathname === '/api/live/settings/history' && request.method === 'GET') return json({history:await stub.livePromptHistory()});
       // The log reads openly, by decision: it is the working record of what the framework
       // returned, and gating it behind a token got in the way of reading it.
+      // Clearing is a POST, so the same-origin check above applies to it; reading is open.
+      if (url.pathname === '/api/live/log/clear' && request.method === 'POST') return json(await stub.clearLiveLog());
       if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
         if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));
