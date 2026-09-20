@@ -117,6 +117,7 @@ export class ListDocumentDO extends Agent {
   restoreLivePrompt(target, at) { return this.liveSettings.restorePrompt(target,at); }
   livePromptHistory() { return this.liveSettings.history(); }
   setLiveBackendModel(model) { return this.liveSettings.setBackendModel(model); }
+  setLiveReasoningEffort(effort) { return this.liveSettings.setReasoningEffort(effort); }
   async onRequest(request) {
     if (new URL(request.url).pathname === '/mcp') {
       const response = await handleMcpRequest(request, this.port); this.broadcastState(); return response;

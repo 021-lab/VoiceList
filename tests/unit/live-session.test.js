@@ -119,13 +119,13 @@ describe('function calls', () => {
 
 describe('loggable events', () => {
   it('keeps transcripts, delegations and finished items', () => {
-    for (const type of ['session.started', 'session.input_transcript.delta', 'session.delegation.created', 'response.event', 'session.closed']) {
+    for (const type of ['session.started', 'session.delegation.created', 'response.event', 'session.closed', 'session.usage.updated']) {
       expect(isLoggableEvent(type)).toBe(true);
     }
   });
 
-  it('drops audio bytes and streamed text deltas', () => {
-    for (const type of ['session.output_audio.delta', 'session.input_audio.append', 'response.output_text.delta']) {
+  it('drops audio bytes and every streamed delta, transcripts included', () => {
+    for (const type of ['session.output_audio.delta', 'session.input_audio.append', 'response.output_text.delta', 'session.input_transcript.delta', 'session.output_transcript.delta']) {
       expect(isLoggableEvent(type)).toBe(false);
     }
   });

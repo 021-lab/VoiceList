@@ -160,6 +160,7 @@ export function createSettingsPanel({
   voicePromptInput, voicePromptSave, voicePromptReset, voicePromptStatus,
   backendPromptInput, backendPromptSave, backendPromptReset, backendPromptStatus,
   backendModelInput, backendModelSave, backendModelStatus,
+  reasoningInput, reasoningSave, reasoningStatus,
   fetchImpl = fetch
 } = {}) {
   const say = (element, text) => { if (element) element.textContent = text; };
@@ -182,9 +183,11 @@ export function createSettingsPanel({
       if (voicePromptInput) voicePromptInput.value = settings.voicePrompt;
       if (backendPromptInput) backendPromptInput.value = settings.backendPrompt;
       if (backendModelInput) backendModelInput.value = settings.backendModel;
+      if (reasoningInput) reasoningInput.value = settings.reasoningEffort || '';
       say(voicePromptStatus, settings.defaults.voicePrompt ? 'Используется встроенный промпт.' : 'Сохранена своя редакция.');
       say(backendPromptStatus, settings.defaults.backendPrompt ? 'Используется встроенный промпт.' : 'Сохранена своя редакция.');
       say(backendModelStatus, settings.defaults.backendModel ? 'Используется модель по умолчанию.' : 'Задана своя модель.');
+      say(reasoningStatus, settings.defaults.reasoningEffort ? 'Глубину задаёт сама модель.' : `Глубина: ${settings.reasoningEffort}.`);
       return settings;
     } catch (error) { say(keyStatus, error.message); return null; }
   }
@@ -217,6 +220,12 @@ export function createSettingsPanel({
   voicePromptReset?.addEventListener('click', () => resetPrompt('voice', voicePromptInput, voicePromptStatus));
   backendPromptSave?.addEventListener('click', () => savePrompt('backend', backendPromptInput, backendPromptStatus));
   backendPromptReset?.addEventListener('click', () => resetPrompt('backend', backendPromptInput, backendPromptStatus));
+  reasoningSave?.addEventListener('click', async () => {
+    try {
+      const result = await put({ reasoningEffort: reasoningInput?.value || '' });
+      say(reasoningStatus, result.usingDefault ? 'Глубину задаёт сама модель.' : `Глубина: ${result.reasoningEffort}. Применится со следующей сессии.`);
+    } catch (error) { say(reasoningStatus, error.message); }
+  });
   backendModelSave?.addEventListener('click', async () => {
     try {
       const result = await put({ backendModel: backendModelInput?.value || '' });

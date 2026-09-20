@@ -100,9 +100,14 @@ export const DEFAULT_VOICE_PROMPT = `
 задач или ты не уверен, задай один короткий уточняющий вопрос и дождись подтверждения.
 Не обращайся за этим к бэкенду и никогда не угадывай идентификатор.
 
-Обращайся к бэкенду, когда пользователь просит создать, изменить, переместить задачу,
-сменить статус или дедлайн, спрашивает про фронтир, либо просит изменить промпт.
-Передавай туда точный идентификатор из таблицы.
+Простое изменение выполняй сразу. Переименование, смена статуса, дедлайн, новая задача
+или подзадача, перенос — если задача в таблице найдена однозначно, не переспрашивай, не
+предупреждай и не объясняй, что собираешься сделать: сразу отправляй операцию с точным
+идентификатором и говори только о результате.
+
+Переспрашивай лишь тогда, когда подходит несколько задач, речь неразборчива или в просьбе
+не хватает данных. Разбирайся дольше, когда просьба требует рассуждения: несколько
+операций подряд, условие, выбор из вариантов, перестройка ветки.
 
 Отвечай сам, без бэкенда: на приветствие, на просьбу повторить уже сказанное, на вопрос
 о текущем состоянии задачи, который виден из таблицы, и на короткое уточнение.
@@ -228,7 +233,7 @@ export function composeVoiceInstructions(voicePrompt, snapshot) {
   ].join('\n');
 }
 
-export function buildLiveSessionConfig({ items = [], voicePrompt, backendPrompt, backendModel, store = true } = {}) {
+export function buildLiveSessionConfig({ items = [], voicePrompt, backendPrompt, backendModel, reasoningEffort = '', store = true } = {}) {
   return {
     model: LIVE_MODEL,
     instructions: composeVoiceInstructions(voicePrompt || DEFAULT_VOICE_PROMPT, formatTaskSnapshot(items)),
@@ -241,7 +246,8 @@ export function buildLiveSessionConfig({ items = [], voicePrompt, backendPrompt,
         instructions: String(backendPrompt || DEFAULT_BACKEND_PROMPT).trim(),
         tools: LIVE_TOOLS,
         tool_choice: 'auto',
-        parallel_tool_calls: false
+        parallel_tool_calls: false,
+        ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {})
       }
     }
   };
@@ -268,6 +274,8 @@ const SKIPPED_EVENT_TYPES = new Set([
   'session.output_audio.delta',
   'session.input_audio.append',
   'response.output_text.delta',
+  'session.input_transcript.delta',
+  'session.output_transcript.delta',
   'response.function_call_arguments.delta',
   'response.output_audio.delta',
   'response.audio.delta'

@@ -24,6 +24,8 @@ export const LIVE_LOG_PAGE = `<!DOCTYPE html>
   li { border-bottom:1px solid var(--line); }
   .row { display:grid; grid-template-columns:54px 16px 1fr; gap:10px; padding:9px 16px; cursor:pointer; align-items:baseline; }
   .row:hover { background:var(--panel); }
+  .row.plain { cursor:default; }
+  .row.plain:hover { background:transparent; }
   .at { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
   .dir { font-weight:700; }
   .dir.in { color:var(--in); }
@@ -53,8 +55,7 @@ function gist(entry) {
   const inner = p.event || {};
   const item = inner.item || {};
   switch (entry.type) {
-    case 'session.input_transcript.delta': return ['речь', p.delta || ''];
-    case 'session.output_transcript.delta': return ['ответ', p.delta || ''];
+    case 'vl.speech': return [p.role === 'user' ? 'речь' : 'ответ', p.text || ''];
     case 'session.delegation.created': return ['делегирование', (p.delegation?.target || '') + (p.delegation?.offset_ms != null ? ' · ' + Math.round(p.delegation.offset_ms / 1000) + ' c' : '')];
     case 'session.started': return ['сессия началась', p.session?.model || ''];
     case 'session.closed': return ['сессия закрыта', p.reason || ''];
@@ -82,51 +83,38 @@ function gist(entry) {
   return [entry.type, ''];
 }
 
-/** Transcript fragments follow audio cadence, so consecutive ones are joined: otherwise a
- *  single sentence fills the screen one syllable per line. */
-function fold(entries) {
-  const out = [];
-  for (const entry of entries) {
-    const last = out[out.length - 1];
-    const speech = entry.type === 'session.input_transcript.delta' || entry.type === 'session.output_transcript.delta';
-    if (speech && last && last.type === entry.type && last.liveSessionId === entry.liveSessionId) {
-      last.merged.push(entry);
-      last.text += entry.payload?.delta || '';
-      continue;
-    }
-    out.push({ ...entry, merged: [entry], text: speech ? (entry.payload?.delta || '') : '' });
-  }
-  return out;
-}
-
 let rows = [];
 function render() {
   const list = $('rows');
   list.textContent = '';
   const picked = $('session').value;
-  const shown = fold(rows.filter(entry => !picked || entry.liveSessionId === picked));
+  const shown = rows.filter(entry => !picked || entry.liveSessionId === picked);
   if (!shown.length) { list.innerHTML = '<li class="empty">Записей нет.</li>'; return; }
   for (const entry of shown) {
     const [kind, detail] = gist(entry);
-    const text = entry.text || detail;
+    const speech = entry.type === 'vl.speech';
     const li = document.createElement('li');
     const row = document.createElement('div');
-    row.className = 'row';
+    row.className = speech ? 'row plain' : 'row';
     row.innerHTML = '<span class="at"></span><span class="dir"></span><span class="gist"></span>';
     row.querySelector('.at').textContent = entry.at.slice(11, 19);
     const dir = row.querySelector('.dir');
     dir.textContent = entry.direction === 'out' ? '→' : '←';
     dir.classList.add(entry.direction === 'out' ? 'out' : 'in');
     const body = row.querySelector('.gist');
-    body.textContent = text ? short(text, 220) : kind;
-    if (text) { const label = document.createElement('span'); label.className = 'kind'; label.textContent = kind; body.append(label); }
-    const details = document.createElement('pre');
-    details.hidden = true;
-    row.addEventListener('click', () => {
-      if (details.hidden) details.textContent = entry.merged.map(one => '# seq ' + one.seq + '  ' + one.type + '\\n' + JSON.stringify(one.payload, null, 2)).join('\\n\\n');
-      details.hidden = !details.hidden;
-    });
-    li.append(row, details);
+    body.textContent = detail ? short(detail, 400) : kind;
+    if (detail) { const label = document.createElement('span'); label.className = 'kind'; label.textContent = kind; body.append(label); }
+    li.append(row);
+    // Speech rows hold nothing beyond their own text, so they do not open.
+    if (!speech) {
+      const details = document.createElement('pre');
+      details.hidden = true;
+      row.addEventListener('click', () => {
+        if (details.hidden) details.textContent = '# seq ' + entry.seq + '  ' + entry.type + '\\n' + JSON.stringify(entry.payload, null, 2);
+        details.hidden = !details.hidden;
+      });
+      li.append(details);
+    }
     list.append(li);
   }
 }

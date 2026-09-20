@@ -81,10 +81,8 @@ describe('logging', () => {
 
   it('keeps every framework event, incoming and outgoing', async () => {
     context.socket.deliver({ type: 'session.started', session: { id: 'live_1' } });
-    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'поставь', start_ms: 10, end_ms: 400 });
     const types = context.rows.map(row => row.event.type);
     expect(types).toContain('session.started');
-    expect(types).toContain('session.input_transcript.delta');
     // Everything from the session itself is keyed by its id; only the record of the attempt
     // predates the id, which is the point of writing it before the call goes out.
     expect(context.rows.filter(row => row.event.type !== 'vl.session.requested').every(row => row.sessionId === 'live_1')).toBe(true);
@@ -112,6 +110,27 @@ describe('logging', () => {
     context.socket.deliver({ type: 'session.output_audio.delta', audio: 'AAAA' });
     context.socket.deliver({ type: 'response.output_text.delta', delta: 'при' });
     expect(context.rows).toHaveLength(before);
+  });
+
+  it('writes speech as one assembled record rather than a row per fragment', async () => {
+    for (const [delta, start, end] of [['по', 10, 200], ['ставь ', 200, 400], ['в фокус', 400, 900]]) {
+      context.socket.deliver({ type: 'session.input_transcript.delta', delta, start_ms: start, end_ms: end });
+    }
+    expect(context.rows.some(row => row.event.type === 'vl.speech')).toBe(false);
+
+    // Anything else happening is what closes the turn.
+    context.socket.deliver({ type: 'session.usage.updated', usage: {} });
+    const speech = context.rows.find(row => row.event.type === 'vl.speech');
+    expect(speech.event).toMatchObject({ role: 'user', text: 'поставь в фокус', start_ms: 10, end_ms: 900 });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech')).toHaveLength(1);
+  });
+
+  it('starts a new record when the other speaker begins', async () => {
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'привет', start_ms: 0, end_ms: 100 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'слушаю', start_ms: 120, end_ms: 300 });
+    context.socket.deliver({ type: 'session.usage.updated', usage: {} });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => [row.event.role, row.event.text]))
+      .toEqual([['user', 'привет'], ['assistant', 'слушаю']]);
   });
 
   it('records an unparsable frame instead of dropping it silently', async () => {

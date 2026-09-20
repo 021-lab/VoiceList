@@ -42,6 +42,7 @@ export class LiveHost {
   send(message) {
     const socket = this.session?.socket;
     if (!socket) return false;
+    this.flushSpeech();
     const event = { event_id: `vl_${++this.session.outgoing}`, ...message };
     try { socket.send(JSON.stringify(event)); } catch { return false; }
     this.record(event, 'out');
@@ -54,10 +55,10 @@ export class LiveHost {
     if (this.active) await this.stop('replaced');
 
     const items = await this.services.readItems();
-    const [voicePrompt, backendPrompt, backendModel] = await Promise.all([
-      this.settings.prompt('voice'), this.settings.prompt('backend'), this.settings.backendModel()
+    const [voicePrompt, backendPrompt, backendModel, reasoningEffort] = await Promise.all([
+      this.settings.prompt('voice'), this.settings.prompt('backend'), this.settings.backendModel(), this.settings.reasoningEffort()
     ]);
-    const config = buildLiveSessionConfig({ items, voicePrompt, backendPrompt, backendModel, store: this.store });
+    const config = buildLiveSessionConfig({ items, voicePrompt, backendPrompt, backendModel, reasoningEffort, store: this.store });
 
     // Every attempt leaves a trace, including one that never reaches OpenAI: an attempt
     // missing from the log would be indistinguishable from one that was never made.
@@ -89,7 +90,7 @@ export class LiveHost {
     const answer = String(payload?.transport?.sdp || '');
     if (!id || !answer) fail('MODEL_UNAVAILABLE', 'GPT-Live не вернул идентификатор сессии');
 
-    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), closing: false };
+    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false };
 
     // The session record carries the prompt versions and the model name: an entry from last
     // week cannot be read without knowing which text drove the model then. The response is
@@ -128,18 +129,45 @@ export class LiveHost {
     socket.addEventListener('error', () => { this.record({ type: 'vl.sideband.error' }, 'out', id); });
   }
 
+  /** Transcript fragments follow audio cadence, so one row per fragment buries the log in
+   *  syllables. Speech is buffered and written as a single assembled record when anything
+   *  else happens — which is also what makes the boundary meaningful. */
+  bufferSpeech(role, event) {
+    const speech = this.session.speech;
+    if (speech && speech.role !== role) this.flushSpeech();
+    const startMs = Number.isFinite(event?.start_ms) ? event.start_ms : null;
+    const endMs = Number.isFinite(event?.end_ms) ? event.end_ms : null;
+    if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs };
+    this.session.speech.text += String(event?.delta ?? '');
+    if (endMs != null) this.session.speech.endMs = endMs;
+  }
+
+  flushSpeech() {
+    const speech = this.session?.speech;
+    if (!speech) return;
+    this.session.speech = null;
+    if (!speech.text.trim()) return;
+    this.record({ type: 'vl.speech', role: speech.role, text: speech.text.trim(), start_ms: speech.startMs, end_ms: speech.endMs });
+  }
+
   receive(raw) {
     let event;
     try { event = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)); }
-    catch { this.record({ type: 'vl.event.unparsed', raw: String(raw).slice(0, 2_000) }); return; }
-    // Delegation events arrive wrapped in response.event, so the skip list has to be applied
-    // to the inner type as well — otherwise every streamed delta is kept after all.
-    if (isLoggableEvent(event?.type) && isLoggableEvent(event?.event?.type ?? 'none')) this.record(event);
+    catch { this.flushSpeech(); this.record({ type: 'vl.event.unparsed', raw: String(raw).slice(0, 2_000) }); return; }
+
+    if (event?.type === 'session.input_transcript.delta') this.bufferSpeech('user', event);
+    else if (event?.type === 'session.output_transcript.delta') this.bufferSpeech('assistant', event);
+    else {
+      this.flushSpeech();
+      // Delegation events arrive wrapped in response.event, so the skip list has to be applied
+      // to the inner type as well — otherwise every streamed delta is kept after all.
+      if (isLoggableEvent(event?.type) && isLoggableEvent(event?.event?.type ?? 'none')) this.record(event);
+    }
     this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
   }
 
   async dispatch(event) {
-    if (event?.type === 'session.closed') { this.session = null; return; }
+    if (event?.type === 'session.closed') { this.flushSpeech(); this.session = null; return; }
     if (event?.type !== 'response.event') return;
     const inner = event.event;
     if (inner?.type !== 'response.output_item.done') return;
@@ -204,6 +232,7 @@ export class LiveHost {
 
   async stop(reason = 'client') {
     if (!this.session) return false;
+    this.flushSpeech();
     this.send({ type: 'session.close' });
     this.record({ type: 'vl.session.stopped', reason }, 'out');
     try { this.session.socket?.close(); } catch { /* already gone */ }

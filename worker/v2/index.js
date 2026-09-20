@@ -42,6 +42,7 @@ export default {
         if (request.method === 'PUT') {
           const body = await readBoundedJson(request,32000);
           if (typeof body.backendModel === 'string') return json(await stub.setLiveBackendModel(body.backendModel));
+          if (typeof body.reasoningEffort === 'string') return json(await stub.setLiveReasoningEffort(body.reasoningEffort));
           if (!PROMPT_TARGETS.includes(body.target)) return json({error:'Unknown prompt target'},400);
           if (body.action === 'reset') return json(await stub.resetLivePrompt(body.target));
           if (body.action === 'restore') return json(await stub.restoreLivePrompt(body.target,String(body.at||'')));

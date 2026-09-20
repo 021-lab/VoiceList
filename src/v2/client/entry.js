@@ -19,7 +19,8 @@ async function bootstrap() {
       keyInput: $('openai-key-input'), keyField: $('openai-key-field'), keySave: $('openai-key-save'), keyStatus: $('openai-key-status'),
       voicePromptInput: $('live-voice-prompt'), voicePromptSave: $('live-voice-prompt-save'), voicePromptReset: $('live-voice-prompt-reset'), voicePromptStatus: $('live-voice-prompt-status'),
       backendPromptInput: $('live-backend-prompt'), backendPromptSave: $('live-backend-prompt-save'), backendPromptReset: $('live-backend-prompt-reset'), backendPromptStatus: $('live-backend-prompt-status'),
-      backendModelInput: $('live-backend-model'), backendModelSave: $('live-backend-model-save'), backendModelStatus: $('live-backend-model-status')
+      backendModelInput: $('live-backend-model'), backendModelSave: $('live-backend-model-save'), backendModelStatus: $('live-backend-model-status'),
+      reasoningInput: $('live-reasoning'), reasoningSave: $('live-reasoning-save'), reasoningStatus: $('live-reasoning-status')
     }
   });
   client.realtime = live;

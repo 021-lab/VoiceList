@@ -4,6 +4,8 @@ import { fail } from './contracts.js';
 export const VOICE_PROMPT_KEY = 'voicelist.live.voice-prompt.v1';
 export const BACKEND_PROMPT_KEY = 'voicelist.live.backend-prompt.v1';
 export const BACKEND_MODEL_KEY = 'voicelist.live.backend-model.v1';
+export const REASONING_KEY = 'voicelist.live.reasoning-effort.v1';
+export const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high'];
 export const PROMPT_HISTORY_KEY = 'voicelist.live.prompt-history.v1';
 
 export const MAX_PROMPT_CHARS = 16_000;
@@ -30,15 +32,28 @@ export class LiveSettings {
 
   async backendModel() { return (await this.storage.get(BACKEND_MODEL_KEY)) || ''; }
 
+  /** Picking a tool by a name the voice layer already resolved needs no deep thinking, and
+   *  reasoning effort is what that costs in latency. Left unset, nothing is sent and the
+   *  backend model keeps its own default. */
+  async reasoningEffort() { return (await this.storage.get(REASONING_KEY)) || ''; }
+
+  async setReasoningEffort(effort) {
+    const value = String(effort ?? '').trim();
+    if (value && !REASONING_EFFORTS.includes(value)) fail('INVALID_INPUT', 'Недопустимая глубина рассуждений');
+    await this.storage.put(REASONING_KEY, value);
+    return { reasoningEffort: value, usingDefault: !value };
+  }
+
   async read() {
-    const [voice, backend, model, history] = await Promise.all([
-      this.stored('voice'), this.stored('backend'), this.backendModel(), this.history()
+    const [voice, backend, model, reasoning, history] = await Promise.all([
+      this.stored('voice'), this.stored('backend'), this.backendModel(), this.reasoningEffort(), this.history()
     ]);
     return {
       voicePrompt: voice || DEFAULT_VOICE_PROMPT,
       backendPrompt: backend || DEFAULT_BACKEND_PROMPT,
       backendModel: model || DEFAULT_BACKEND_MODEL,
-      defaults: { voicePrompt: !voice, backendPrompt: !backend, backendModel: !model },
+      reasoningEffort: reasoning,
+      defaults: { voicePrompt: !voice, backendPrompt: !backend, backendModel: !model, reasoningEffort: !reasoning },
       history: history.map(({ before, after, ...rest }) => ({ ...rest, beforeChars: before.length, afterChars: after.length }))
     };
   }

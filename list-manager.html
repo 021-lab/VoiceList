@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-b6647f028cb393b0">
+<meta name="preview-build-hash" content="v02-16d3d666e71abc8b">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -970,6 +970,20 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	        </label>
 	        <button id="live-backend-model-save" class="settings-primary" type="button">Сохранить</button>
 	        <div id="live-backend-model-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Глубина рассуждений бэкенда</span>
+	          <select id="live-reasoning">
+	            <option value="">По умолчанию модели</option>
+	            <option value="minimal">minimal — быстрее всего</option>
+	            <option value="low">low</option>
+	            <option value="medium">medium</option>
+	            <option value="high">high</option>
+	          </select>
+	        </label>
+	        <p class="settings-help">Простая команда не требует размышления: меньшая глубина заметно сокращает паузу перед ответом.</p>
+	        <button id="live-reasoning-save" class="settings-primary" type="button">Сохранить</button>
+	        <div id="live-reasoning-status" class="settings-status" aria-live="polite"></div>
 	      </section>
 	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
 	        <h3 id="workflowy-heading">Workflowy</h3>
@@ -1031,7 +1045,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-b6647f028cb393b0";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-16d3d666e71abc8b";
 </script>
 <script>
 (() => {
@@ -2569,6 +2583,9 @@ ${text}`;
     backendModelInput,
     backendModelSave,
     backendModelStatus,
+    reasoningInput,
+    reasoningSave,
+    reasoningStatus,
     fetchImpl = fetch
   } = {}) {
     const say = (element, text) => {
@@ -2592,9 +2609,11 @@ ${text}`;
         if (voicePromptInput) voicePromptInput.value = settings.voicePrompt;
         if (backendPromptInput) backendPromptInput.value = settings.backendPrompt;
         if (backendModelInput) backendModelInput.value = settings.backendModel;
+        if (reasoningInput) reasoningInput.value = settings.reasoningEffort || "";
         say(voicePromptStatus, settings.defaults.voicePrompt ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." : "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0441\u0432\u043E\u044F \u0440\u0435\u0434\u0430\u043A\u0446\u0438\u044F.");
         say(backendPromptStatus, settings.defaults.backendPrompt ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." : "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0441\u0432\u043E\u044F \u0440\u0435\u0434\u0430\u043A\u0446\u0438\u044F.");
         say(backendModelStatus, settings.defaults.backendModel ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043C\u043E\u0434\u0435\u043B\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E." : "\u0417\u0430\u0434\u0430\u043D\u0430 \u0441\u0432\u043E\u044F \u043C\u043E\u0434\u0435\u043B\u044C.");
+        say(reasoningStatus, settings.defaults.reasoningEffort ? "\u0413\u043B\u0443\u0431\u0438\u043D\u0443 \u0437\u0430\u0434\u0430\u0451\u0442 \u0441\u0430\u043C\u0430 \u043C\u043E\u0434\u0435\u043B\u044C." : `\u0413\u043B\u0443\u0431\u0438\u043D\u0430: ${settings.reasoningEffort}.`);
         return settings;
       } catch (error) {
         say(keyStatus, error.message);
@@ -2633,6 +2652,14 @@ ${text}`;
     voicePromptReset?.addEventListener("click", () => resetPrompt("voice", voicePromptInput, voicePromptStatus));
     backendPromptSave?.addEventListener("click", () => savePrompt("backend", backendPromptInput, backendPromptStatus));
     backendPromptReset?.addEventListener("click", () => resetPrompt("backend", backendPromptInput, backendPromptStatus));
+    reasoningSave?.addEventListener("click", async () => {
+      try {
+        const result = await put({ reasoningEffort: reasoningInput?.value || "" });
+        say(reasoningStatus, result.usingDefault ? "\u0413\u043B\u0443\u0431\u0438\u043D\u0443 \u0437\u0430\u0434\u0430\u0451\u0442 \u0441\u0430\u043C\u0430 \u043C\u043E\u0434\u0435\u043B\u044C." : `\u0413\u043B\u0443\u0431\u0438\u043D\u0430: ${result.reasoningEffort}. \u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u0441\u044F \u0441\u043E \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0441\u0435\u0441\u0441\u0438\u0438.`);
+      } catch (error) {
+        say(reasoningStatus, error.message);
+      }
+    });
     backendModelSave?.addEventListener("click", async () => {
       try {
         const result = await put({ backendModel: backendModelInput?.value || "" });
@@ -2648,7 +2675,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-b6647f028cb393b0";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-16d3d666e71abc8b";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
@@ -2675,7 +2702,10 @@ ${text}`;
         backendPromptStatus: $("live-backend-prompt-status"),
         backendModelInput: $("live-backend-model"),
         backendModelSave: $("live-backend-model-save"),
-        backendModelStatus: $("live-backend-model-status")
+        backendModelStatus: $("live-backend-model-status"),
+        reasoningInput: $("live-reasoning"),
+        reasoningSave: $("live-reasoning-save"),
+        reasoningStatus: $("live-reasoning-status")
       }
     });
     client.realtime = live;

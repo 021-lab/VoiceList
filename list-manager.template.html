@@ -92,6 +92,20 @@ __INLINE_CSS__
 	        </label>
 	        <button id="live-backend-model-save" class="settings-primary" type="button">Сохранить</button>
 	        <div id="live-backend-model-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Глубина рассуждений бэкенда</span>
+	          <select id="live-reasoning">
+	            <option value="">По умолчанию модели</option>
+	            <option value="minimal">minimal — быстрее всего</option>
+	            <option value="low">low</option>
+	            <option value="medium">medium</option>
+	            <option value="high">high</option>
+	          </select>
+	        </label>
+	        <p class="settings-help">Простая команда не требует размышления: меньшая глубина заметно сокращает паузу перед ответом.</p>
+	        <button id="live-reasoning-save" class="settings-primary" type="button">Сохранить</button>
+	        <div id="live-reasoning-status" class="settings-status" aria-live="polite"></div>
 	      </section>
 	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
 	        <h3 id="workflowy-heading">Workflowy</h3>
