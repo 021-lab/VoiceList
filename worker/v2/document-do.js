@@ -110,6 +110,11 @@ export class ListDocumentDO extends Agent {
   liveSessionStatus() { return {active:Boolean(this.live?.active),sessionId:this.live?.sessionId || ''}; }
   readLiveLog(query) { return {entries:this.liveLog.read(query),stats:this.liveLog.stats()}; }
   clearLiveLog() { return this.liveLog.clear(); }
+  async repairLiveLog() {
+    const host = this.liveHost();
+    if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();
+    return host.repairBackendInputs(this.liveLog.read({ limit: 1000 }));
+  }
   async readBackendInput(responseId) {
     const host = this.liveHost();
     if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();

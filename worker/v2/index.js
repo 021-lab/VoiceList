@@ -55,6 +55,7 @@ export default {
       // returned, and gating it behind a token got in the way of reading it.
       // Clearing is a POST, so the same-origin check above applies to it; reading is open.
       if (url.pathname === '/api/live/log/clear' && request.method === 'POST') return json(await stub.clearLiveLog());
+      if (url.pathname === '/api/live/log/repair' && request.method === 'POST') return json(await stub.repairLiveLog());
       if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
         if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));

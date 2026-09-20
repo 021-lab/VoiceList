@@ -177,7 +177,7 @@ export class LiveHost {
     try { return JSON.parse(body); } catch { return { raw: body.slice(0, 2_000) }; }
   }
 
-  async fetchBackendInput(delegationId, response) {
+  async fetchBackendInput(delegationId, response, sessionId = this.sessionId) {
     const responseId = response?.id;
     if (!responseId || !this.apiKey) return;
     try {
@@ -186,7 +186,7 @@ export class LiveHost {
       });
       if (!reply.ok) {
         const detail = await reply.text().catch(() => '');
-        this.record({ type: 'vl.backend_input.failed', delegation_id: delegationId, response_id: responseId, status: reply.status, detail: detail.slice(0, 800) }, 'out');
+        this.record({ type: 'vl.backend_input.failed', delegation_id: delegationId, response_id: responseId, status: reply.status, detail: detail.slice(0, 800) }, 'out', sessionId);
         return;
       }
       const payload = await reply.json();
@@ -195,10 +195,31 @@ export class LiveHost {
         previous_response_id: response?.previous_response_id || null,
         instructions: response?.instructions ?? null,
         items: payload?.data ?? payload
-      });
+      }, 'in', sessionId);
     } catch (error) {
-      this.record({ type: 'vl.backend_input.failed', delegation_id: delegationId, response_id: responseId, error: { message: error?.message } }, 'out');
+      this.record({ type: 'vl.backend_input.failed', delegation_id: delegationId, response_id: responseId, error: { message: error?.message } }, 'out', sessionId);
     }
+  }
+
+  /** Re-reads the inputs of responses whose context never made it into the log, which is what
+   *  the early-fetch race left behind. Safe to run again: a response already recorded is
+   *  skipped. */
+  async repairBackendInputs(rows) {
+    const done = new Set(rows.filter(row => row.type === 'vl.backend_input').map(row => row.responseId || row.payload?.response_id));
+    const wanted = new Map();
+    for (const row of rows) {
+      const responseId = row.responseId || row.payload?.response_id;
+      if (!responseId || done.has(responseId) || wanted.has(responseId)) continue;
+      const finished = row.type.endsWith('response.completed') || row.type === 'vl.backend_input.failed';
+      if (finished) wanted.set(responseId, { sessionId: row.liveSessionId || '', delegationId: row.delegationId || row.payload?.delegation_id || null });
+    }
+    let repaired = 0;
+    for (const [responseId, where] of wanted) {
+      const before = repaired;
+      await this.fetchBackendInput(where.delegationId, { id: responseId }, where.sessionId);
+      repaired = before + 1;
+    }
+    return { requested: wanted.size, repaired };
   }
 
   receive(raw) {
@@ -217,8 +238,10 @@ export class LiveHost {
       // Delegation events arrive wrapped in response.event, so the skip list has to be applied
       // to the inner type as well — otherwise every streamed delta is kept after all.
       if (isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none')) this.record(event);
-      if (inner?.type === 'response.created') {
-        this.fetchBackendInput(event?.delegation_id || null, inner.response).catch(() => {});
+      // Read the input once the response is stored: at creation time it is not there yet and
+      // the API answers "not found".
+      if (inner?.type === 'response.completed') {
+        this.fetchBackendInput(event?.delegation_id || null, inner.response, this.sessionId).catch(() => {});
       }
     }
     this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
