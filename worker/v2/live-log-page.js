@@ -51,6 +51,36 @@ export const LIVE_LOG_PAGE = `<!DOCTYPE html>
 const $ = (id) => document.getElementById(id);
 const short = (value, limit = 160) => { const text = String(value ?? ''); return text.length > limit ? text.slice(0, limit) + '…' : text; };
 
+/** GPT-Live hands the backend an SRT-style transcript wrapped in boilerplate. The line shows
+ *  the transcript; the wrapper and everything else stay in the expanded record. */
+function transcriptOf(text) {
+  const marker = '[Spoken conversation transcript]';
+  const at = text.indexOf(marker);
+  if (at < 0) return null;
+  return text.slice(at + marker.length)
+    .split('\\n').map(line => line.trim()).filter(line => line && !/^\\d+$/.test(line))
+    .map(line => line === '[User speech transcript]' ? '👤' : line === '[Assistant speech transcript]' ? '🤖' : line)
+    .join(' ').replace(/\\s*(👤|🤖)\\s*/g, ' $1 ').trim();
+}
+
+/** An input item is a message, a tool call or its result; all of them reduce to text. */
+function itemText(item) {
+  if (!item || typeof item !== 'object') return '';
+  const who = item.role === 'user' ? '👤 ' : item.role === 'assistant' ? '🤖 ' : '';
+  const parts = Array.isArray(item.content)
+    ? item.content.map(part => part?.text ?? part?.transcript ?? '').filter(Boolean).join(' ')
+    : (typeof item.content === 'string' ? item.content : '');
+  if (parts) {
+    const transcript = transcriptOf(parts);
+    if (transcript) return transcript;
+    if (item.role === 'developer') return '';
+    return who + parts;
+  }
+  if (item.type === 'function_call') return '⚙ ' + item.name + ' ' + (item.arguments || '');
+  if (item.type === 'function_call_output') return '↩ ' + (item.output || '');
+  return '';
+}
+
 /** The point of the line is what happened, not which event type carried it. */
 function gist(entry) {
   const p = entry.payload || {};
@@ -63,6 +93,8 @@ function gist(entry) {
       return ['спросили бэкенд', context || '(без контекста)'];
     }
     case 'vl.backend_text': return ['ответил бэкенд', p.text || ''];
+    case 'vl.backend_input': { const texts = (p.items || []).map(itemText).filter(Boolean); return ['контекст в бэкенд', texts[texts.length - 1] || '']; }
+    case 'vl.backend_input.failed': return ['контекст не прочитан', p.detail || p.error?.message || ('HTTP ' + p.status)];
     case 'session.delegation.created': return ['делегирование', (p.delegation?.target || '') + (p.delegation?.offset_ms != null ? ' · ' + Math.round(p.delegation.offset_ms / 1000) + ' c' : '')];
     case 'session.started': return ['сессия началась', p.session?.model || ''];
     case 'session.closed': return ['сессия закрыта', p.reason || ''];

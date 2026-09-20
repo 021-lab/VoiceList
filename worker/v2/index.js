@@ -50,6 +50,7 @@ export default {
         }
       }
       if (url.pathname === '/api/live/settings/history' && request.method === 'GET') return json({history:await stub.livePromptHistory()});
+      if (url.pathname === '/api/live/input' && request.method === 'GET') { const id=url.searchParams.get('response'); if(!id) return json({error:'response required'},400); return json(await stub.readBackendInput(id)); }
       // The log reads openly, by decision: it is the working record of what the framework
       // returned, and gating it behind a token got in the way of reading it.
       // Clearing is a POST, so the same-origin check above applies to it; reading is open.

@@ -6,6 +6,7 @@ import { promptVersion } from '../../src/v2/domain/live-settings.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
 
 export const OPENAI_LIVE_SESSIONS_URL = 'https://api.openai.com/v1/live/sessions';
+export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
 /** Two utterances by the same speaker are separated by a pause, not by an event. */
 const SILENCE_GAP_MS = 1_500;
@@ -19,13 +20,14 @@ const PROMPT_TOOLS = new Set(['getVoicePrompt', 'getBackendPrompt', 'setVoicePro
  *  browser. That is what makes a server-side log possible at all — with the media path
  *  alone the worker never sees an event past the SDP exchange. */
 export class LiveHost {
-  constructor({ log, settings, services, apiKey, fetchImpl = (...args) => fetch(...args), sessionsUrl = OPENAI_LIVE_SESSIONS_URL, store = true, now = () => new Date() }) {
+  constructor({ log, settings, services, apiKey, fetchImpl = (...args) => fetch(...args), sessionsUrl = OPENAI_LIVE_SESSIONS_URL, responsesUrl = OPENAI_RESPONSES_URL, store = true, now = () => new Date() }) {
     this.log = log;
     this.settings = settings;
     this.services = services;
     this.apiKey = apiKey;
     this.fetchImpl = fetchImpl;
     this.sessionsUrl = sessionsUrl;
+    this.responsesUrl = responsesUrl;
     this.store = store;
     this.now = now;
     this.session = null;
@@ -195,6 +197,47 @@ export class LiveHost {
     return turns.slice(start);
   }
 
+  /** The literal context the voice layer handed the backend.
+   *
+   *  It is not in any event: a response.created carries the model, tools and settings but
+   *  neither instructions nor input. Since the responses are stored, the input can be read
+   *  back by id, and that is the real thing rather than a reconstruction. */
+  /** Reads the stored input of a past response, which is also how a delegation already in the
+   *  log can be inspected after the fact. */
+  async readBackendInput(responseId) {
+    if (!this.apiKey) fail('MODEL_UNAVAILABLE', 'Ключ OpenAI не настроен');
+    const reply = await this.fetchImpl(`${this.responsesUrl}/${encodeURIComponent(String(responseId))}/input_items?order=asc&limit=100`, {
+      headers: { Authorization: `Bearer ${this.apiKey}` }
+    });
+    const body = await reply.text();
+    if (!reply.ok) fail('MODEL_UNAVAILABLE', `Вход не прочитан (${reply.status}): ${body.slice(0, 300)}`);
+    try { return JSON.parse(body); } catch { return { raw: body.slice(0, 2_000) }; }
+  }
+
+  async fetchBackendInput(delegationId, response) {
+    const responseId = response?.id;
+    if (!responseId || !this.apiKey) return;
+    try {
+      const reply = await this.fetchImpl(`${this.responsesUrl}/${encodeURIComponent(responseId)}/input_items?order=asc&limit=100`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` }
+      });
+      if (!reply.ok) {
+        const detail = await reply.text().catch(() => '');
+        this.record({ type: 'vl.backend_input.failed', delegation_id: delegationId, response_id: responseId, status: reply.status, detail: detail.slice(0, 800) }, 'out');
+        return;
+      }
+      const payload = await reply.json();
+      this.record({
+        type: 'vl.backend_input', delegation_id: delegationId, response_id: responseId,
+        previous_response_id: response?.previous_response_id || null,
+        instructions: response?.instructions ?? null,
+        items: payload?.data ?? payload
+      });
+    } catch (error) {
+      this.record({ type: 'vl.backend_input.failed', delegation_id: delegationId, response_id: responseId, error: { message: error?.message } }, 'out');
+    }
+  }
+
   receive(raw) {
     let event;
     try { event = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)); }
@@ -213,6 +256,9 @@ export class LiveHost {
       // to the inner type as well — otherwise every streamed delta is kept after all.
       if (inner?.type === 'response.completed') this.flushBackendText();
       if (isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none')) this.record(event);
+      if (inner?.type === 'response.created') {
+        this.fetchBackendInput(event?.delegation_id || null, inner.response).catch(() => {});
+      }
     }
     this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
   }
