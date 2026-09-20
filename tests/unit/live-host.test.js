@@ -125,6 +125,14 @@ describe('logging', () => {
     expect(context.rows.filter(row => row.event.type === 'vl.speech')).toHaveLength(1);
   });
 
+  it('does not split a turn on a frame that is not worth logging', async () => {
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'пере', start_ms: 0, end_ms: 200 });
+    context.socket.deliver({ type: 'session.output_audio.delta', audio: 'AAAA' });
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'именуй', start_ms: 200, end_ms: 400 });
+    context.socket.deliver({ type: 'session.usage.updated', usage: {} });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => row.event.text)).toEqual(['переименуй']);
+  });
+
   it('starts a new record when the other speaker begins', async () => {
     context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'привет', start_ms: 0, end_ms: 100 });
     context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'слушаю', start_ms: 120, end_ms: 300 });

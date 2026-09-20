@@ -27,6 +27,7 @@ export const LIVE_LOG_PAGE = `<!DOCTYPE html>
   .row.plain { cursor:default; }
   .row.plain:hover { background:transparent; }
   .row.context .gist { color:var(--muted); }
+  .row.bad .gist { color:#c04040; font-weight:600; }
   .at { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
   .dir { font-weight:700; }
   .dir.in { color:var(--in); }
@@ -81,6 +82,7 @@ function gist(entry) {
     case 'vl.sideband.failed': return ['sideband не открылся', p.error?.message || ''];
     case 'vl.event.unparsed': return ['нечитаемый кадр', short(p.raw || '', 120)];
     case 'vl.dispatch.failed': return ['ошибка обработки', p.error?.message || ''];
+    case 'error': return ['ОШИБКА', p.error?.message || short(JSON.stringify(p), 200)];
   }
   if (entry.type.endsWith('response.output_item.done') && item.type === 'function_call') return ['вызов ' + item.name, short(item.arguments || '', 140)];
   if (entry.type.endsWith('response.created')) return ['ответ модели начат', ''];
@@ -101,7 +103,7 @@ function render() {
     const speech = entry.type === 'vl.speech' || entry.type === 'vl.backend_text';
     const li = document.createElement('li');
     const row = document.createElement('div');
-    row.className = speech ? 'row plain' : (entry.type === 'vl.delegation' ? 'row context' : 'row');
+    row.className = speech ? 'row plain' : entry.type === 'vl.delegation' ? 'row context' : entry.type === 'error' ? 'row bad' : 'row';
     row.innerHTML = '<span class="at"></span><span class="dir"></span><span class="gist"></span>';
     row.querySelector('.at').textContent = entry.at.slice(11, 19);
     const dir = row.querySelector('.dir');

@@ -5,7 +5,7 @@ export const VOICE_PROMPT_KEY = 'voicelist.live.voice-prompt.v1';
 export const BACKEND_PROMPT_KEY = 'voicelist.live.backend-prompt.v1';
 export const BACKEND_MODEL_KEY = 'voicelist.live.backend-model.v1';
 export const REASONING_KEY = 'voicelist.live.reasoning-effort.v1';
-export const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high'];
+export const REASONING_EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh', 'max'];
 export const PROMPT_HISTORY_KEY = 'voicelist.live.prompt-history.v1';
 
 export const MAX_PROMPT_CHARS = 16_000;

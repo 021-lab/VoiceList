@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-16d3d666e71abc8b">
+<meta name="preview-build-hash" content="v02-2d015cfaa092d61d">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -975,10 +975,12 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 	          <span>Глубина рассуждений бэкенда</span>
 	          <select id="live-reasoning">
 	            <option value="">По умолчанию модели</option>
-	            <option value="minimal">minimal — быстрее всего</option>
+	            <option value="none">none — быстрее всего</option>
 	            <option value="low">low</option>
 	            <option value="medium">medium</option>
 	            <option value="high">high</option>
+	            <option value="xhigh">xhigh</option>
+	            <option value="max">max</option>
 	          </select>
 	        </label>
 	        <p class="settings-help">Простая команда не требует размышления: меньшая глубина заметно сокращает паузу перед ответом.</p>
@@ -1045,7 +1047,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-16d3d666e71abc8b";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-2d015cfaa092d61d";
 </script>
 <script>
 (() => {
@@ -2675,7 +2677,7 @@ ${text}`;
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-16d3d666e71abc8b";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-2d015cfaa092d61d";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

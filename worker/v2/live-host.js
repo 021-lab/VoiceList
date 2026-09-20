@@ -187,11 +187,14 @@ export class LiveHost {
       this.record({ type: 'vl.delegation', delegation: event.delegation, offset_ms: event.offset_ms, context: this.session?.recent || [], raw: event });
     }
     else {
-      this.flushSpeech();
-      if (inner?.type === 'response.completed') this.flushBackendText();
       // Delegation events arrive wrapped in response.event, so the skip list has to be applied
       // to the inner type as well — otherwise every streamed delta is kept after all.
-      if (isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none')) this.record(event);
+      const loggable = isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none');
+      // The turn closes on an event worth recording. Closing it on any frame at all splits a
+      // sentence wherever a skipped one happened to land, and the log shows no reason why.
+      if (loggable) this.flushSpeech();
+      if (inner?.type === 'response.completed') this.flushBackendText();
+      if (loggable) this.record(event);
     }
     this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
   }
