@@ -7,6 +7,9 @@ import { fail, safeError } from '../../src/v2/domain/contracts.js';
 
 export const OPENAI_LIVE_SESSIONS_URL = 'https://api.openai.com/v1/live/sessions';
 
+/** Two utterances by the same speaker are separated by a pause, not by an event. */
+const SILENCE_GAP_MS = 1_500;
+
 const PROMPT_TOOLS = new Set(['getVoicePrompt', 'getBackendPrompt', 'setVoicePrompt', 'setBackendPrompt']);
 
 /** Owns one GPT-Live session for the document.
@@ -42,7 +45,6 @@ export class LiveHost {
   send(message) {
     const socket = this.session?.socket;
     if (!socket) return false;
-    this.flushSpeech();
     const event = { event_id: `vl_${++this.session.outgoing}`, ...message };
     try { socket.send(JSON.stringify(event)); } catch { return false; }
     this.record(event, 'out');
@@ -90,7 +92,7 @@ export class LiveHost {
     const answer = String(payload?.transport?.sdp || '');
     if (!id || !answer) fail('MODEL_UNAVAILABLE', 'GPT-Live не вернул идентификатор сессии');
 
-    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, backendText: null, recent: [], closing: false };
+    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, backendText: null, pending: [], closing: false };
 
     // The session record carries the prompt versions and the model name: an entry from last
     // week cannot be read without knowing which text drove the model then. The response is
@@ -130,13 +132,18 @@ export class LiveHost {
   }
 
   /** Transcript fragments follow audio cadence, so one row per fragment buries the log in
-   *  syllables. Speech is buffered and written as a single assembled record when anything
-   *  else happens — which is also what makes the boundary meaningful. */
+   *  syllables.
+   *
+   *  What ends a spoken turn is the speech itself: the other speaker starting, or a silence
+   *  long enough to separate two utterances. The backend's own stream runs in parallel in a
+   *  full-duplex model, so its events are not a boundary — treating them as one cut phrases
+   *  wherever a response lifecycle event happened to land. */
   bufferSpeech(role, event) {
     const speech = this.session.speech;
-    if (speech && speech.role !== role) this.flushSpeech();
     const startMs = Number.isFinite(event?.start_ms) ? event.start_ms : null;
     const endMs = Number.isFinite(event?.end_ms) ? event.end_ms : null;
+    const silence = speech && startMs != null && speech.endMs != null && startMs - speech.endMs > SILENCE_GAP_MS;
+    if (speech && (speech.role !== role || silence)) this.flushSpeech();
     if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs };
     this.session.speech.text += String(event?.delta ?? '');
     if (endMs != null) this.session.speech.endMs = endMs;
@@ -148,7 +155,9 @@ export class LiveHost {
     this.session.speech = null;
     const text = speech.text.trim();
     if (!text) return;
-    this.session.recent = [...(this.session.recent || []), { role: speech.role, text }].slice(-6);
+    // Turns since the last delegation, not a rolling window: a window mixes the request that
+    // is being made now with one that was already answered.
+    this.session.pending = [...(this.session.pending || []), { role: speech.role, text }].slice(-12);
     this.record({ type: 'vl.speech', role: speech.role, text, start_ms: speech.startMs, end_ms: speech.endMs });
   }
 
@@ -173,6 +182,19 @@ export class LiveHost {
     this.record({ type: 'vl.backend_text', delegation_id: pending.delegationId, text });
   }
 
+  /** What actually caused this delegation. The framework does not expose the input it sent to
+   *  the backend — a response.created carries the model, tools and settings but neither the
+   *  instructions nor the input — so the closest true thing is the exchange since the previous
+   *  delegation. Assistant turns that open the window belong to the exchange that just ended,
+   *  so they are dropped. */
+  takeContext() {
+    const turns = this.session?.pending || [];
+    if (this.session) this.session.pending = [];
+    let start = 0;
+    while (start < turns.length && turns[start].role !== 'user') start += 1;
+    return turns.slice(start);
+  }
+
   receive(raw) {
     let event;
     try { event = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)); }
@@ -184,17 +206,13 @@ export class LiveHost {
     else if (inner?.type === 'response.output_text.delta') this.bufferBackendText(event);
     else if (event?.type === 'session.delegation.created') {
       this.flushSpeech();
-      this.record({ type: 'vl.delegation', delegation: event.delegation, offset_ms: event.offset_ms, context: this.session?.recent || [], raw: event });
+      this.record({ type: 'vl.delegation', delegation: event.delegation, offset_ms: event.offset_ms, context: this.takeContext(), raw: event });
     }
     else {
       // Delegation events arrive wrapped in response.event, so the skip list has to be applied
       // to the inner type as well — otherwise every streamed delta is kept after all.
-      const loggable = isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none');
-      // The turn closes on an event worth recording. Closing it on any frame at all splits a
-      // sentence wherever a skipped one happened to land, and the log shows no reason why.
-      if (loggable) this.flushSpeech();
       if (inner?.type === 'response.completed') this.flushBackendText();
-      if (loggable) this.record(event);
+      if (isLoggableEvent(event?.type) && isLoggableEvent(inner?.type ?? 'none')) this.record(event);
     }
     this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
   }

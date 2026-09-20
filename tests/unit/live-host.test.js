@@ -113,30 +113,39 @@ describe('logging', () => {
   });
 
   it('writes speech as one assembled record rather than a row per fragment', async () => {
-    for (const [delta, start, end] of [['по', 10, 200], ['ставь ', 200, 400], ['в фокус', 400, 900]]) {
-      context.socket.deliver({ type: 'session.input_transcript.delta', delta, start_ms: start, end_ms: end });
+    for (const [delta, from, to] of [['по', 10, 200], ['ставь ', 200, 400], ['в фокус', 400, 900]]) {
+      context.socket.deliver({ type: 'session.input_transcript.delta', delta, start_ms: from, end_ms: to });
     }
     expect(context.rows.some(row => row.event.type === 'vl.speech')).toBe(false);
 
-    // Anything else happening is what closes the turn.
-    context.socket.deliver({ type: 'session.usage.updated', usage: {} });
+    // A delegation is a boundary: it is the moment the turn was acted on.
+    context.socket.deliver({ type: 'session.delegation.created', delegation: { id: 'item_1', target: 'responses' }, offset_ms: 950 });
     const speech = context.rows.find(row => row.event.type === 'vl.speech');
     expect(speech.event).toMatchObject({ role: 'user', text: 'поставь в фокус', start_ms: 10, end_ms: 900 });
     expect(context.rows.filter(row => row.event.type === 'vl.speech')).toHaveLength(1);
   });
 
-  it('does not split a turn on a frame that is not worth logging', async () => {
-    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'пере', start_ms: 0, end_ms: 200 });
-    context.socket.deliver({ type: 'session.output_audio.delta', audio: 'AAAA' });
-    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'именуй', start_ms: 200, end_ms: 400 });
+  it('is not cut by the backend stream running alongside it', async () => {
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'Сек', start_ms: 0, end_ms: 200 });
+    context.socket.deliver({ type: 'response.event', delegation_id: 'item_1', event: { type: 'response.created', response: { id: 'r1' } } });
     context.socket.deliver({ type: 'session.usage.updated', usage: {} });
-    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => row.event.text)).toEqual(['переименуй']);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'унду.', start_ms: 200, end_ms: 400 });
+    context.socket.deliver({ type: 'session.closed', reason: 'client' });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => row.event.text)).toEqual(['Секунду.']);
+  });
+
+  it('separates two utterances of the same speaker by the silence between them', async () => {
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'переименуй первый', start_ms: 0, end_ms: 900 });
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'а ещё добавь второй', start_ms: 4000, end_ms: 5000 });
+    context.socket.deliver({ type: 'session.closed', reason: 'client' });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => row.event.text))
+      .toEqual(['переименуй первый', 'а ещё добавь второй']);
   });
 
   it('starts a new record when the other speaker begins', async () => {
     context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'привет', start_ms: 0, end_ms: 100 });
     context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'слушаю', start_ms: 120, end_ms: 300 });
-    context.socket.deliver({ type: 'session.usage.updated', usage: {} });
+    context.socket.deliver({ type: 'session.closed', reason: 'client' });
     expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => [row.event.role, row.event.text]))
       .toEqual([['user', 'привет'], ['assistant', 'слушаю']]);
   });
