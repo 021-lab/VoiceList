@@ -1,6 +1,6 @@
 import {
-  DEFAULT_BACKEND_MODEL, buildLiveSessionConfig, chunkDeltaLines, diffSnapshotRows,
-  isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand
+  DEFAULT_BACKEND_MODEL, LIVE_TOOLS, buildLiveSessionConfig, chunkDeltaLines, diffSnapshotRows,
+  isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand, buildSimulatedInput
 } from '../../src/v2/domain/live-session.js';
 import { promptVersion } from '../../src/v2/domain/live-settings.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
@@ -10,6 +10,9 @@ export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
 /** Two utterances by the same speaker are separated by a pause, not by an event. */
 const SILENCE_GAP_MS = 1_500;
+
+/** The Responses API takes the same function schemas the delegation config carries. */
+const LIVE_TOOLS_FOR_RESPONSES = LIVE_TOOLS;
 
 const PROMPT_TOOLS = new Set(['getVoicePrompt', 'getBackendPrompt', 'setVoicePrompt', 'setBackendPrompt']);
 
@@ -220,6 +223,41 @@ export class LiveHost {
       repaired = before + 1;
     }
     return { requested: wanted.size, repaired };
+  }
+
+  /** Runs one delegation against the backend from a written transcript, so the half that
+   *  picks a tool can be tested without speech. Nothing is executed and nothing is logged as
+   *  a session event: the reply is returned for inspection. */
+  async simulate(turns) {
+    if (!this.apiKey) fail('MODEL_UNAVAILABLE', 'Ключ OpenAI не настроен');
+    const [backendPrompt, backendModel, reasoningEffort, items] = await Promise.all([
+      this.settings.prompt('backend'), this.settings.backendModel(), this.settings.reasoningEffort(), this.services.readItems()
+    ]);
+    const body = {
+      model: backendModel || DEFAULT_BACKEND_MODEL,
+      instructions: backendPrompt,
+      input: buildSimulatedInput(turns),
+      tools: LIVE_TOOLS_FOR_RESPONSES,
+      tool_choice: 'auto',
+      store: false,
+      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {})
+    };
+    const reply = await this.fetchImpl(this.responsesUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const text = await reply.text();
+    if (!reply.ok) fail('MODEL_UNAVAILABLE', `Бэкенд отклонил запрос (${reply.status}): ${text.slice(0, 400)}`);
+    const payload = JSON.parse(text);
+    const output = payload.output || [];
+    return {
+      model: body.model,
+      snapshotTasks: snapshotRows(items).length,
+      calls: output.filter(item => item.type === 'function_call').map(item => ({ name: item.name, arguments: item.arguments })),
+      text: output.filter(item => item.type === 'message').flatMap(item => (item.content || []).map(part => part.text)).filter(Boolean).join(' '),
+      usage: payload.usage || null
+    };
   }
 
   receive(raw) {

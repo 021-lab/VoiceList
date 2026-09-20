@@ -100,10 +100,16 @@ export const DEFAULT_VOICE_PROMPT = `
 задач или ты не уверен, задай один короткий уточняющий вопрос и дождись подтверждения.
 Не обращайся за этим к бэкенду и никогда не угадывай идентификатор.
 
+Идентификатор обязательно произнеси. Бэкенд видит только расшифровку разговора, поэтому
+всё, что ты не сказал вслух, до него не доходит. Обращаясь к бэкенду, называй каждую
+упомянутую задачу в виде «название [идентификатор]» — например: Секундочку, Клубника [rv].
+Если задач несколько, перечисли все: Секундочку, Клубника [rv] в Хлеб [bread].
+Произноси идентификатор ровно как он записан в таблице, посимвольно, ничего не меняя.
+
 Простое изменение выполняй сразу. Переименование, смена статуса, дедлайн, новая задача
-или подзадача, перенос — если задача в таблице найдена однозначно, не переспрашивай, не
-предупреждай и не объясняй, что собираешься сделать: сразу отправляй операцию с точным
-идентификатором и говори только о результате.
+или подзадача, перенос — если задача в таблице найдена однозначно, не переспрашивай и не
+объясняй, что собираешься делать. Скажи одну короткую фразу с идентификаторами всех
+упомянутых задач и сразу отправляй операцию, а дальше говори только о результате.
 
 Переспрашивай лишь тогда, когда подходит несколько задач, речь неразборчива или в просьбе
 не хватает данных. Разбирайся дольше, когда просьба требует рассуждения: несколько
@@ -345,4 +351,37 @@ export function chunkDeltaLines(lines, maxChars = 1_200) {
   }
   if (current.length) chunks.push(current);
   return chunks.map(group => group.join('\n'));
+}
+
+/** The input GPT-Live builds for a delegation, reproduced from a written transcript.
+ *  Lets the backend half be exercised without a microphone: the same SRT-style user message
+ *  and the same backend_task wrapper, observed verbatim in a real delegation. */
+export const BACKEND_TASK = `<backend_task>
+Determine the best next step based on the provided context. Use the capabilities available to you when appropriate. Return a handoff result for the frontend assistant's thinking context.
+
+The fact that this request was delegated provides no information about the best next step. Do not expose internal delegation details or emit internal protocol markers.
+
+SERIAL DELEGATION EXECUTION
+- Complete all authorized work, including multiple independent or dependent tool calls.
+- Resolve every relevant discrepancy between the conversation, tool results, and current state.
+- Never repeat a write or other state-changing action that has already completed.
+</backend_task>`;
+
+export function buildSimulatedInput(turns) {
+  const blocks = turns.map((turn, index) => [
+    String(index + 1),
+    turn.role === 'assistant' ? '[Assistant speech transcript]' : '[User speech transcript]',
+    turn.text
+  ].join('\n'));
+  const transcript = [
+    'The conversation below is an SRT-style transcript of the recent live spoken conversation. The blocks are ordered and role-labeled; use it to answer the latest user turn for the downstream voice assistant.',
+    '',
+    '[Spoken conversation transcript]',
+    '',
+    blocks.join('\n\n')
+  ].join('\n');
+  return [
+    { role: 'user', content: transcript },
+    { role: 'developer', content: BACKEND_TASK }
+  ];
 }
