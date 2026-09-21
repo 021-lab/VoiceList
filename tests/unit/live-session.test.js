@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_BACKEND_MODEL, LIVE_MODEL, LIVE_TOOL_NAMES, SNAPSHOT_HEADER,
+  DEFAULT_BACKEND_MODEL, DEFAULT_VOICE_PROMPT, LIVE_MODEL, LIVE_TOOL_NAMES, SNAPSHOT_HEADER,
   buildLiveSessionConfig, formatSnapshotDeltas, formatTaskSnapshot, isLoggableEvent, readFunctionCall
 } from '../../src/v2/domain/live-session.js';
 
@@ -128,5 +128,16 @@ describe('loggable events', () => {
     for (const type of ['session.output_audio.delta', 'session.input_audio.append', 'response.output_text.delta', 'session.input_transcript.delta', 'session.output_transcript.delta']) {
       expect(isLoggableEvent(type)).toBe(false);
     }
+  });
+});
+
+describe('the voice prompt', () => {
+  it('makes the choice between several matching tasks a dialogue that precedes delegation', () => {
+    expect(DEFAULT_VOICE_PROMPT).toContain('Подошло несколько');
+    expect(DEFAULT_VOICE_PROMPT).toContain('Дождись ответа');
+    expect(DEFAULT_VOICE_PROMPT).toContain('к бэкенду не обращайся');
+    expect(DEFAULT_VOICE_PROMPT).toContain('повтори выбранную задачу вслух вместе с идентификатором');
+    // A single match must still go through without a question, or every change costs a turn.
+    expect(DEFAULT_VOICE_PROMPT).toContain('Подошла ровно одна — не переспрашивай');
   });
 });

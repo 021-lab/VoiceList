@@ -1,6 +1,7 @@
 import {
   DEFAULT_BACKEND_MODEL, LIVE_TOOLS, buildLiveSessionConfig, chunkDeltaLines, diffSnapshotRows,
-  isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand, buildSimulatedInput
+  isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand, buildSimulatedInput,
+  buildSimulatedVoiceInput, composeVoiceInstructions, formatTaskSnapshot
 } from '../../src/v2/domain/live-session.js';
 import { promptVersion } from '../../src/v2/domain/live-settings.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
@@ -255,6 +256,40 @@ export class LiveHost {
       model: body.model,
       snapshotTasks: snapshotRows(items).length,
       calls: output.filter(item => item.type === 'function_call').map(item => ({ name: item.name, arguments: item.arguments })),
+      text: output.filter(item => item.type === 'message').flatMap(item => (item.content || []).map(part => part.text)).filter(Boolean).join(' '),
+      usage: payload.usage || null
+    };
+  }
+
+  /** Replays a written dialogue against the voice layer's own instructions. The live model
+   *  itself is not a Responses model, so the stand-in is the backend model reading the same
+   *  instruction text; what it shows is whether the prompt leads to asking which of several
+   *  tasks is meant and to saying the chosen identifier aloud. Nothing is changed and no
+   *  tools are offered — the voice layer has none of its own. */
+  async simulateVoice(turns) {
+    if (!this.apiKey) fail('MODEL_UNAVAILABLE', 'Ключ OpenAI не настроен');
+    const [voicePrompt, backendModel, items] = await Promise.all([
+      this.settings.prompt('voice'), this.settings.backendModel(), this.services.readItems()
+    ]);
+    const body = {
+      model: backendModel || DEFAULT_BACKEND_MODEL,
+      instructions: composeVoiceInstructions(voicePrompt, formatTaskSnapshot(items)),
+      input: buildSimulatedVoiceInput(turns),
+      store: false
+    };
+    const reply = await this.fetchImpl(this.responsesUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const text = await reply.text();
+    if (!reply.ok) fail('MODEL_UNAVAILABLE', `Модель отклонила запрос (${reply.status}): ${text.slice(0, 400)}`);
+    const payload = JSON.parse(text);
+    const output = payload.output || [];
+    return {
+      layer: 'voice',
+      model: body.model,
+      snapshotTasks: snapshotRows(items).length,
       text: output.filter(item => item.type === 'message').flatMap(item => (item.content || []).map(part => part.text)).filter(Boolean).join(' '),
       usage: payload.usage || null
     };

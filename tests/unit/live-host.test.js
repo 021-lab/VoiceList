@@ -299,3 +299,43 @@ describe('stopping', () => {
     expect(context.rows.some(row => row.event.type === 'session.closed')).toBe(true);
   });
 });
+
+describe('replaying a dialogue against the voice layer', () => {
+  it('sends the voice instructions with the task table and returns what it would say', async () => {
+    const sent = [];
+    const host = new LiveHost({
+      log: { append: () => {} },
+      settings: new LiveSettings(memory()),
+      apiKey: 'sk-test',
+      fetchImpl: async (url, options) => {
+        sent.push({ url: String(url), body: JSON.parse(options.body) });
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            output: [{ type: 'message', content: [{ text: 'Голден на Яблоках или Голден на Даче?' }] }],
+            usage: { input_tokens: 700 }
+          })
+        };
+      },
+      services: {
+        readItems: async () => [task('rs', null, 'Open', 'Яблоки'), task('rt', 'rs', 'Open', 'Голден')],
+        readFrontier: async () => [],
+        applyCommand: async () => ({ status: 'applied' })
+      }
+    });
+
+    const result = await host.simulateVoice([{ role: 'user', text: 'переименуй голден' }]);
+
+    expect(sent[0].url).toContain('/responses');
+    expect(sent[0].body.instructions).toContain('rt\trs\tO\tГолден');
+    expect(sent[0].body.instructions).toContain('Выбор задачи');
+    // The voice layer holds no tools of its own, so none are offered here either.
+    expect(sent[0].body.tools).toBeUndefined();
+    expect(sent[0].body.store).toBe(false);
+    expect(sent[0].body.input).toEqual([{ role: 'user', content: 'переименуй голден' }]);
+    expect(result.layer).toBe('voice');
+    expect(result.snapshotTasks).toBe(2);
+    expect(result.text).toContain('Голден на Яблоках');
+  });
+});

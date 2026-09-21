@@ -56,13 +56,15 @@ export default {
       // Clearing is a POST, so the same-origin check above applies to it; reading is open.
       if (url.pathname === '/api/live/log/clear' && request.method === 'POST') return json(await stub.clearLiveLog());
       if (url.pathname === '/api/live/log/repair' && request.method === 'POST') return json(await stub.repairLiveLog());
-      // Drives one delegation from a written transcript, so the backend half is testable
-      // without a microphone. It runs the model only; no task is changed.
+      // Replays a written dialogue, so both halves are testable without a microphone:
+      // layer=voice shows which task the voice layer picks and what it says aloud,
+      // layer=backend drives one delegation. Runs the model only; no task is changed.
       if (url.pathname === '/api/live/simulate' && request.method === 'POST') {
         const body = await readBoundedJson(request,32000);
         const turns = Array.isArray(body.turns) ? body.turns : [{role:'user',text:String(body.text||'')}];
         if (!turns.length || !turns.every(turn => turn && typeof turn.text === 'string' && turn.text.trim())) return json({error:'turns required'},400);
-        return json(await stub.simulateDelegation(turns.map(turn => ({role:turn.role === 'assistant' ? 'assistant' : 'user', text:turn.text}))));
+        const dialogue = turns.map(turn => ({role:turn.role === 'assistant' ? 'assistant' : 'user', text:turn.text}));
+        return json(body.layer === 'voice' ? await stub.simulateVoiceTurn(dialogue) : await stub.simulateDelegation(dialogue));
       }
       if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
