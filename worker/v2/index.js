@@ -64,7 +64,7 @@ export default {
         const turns = Array.isArray(body.turns) ? body.turns : [{role:'user',text:String(body.text||'')}];
         if (!turns.length || !turns.every(turn => turn && typeof turn.text === 'string' && turn.text.trim())) return json({error:'turns required'},400);
         const dialogue = turns.map(turn => ({role:turn.role === 'assistant' ? 'assistant' : 'user', text:turn.text}));
-        return json(body.layer === 'voice' ? await stub.simulateVoiceTurn(dialogue) : await stub.simulateDelegation(dialogue));
+        return json(body.layer === 'voice' ? await stub.simulateVoiceTurn(dialogue,{prompt:body.prompt === 'default' ? 'default' : 'current'}) : await stub.simulateDelegation(dialogue));
       }
       if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));

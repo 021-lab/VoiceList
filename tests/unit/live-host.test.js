@@ -333,7 +333,10 @@ describe('replaying a dialogue against the voice layer', () => {
     // The voice layer holds no tools of its own, so none are offered here either.
     expect(sent[0].body.tools).toBeUndefined();
     expect(sent[0].body.store).toBe(false);
-    expect(sent[0].body.input).toEqual([{ role: 'user', content: 'переименуй голден' }]);
+    expect(sent[0].body.input[0]).toEqual({ role: 'user', content: 'переименуй голден' });
+    // The stand-in is told what the live transport enforces on its own: no tools, speech only.
+    expect(sent[0].body.input[1].role).toBe('developer');
+    expect(sent[0].body.input[1].content).toContain('Инструментов у тебя нет');
     expect(result.layer).toBe('voice');
     expect(result.snapshotTasks).toBe(2);
     expect(result.text).toContain('Голден на Яблоках');

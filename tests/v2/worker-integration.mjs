@@ -36,7 +36,7 @@ const logged=log.root.children[1].children.find(node=>node.props.actionId===acti
 assert.equal(logged.props.rolledBack,true);
 const invalid=await fetch(base+'/api/v2/input',{method:'POST',headers:{'Content-Type':'application/json','Origin':'https://untrusted.invalid'},body:JSON.stringify(created.input)});
 assert.equal(invalid.status,403);
-const status=await request('/api/realtime/key/status');assert.equal(typeof status.configured,'boolean');assert.equal('apiKey' in status,false);
+const status=await request('/api/live/key/status');assert.equal(typeof status.configured,'boolean');assert.equal('apiKey' in status,false);
 const socket=new WebSocket(base.replace(/^http/,'ws')+'/ws');
 await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('WebSocket timeout')),5000);socket.onmessage=event=>{const value=JSON.parse(event.data);if(value.type==='state'){clearTimeout(timer);assert.ok(value.state.content.snapshot.items.find(x=>x.id===id));resolve();}};socket.onerror=reject;});socket.close();
 if(new URL(base).hostname==='127.0.0.1') {

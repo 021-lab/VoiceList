@@ -136,7 +136,7 @@ describe('the voice prompt', () => {
     expect(DEFAULT_VOICE_PROMPT).toContain('Подошло несколько');
     expect(DEFAULT_VOICE_PROMPT).toContain('Дождись ответа');
     expect(DEFAULT_VOICE_PROMPT).toContain('к бэкенду не обращайся');
-    expect(DEFAULT_VOICE_PROMPT).toContain('повтори выбранную задачу вслух вместе с идентификатором');
+    expect(DEFAULT_VOICE_PROMPT).toContain('обязательно содержит идентификатор выбранной');
     // A single match must still go through without a question, or every change costs a turn.
     expect(DEFAULT_VOICE_PROMPT).toContain('Подошла ровно одна — не переспрашивай');
   });

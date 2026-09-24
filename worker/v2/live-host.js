@@ -1,7 +1,7 @@
 import {
   DEFAULT_BACKEND_MODEL, LIVE_TOOLS, buildLiveSessionConfig, chunkDeltaLines, diffSnapshotRows,
   isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand, buildSimulatedInput,
-  buildSimulatedVoiceInput, composeVoiceInstructions, formatTaskSnapshot
+  buildSimulatedVoiceInput, composeVoiceInstructions, formatTaskSnapshot, DEFAULT_VOICE_PROMPT
 } from '../../src/v2/domain/live-session.js';
 import { promptVersion } from '../../src/v2/domain/live-settings.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
@@ -266,10 +266,14 @@ export class LiveHost {
    *  instruction text; what it shows is whether the prompt leads to asking which of several
    *  tasks is meant and to saying the chosen identifier aloud. Nothing is changed and no
    *  tools are offered — the voice layer has none of its own. */
-  async simulateVoice(turns) {
+  async simulateVoice(turns, { prompt = 'current' } = {}) {
     if (!this.apiKey) fail('MODEL_UNAVAILABLE', 'Ключ OpenAI не настроен');
+    // A saved edit hides the shipped text, so a change to the default cannot be judged
+    // against the stored prompt. Asking for the default explicitly reads it without
+    // touching what is saved — the alternative, resetting to test, destroys the edit.
     const [voicePrompt, backendModel, items] = await Promise.all([
-      this.settings.prompt('voice'), this.settings.backendModel(), this.services.readItems()
+      prompt === 'default' ? DEFAULT_VOICE_PROMPT : this.settings.prompt('voice'),
+      this.settings.backendModel(), this.services.readItems()
     ]);
     const body = {
       model: backendModel || DEFAULT_BACKEND_MODEL,
@@ -288,6 +292,7 @@ export class LiveHost {
     const output = payload.output || [];
     return {
       layer: 'voice',
+      prompt: prompt === 'default' ? 'default' : 'current',
       model: body.model,
       snapshotTasks: snapshotRows(items).length,
       text: output.filter(item => item.type === 'message').flatMap(item => (item.content || []).map(part => part.text)).filter(Boolean).join(' '),

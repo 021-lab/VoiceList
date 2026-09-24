@@ -115,10 +115,10 @@ export class ListDocumentDO extends Agent {
     if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();
     return host.simulate(turns);
   }
-  async simulateVoiceTurn(turns) {
+  async simulateVoiceTurn(turns, options) {
     const host = this.liveHost();
     if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();
-    return host.simulateVoice(turns);
+    return host.simulateVoice(turns, options || {});
   }
   async repairLiveLog() {
     const host = this.liveHost();
