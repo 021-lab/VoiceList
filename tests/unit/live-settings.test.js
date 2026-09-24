@@ -14,7 +14,10 @@ describe('live settings', () => {
     const read = await settings.read();
     expect(read.voicePrompt).toBe(DEFAULT_VOICE_PROMPT);
     expect(read.backendModel).toBe(DEFAULT_BACKEND_MODEL);
-    expect(read.defaults).toEqual({ voicePrompt: true, backendPrompt: true, backendModel: true, reasoningEffort: true });
+    expect(read.defaults).toEqual({
+      voicePrompt: true, backendPrompt: true, geminiPrompt: true,
+      backendModel: true, geminiModel: true, reasoningEffort: true
+    });
   });
 
   it('appends a rule without losing the text it had', async () => {

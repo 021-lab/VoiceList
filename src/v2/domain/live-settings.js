@@ -1,19 +1,22 @@
 import { DEFAULT_BACKEND_MODEL, DEFAULT_BACKEND_PROMPT, DEFAULT_VOICE_PROMPT } from './live-session.js';
+import { DEFAULT_GEMINI_PROMPT, GEMINI_MODEL } from './gemini-live.js';
 import { fail } from './contracts.js';
 
 export const VOICE_PROMPT_KEY = 'voicelist.live.voice-prompt.v1';
 export const BACKEND_PROMPT_KEY = 'voicelist.live.backend-prompt.v1';
 export const BACKEND_MODEL_KEY = 'voicelist.live.backend-model.v1';
+export const GEMINI_PROMPT_KEY = 'voicelist.live.gemini-prompt.v1';
+export const GEMINI_MODEL_KEY = 'voicelist.live.gemini-model.v1';
 export const REASONING_KEY = 'voicelist.live.reasoning-effort.v1';
 export const REASONING_EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh', 'max'];
 export const PROMPT_HISTORY_KEY = 'voicelist.live.prompt-history.v1';
 
 export const MAX_PROMPT_CHARS = 16_000;
 export const MAX_HISTORY = 50;
-export const PROMPT_TARGETS = ['voice', 'backend'];
+export const PROMPT_TARGETS = ['voice', 'backend', 'gemini'];
 
-const KEY = { voice: VOICE_PROMPT_KEY, backend: BACKEND_PROMPT_KEY };
-const DEFAULT = { voice: DEFAULT_VOICE_PROMPT, backend: DEFAULT_BACKEND_PROMPT };
+const KEY = { voice: VOICE_PROMPT_KEY, backend: BACKEND_PROMPT_KEY, gemini: GEMINI_PROMPT_KEY };
+const DEFAULT = { voice: DEFAULT_VOICE_PROMPT, backend: DEFAULT_BACKEND_PROMPT, gemini: DEFAULT_GEMINI_PROMPT };
 
 /** An empty stored value means "use the built-in default".
  *
@@ -32,6 +35,8 @@ export class LiveSettings {
 
   async backendModel() { return (await this.storage.get(BACKEND_MODEL_KEY)) || ''; }
 
+  async geminiModel() { return (await this.storage.get(GEMINI_MODEL_KEY)) || ''; }
+
   /** Picking a tool by a name the voice layer already resolved needs no deep thinking, and
    *  reasoning effort is what that costs in latency. Left unset, nothing is sent and the
    *  backend model keeps its own default. */
@@ -45,15 +50,21 @@ export class LiveSettings {
   }
 
   async read() {
-    const [voice, backend, model, reasoning, history] = await Promise.all([
-      this.stored('voice'), this.stored('backend'), this.backendModel(), this.reasoningEffort(), this.history()
+    const [voice, backend, gemini, model, geminiModel, reasoning, history] = await Promise.all([
+      this.stored('voice'), this.stored('backend'), this.stored('gemini'),
+      this.backendModel(), this.geminiModel(), this.reasoningEffort(), this.history()
     ]);
     return {
       voicePrompt: voice || DEFAULT_VOICE_PROMPT,
       backendPrompt: backend || DEFAULT_BACKEND_PROMPT,
+      geminiPrompt: gemini || DEFAULT_GEMINI_PROMPT,
       backendModel: model || DEFAULT_BACKEND_MODEL,
+      geminiModel: geminiModel || GEMINI_MODEL,
       reasoningEffort: reasoning,
-      defaults: { voicePrompt: !voice, backendPrompt: !backend, backendModel: !model, reasoningEffort: !reasoning },
+      defaults: {
+        voicePrompt: !voice, backendPrompt: !backend, geminiPrompt: !gemini,
+        backendModel: !model, geminiModel: !geminiModel, reasoningEffort: !reasoning
+      },
       history: history.map(({ before, after, ...rest }) => ({ ...rest, beforeChars: before.length, afterChars: after.length }))
     };
   }
@@ -105,6 +116,13 @@ export class LiveSettings {
     if (value && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) fail('INVALID_INPUT', 'Недопустимое имя модели');
     await this.storage.put(BACKEND_MODEL_KEY, value);
     return { backendModel: value || DEFAULT_BACKEND_MODEL, usingDefault: !value };
+  }
+
+  async setGeminiModel(model) {
+    const value = String(model ?? '').trim();
+    if (value && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) fail('INVALID_INPUT', 'Недопустимое имя модели');
+    await this.storage.put(GEMINI_MODEL_KEY, value);
+    return { geminiModel: value || GEMINI_MODEL, usingDefault: !value };
   }
 }
 

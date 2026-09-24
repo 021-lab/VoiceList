@@ -7,11 +7,13 @@ import { resolveOpenAI } from './model.js';
 import { RuntimeStorage } from './runtime-storage.js';
 import { LiveLog } from './live-log.js';
 import { LiveHost } from './live-host.js';
+import { GeminiHost } from './gemini-host.js';
 import { LiveSettings } from '../../src/v2/domain/live-settings.js';
 import { taskTreeFromItems } from '../task-tree.js';
 import { taskFrontierFromItems } from '../task-frontier.js';
 
 const API_KEY = 'voicelist.openai-api-key.v1';
+const GEMINI_KEY = 'voicelist.gemini-api-key.v1';
 export class ListDocumentDO extends Agent {
   static options = { sendIdentityOnConnect: false };
   async onStart() {
@@ -99,9 +101,51 @@ export class ListDocumentDO extends Agent {
     });
     return this.live;
   }
+  geminiHost() {
+    if (!this.gemini) this.gemini = new GeminiHost({
+      log: this.liveLog,
+      settings: this.liveSettings,
+      apiKey: this.env.GEMINI_API_KEY || '',
+      services: {
+        readItems: async () => this.runtime.graph.read().items,
+        readFrontier: async () => this.getTaskFrontier(),
+        applyCommand: async (command, message) => this.port.applyCommand(command, {message})
+      }
+    });
+    return this.gemini;
+  }
+  /** One voice session at a time: two models listening to the same microphone would both
+   *  answer, and the log would interleave two conversations about one list. */
+  async startGeminiSession() {
+    const host = this.geminiHost();
+    if (!host.apiKey) host.apiKey = await this.getGeminiApiKey();
+    if (this.live?.active) await this.live.stop('replaced-by-gemini');
+    const result = await host.mintToken();
+    this.broadcastState();
+    return result;
+  }
+  stopGeminiSession() { return this.gemini ? this.gemini.stop('client') : false; }
+  geminiSessionStatus() { return {active:Boolean(this.gemini?.active),sessionId:this.gemini?.sessionId || ''}; }
+  /** The page relays a tool call and gets back exactly what it must send to Google. */
+  async runGeminiTools(frame) {
+    const host = this.geminiHost();
+    const results = await host.invokeAll(frame);
+    this.broadcastState();
+    return {results};
+  }
+  mirrorGeminiFrames(frames) { return this.geminiHost().mirror(frames); }
+  async getGeminiApiKey() { return await this.ctx.storage.get(GEMINI_KEY) || ''; }
+  async isGeminiKeyConfigured() { return Boolean(this.env.GEMINI_API_KEY || await this.getGeminiApiKey()); }
+  async configureGeminiApiKey(apiKey) {
+    if (await this.isGeminiKeyConfigured()) return false;
+    await this.ctx.storage.put(GEMINI_KEY, apiKey);
+    if (this.gemini) this.gemini.apiKey = apiKey;
+    return true;
+  }
   async startLiveSession(body) {
     const host = this.liveHost();
     if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();
+    if (this.gemini?.active) this.gemini.stop('replaced-by-gpt-live');
     const result = await host.start({sdp:String(body?.sdp || '')});
     this.broadcastState();
     return result;
@@ -138,6 +182,7 @@ export class ListDocumentDO extends Agent {
   livePromptHistory() { return this.liveSettings.history(); }
   setLiveBackendModel(model) { return this.liveSettings.setBackendModel(model); }
   setLiveReasoningEffort(effort) { return this.liveSettings.setReasoningEffort(effort); }
+  setGeminiModel(model) { return this.liveSettings.setGeminiModel(model); }
   async onRequest(request) {
     if (new URL(request.url).pathname === '/mcp') {
       const response = await handleMcpRequest(request, this.port); this.broadcastState(); return response;

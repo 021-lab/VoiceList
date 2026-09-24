@@ -3,6 +3,8 @@ export const LIVE_SESSION_STOP_ENDPOINT = '/api/live/session/stop';
 export const LIVE_KEY_STATUS_ENDPOINT = '/api/live/key/status';
 export const LIVE_KEY_ENDPOINT = '/api/live/key';
 export const LIVE_SETTINGS_ENDPOINT = '/api/live/settings';
+export const GEMINI_KEY_STATUS_ENDPOINT = '/api/live/gemini/key/status';
+export const GEMINI_KEY_ENDPOINT = '/api/live/gemini/key';
 
 const MAX_VISIBLE_TURNS = 240;
 
@@ -161,6 +163,9 @@ export function createSettingsPanel({
   backendPromptInput, backendPromptSave, backendPromptReset, backendPromptStatus,
   backendModelInput, backendModelSave, backendModelStatus,
   reasoningInput, reasoningSave, reasoningStatus,
+  geminiKeyInput, geminiKeyField, geminiKeySave, geminiKeyStatus,
+  geminiPromptInput, geminiPromptSave, geminiPromptReset, geminiPromptStatus,
+  geminiModelInput, geminiModelSave, geminiModelStatus,
   fetchImpl = fetch
 } = {}) {
   const say = (element, text) => { if (element) element.textContent = text; };
@@ -174,8 +179,8 @@ export function createSettingsPanel({
 
   async function load() {
     try {
-      const [key, settings] = await Promise.all([
-        call(LIVE_KEY_STATUS_ENDPOINT, {}), call(LIVE_SETTINGS_ENDPOINT, {})
+      const [key, geminiKey, settings] = await Promise.all([
+        call(LIVE_KEY_STATUS_ENDPOINT, {}), call(GEMINI_KEY_STATUS_ENDPOINT, {}), call(LIVE_SETTINGS_ENDPOINT, {})
       ]);
       if (keyField) keyField.hidden = key.configured;
       if (keySave) keySave.hidden = key.configured;
@@ -188,6 +193,13 @@ export function createSettingsPanel({
       say(backendPromptStatus, settings.defaults.backendPrompt ? 'Используется встроенный промпт.' : 'Сохранена своя редакция.');
       say(backendModelStatus, settings.defaults.backendModel ? 'Используется модель по умолчанию.' : 'Задана своя модель.');
       say(reasoningStatus, settings.defaults.reasoningEffort ? 'Глубину задаёт сама модель.' : `Глубина: ${settings.reasoningEffort}.`);
+      if (geminiKeyField) geminiKeyField.hidden = geminiKey.configured;
+      if (geminiKeySave) geminiKeySave.hidden = geminiKey.configured;
+      say(geminiKeyStatus, geminiKey.configured ? 'Ключ настроен.' : 'Ключ не настроен.');
+      if (geminiPromptInput) geminiPromptInput.value = settings.geminiPrompt;
+      if (geminiModelInput) geminiModelInput.value = settings.geminiModel;
+      say(geminiPromptStatus, settings.defaults.geminiPrompt ? 'Используется встроенный промпт.' : 'Сохранена своя редакция.');
+      say(geminiModelStatus, settings.defaults.geminiModel ? 'Используется модель по умолчанию.' : 'Задана своя модель.');
       return settings;
     } catch (error) { say(keyStatus, error.message); return null; }
   }
@@ -225,6 +237,22 @@ export function createSettingsPanel({
       const result = await put({ reasoningEffort: reasoningInput?.value || '' });
       say(reasoningStatus, result.usingDefault ? 'Глубину задаёт сама модель.' : `Глубина: ${result.reasoningEffort}. Применится со следующей сессии.`);
     } catch (error) { say(reasoningStatus, error.message); }
+  });
+  geminiPromptSave?.addEventListener('click', () => savePrompt('gemini', geminiPromptInput, geminiPromptStatus));
+  geminiPromptReset?.addEventListener('click', () => resetPrompt('gemini', geminiPromptInput, geminiPromptStatus));
+  geminiKeySave?.addEventListener('click', async () => {
+    try {
+      await call(GEMINI_KEY_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: geminiKeyInput?.value || '' }) });
+      say(geminiKeyStatus, 'Ключ сохранён.');
+      if (geminiKeyInput) geminiKeyInput.value = '';
+      await load();
+    } catch (error) { say(geminiKeyStatus, error.message); }
+  });
+  geminiModelSave?.addEventListener('click', async () => {
+    try {
+      const result = await put({ geminiModel: geminiModelInput?.value || '' });
+      say(geminiModelStatus, result.usingDefault ? 'Используется модель по умолчанию.' : `Модель: ${result.geminiModel}. Применится со следующей сессии.`);
+    } catch (error) { say(geminiModelStatus, error.message); }
   });
   backendModelSave?.addEventListener('click', async () => {
     try {

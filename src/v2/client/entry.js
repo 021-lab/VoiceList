@@ -1,5 +1,6 @@
 import { Client } from './client.js';
 import { createLiveVoice } from './live-voice.js';
+import { createGeminiVoice } from './gemini-voice.js';
 
 async function bootstrap() {
   const client = new Client();
@@ -20,9 +21,20 @@ async function bootstrap() {
       voicePromptInput: $('live-voice-prompt'), voicePromptSave: $('live-voice-prompt-save'), voicePromptReset: $('live-voice-prompt-reset'), voicePromptStatus: $('live-voice-prompt-status'),
       backendPromptInput: $('live-backend-prompt'), backendPromptSave: $('live-backend-prompt-save'), backendPromptReset: $('live-backend-prompt-reset'), backendPromptStatus: $('live-backend-prompt-status'),
       backendModelInput: $('live-backend-model'), backendModelSave: $('live-backend-model-save'), backendModelStatus: $('live-backend-model-status'),
-      reasoningInput: $('live-reasoning'), reasoningSave: $('live-reasoning-save'), reasoningStatus: $('live-reasoning-status')
+      reasoningInput: $('live-reasoning'), reasoningSave: $('live-reasoning-save'), reasoningStatus: $('live-reasoning-status'),
+      geminiKeyInput: $('gemini-key-input'), geminiKeyField: $('gemini-key-field'), geminiKeySave: $('gemini-key-save'), geminiKeyStatus: $('gemini-key-status'),
+      geminiPromptInput: $('gemini-prompt'), geminiPromptSave: $('gemini-prompt-save'), geminiPromptReset: $('gemini-prompt-reset'), geminiPromptStatus: $('gemini-prompt-status'),
+      geminiModelInput: $('gemini-model'), geminiModelSave: $('gemini-model-save'), geminiModelStatus: $('gemini-model-status')
     }
   });
+
+  // Gemini holds the socket in the page rather than on the server: it speaks WebSocket, not
+  // WebRTC, and an ephemeral token lets the browser open the session the worker defined.
+  const gemini = createGeminiVoice({
+    button: $('gemini-voice-btn'), status: $('gemini-voice-status'),
+    onTranscript: ({ role, text }) => { if (text) console.debug('gemini', role, text); }
+  });
+  window.__geminiVoice = gemini;
   client.realtime = live;
   window.__liveVoice = live;
   $('settings-btn')?.addEventListener('click', () => { live.settings.load(); });

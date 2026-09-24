@@ -877,3 +877,16 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 .action-log-status-pending { color: #ff9500; }
 .action-log-status-synced { color: #34c759; }
 .action-log-status-failed { color: #ff3b30; }
+
+/* The second voice button sits under the first: two models, one microphone, one at a time. */
+.gemini-voice-btn {
+  top: calc(50% + 76px);
+  background: #2d6cdf;
+  box-shadow: 0 8px 28px rgba(45, 108, 223, 0.34);
+}
+.gemini-voice-btn:active { transform: translateY(-50%) scale(0.94); }
+.gemini-voice-btn[data-active="true"] {
+  background: #ff3b30;
+  box-shadow: 0 0 0 8px rgba(255, 59, 48, 0.15), 0 8px 28px rgba(255, 59, 48, 0.35);
+}
+.gemini-voice-status { top: calc(50% + 76px); }

@@ -46,6 +46,10 @@ __INLINE_CSS__
   <button id="realtime-voice-btn" class="realtime-voice-btn" type="button" aria-label="Начать голосовой диалог" aria-pressed="false" data-state="idle">
     <span aria-hidden="true">🎙</span>
   </button>
+  <div id="gemini-voice-status" class="realtime-voice-status gemini-voice-status" hidden aria-live="polite"></div>
+  <button id="gemini-voice-btn" class="realtime-voice-btn gemini-voice-btn" type="button" aria-label="Начать голосовой диалог с Gemini" aria-pressed="false" data-state="idle">
+    <span aria-hidden="true">✦</span>
+  </button>
 
   <div id="tag-panel" class="swipe-panel"></div>
 
@@ -108,6 +112,31 @@ __INLINE_CSS__
 	        <p class="settings-help">Простая команда не требует размышления: меньшая глубина заметно сокращает паузу перед ответом.</p>
 	        <button id="live-reasoning-save" class="settings-primary" type="button">Сохранить</button>
 	        <div id="live-reasoning-status" class="settings-status" aria-live="polite"></div>
+	      </section>
+	      <section class="settings-section" aria-labelledby="gemini-heading">
+	        <h3 id="gemini-heading">Голос Gemini</h3>
+	        <p class="settings-help">Вторая голосовая модель на той же кнопочной панели. Инструменты изменения задач она держит сама, поэтому бэкенд-модель ей не нужна.</p>
+	        <label class="settings-field" id="gemini-key-field">
+	          <span>Ключ Gemini API</span>
+	          <input type="password" id="gemini-key-input" placeholder="AIza…" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="gemini-key-save" class="settings-primary" type="button">Сохранить ключ</button>
+	        <div id="gemini-key-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Промпт голоса Gemini</span>
+	          <textarea id="gemini-prompt" rows="10" placeholder="Роль, манера речи и правила выбора задачи"></textarea>
+	        </label>
+	        <button id="gemini-prompt-save" class="settings-primary" type="button">Сохранить</button>
+	        <button id="gemini-prompt-reset" class="settings-secondary" type="button">Вернуть встроенный</button>
+	        <div id="gemini-prompt-status" class="settings-status" aria-live="polite"></div>
+
+	        <label class="settings-field" style="margin-top: 18px;">
+	          <span>Модель</span>
+	          <input type="text" id="gemini-model" placeholder="gemini-3.8-live" autocomplete="off" autocapitalize="none" spellcheck="false">
+	        </label>
+	        <button id="gemini-model-save" class="settings-primary" type="button">Сохранить</button>
+	        <div id="gemini-model-status" class="settings-status" aria-live="polite"></div>
 	      </section>
 	      <section class="settings-section settings-section-secondary" aria-labelledby="workflowy-heading">
 	        <h3 id="workflowy-heading">Workflowy</h3>

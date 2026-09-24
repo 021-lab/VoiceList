@@ -320,8 +320,7 @@ const requireText = (value, field) => {
 
 /** Task tools map onto the ordinary document commands, so a voice change travels the same
  *  path as one made by hand and lands in the same interaction journal. */
-export function toTaskCommand(name, args = {}) {
-  const source = 'gpt-live';
+export function toTaskCommand(name, args = {}, source = 'gpt-live') {
   switch (name) {
     case 'addItem':
       return { actId: 'list', actType: 'list', command: 'addItem', payload: { line1: requireText(args.line1, 'line1') }, source };

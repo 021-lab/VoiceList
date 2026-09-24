@@ -42,6 +42,7 @@ export default {
         if (request.method === 'PUT') {
           const body = await readBoundedJson(request,32000);
           if (typeof body.backendModel === 'string') return json(await stub.setLiveBackendModel(body.backendModel));
+          if (typeof body.geminiModel === 'string') return json(await stub.setGeminiModel(body.geminiModel));
           if (typeof body.reasoningEffort === 'string') return json(await stub.setLiveReasoningEffort(body.reasoningEffort));
           if (!PROMPT_TARGETS.includes(body.target)) return json({error:'Unknown prompt target'},400);
           if (body.action === 'reset') return json(await stub.resetLivePrompt(body.target));
@@ -49,6 +50,23 @@ export default {
           return json(await stub.writeLivePrompt(body.target,body));
         }
       }
+      // Gemini Live: the browser holds the socket to Google, so what lives here is the key,
+      // the session the token seals, the execution of every tool call, and the log.
+      if (url.pathname === '/api/live/gemini/key/status') { const configured = await stub.isGeminiKeyConfigured(); return json({configured,setupAvailable:!configured}); }
+      if (url.pathname === '/api/live/gemini/key' && request.method === 'POST') {
+        const body = await readBoundedJson(request,2048);
+        const apiKey = String(body.apiKey || '');
+        if (!/^[A-Za-z0-9_-]{20,128}$/.test(apiKey)) return json({error:'Invalid Gemini API key'},400);
+        const configured = await stub.configureGeminiApiKey(apiKey);
+        return json(configured ? {configured:true} : {error:'Gemini API key is already configured'}, configured ? 200 : 409);
+      }
+      if (url.pathname === '/api/live/gemini/session') {
+        if (request.method === 'POST') return json(await stub.startGeminiSession(),201);
+        if (request.method === 'GET') return json(await stub.geminiSessionStatus());
+      }
+      if (url.pathname === '/api/live/gemini/session/stop' && request.method === 'POST') return json({stopped:await stub.stopGeminiSession()});
+      if (url.pathname === '/api/live/gemini/tools' && request.method === 'POST') return json(await stub.runGeminiTools(await readBoundedJson(request,64000)));
+      if (url.pathname === '/api/live/gemini/frames' && request.method === 'POST') { const body = await readBoundedJson(request,256000); return json(await stub.mirrorGeminiFrames(body.frames)); }
       if (url.pathname === '/api/live/settings/history' && request.method === 'GET') return json({history:await stub.livePromptHistory()});
       if (url.pathname === '/api/live/input' && request.method === 'GET') { const id=url.searchParams.get('response'); if(!id) return json({error:'response required'},400); return json(await stub.readBackendInput(id)); }
       // The log reads openly, by decision: it is the working record of what the framework

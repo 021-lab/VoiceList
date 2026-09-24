@@ -114,6 +114,28 @@ function gist(entry) {
     case 'vl.sideband.failed': return ['sideband не открылся', p.error?.message || ''];
     case 'vl.event.unparsed': return ['нечитаемый кадр', short(p.raw || '', 120)];
     case 'vl.dispatch.failed': return ['ошибка обработки', p.error?.message || ''];
+    case 'gm.token.requested': return ['Gemini: запрос сессии', 'модель ' + (p.model || '') + ' · задач ' + p.tasks];
+    case 'gm.session.started': return ['Gemini: сессия начата', (p.model || '') + ' · инструкций ' + p.promptChars + ' симв.'];
+    case 'gm.session.stopped': return ['Gemini: остановлено', p.reason || ''];
+    case 'gm.token.failed': return ['Gemini отклонил запрос токена', short(p.detail || ('HTTP ' + p.status), 140)];
+    case 'gm.token.unreachable': return ['Gemini: не дозвонились', p.error?.message || ''];
+    case 'gm.tool.call': return ['вызов ' + p.name, short(JSON.stringify(p.arguments || {}), 140)];
+    case 'gm.tool.result': return ['результат ' + p.name, short(JSON.stringify(p.response || {}), 140)];
+    case 'gm.frame': {
+      const f = p.frame || {};
+      const said = f.serverContent?.outputTranscription?.text;
+      const heard = f.serverContent?.inputTranscription?.text;
+      if (heard) return ['речь', heard];
+      if (said) return ['ответ', said];
+      if (f.setupComplete) return ['Gemini: сессия готова', ''];
+      if (f.goAway) return ['Gemini просит закрыть сессию', short(JSON.stringify(f.goAway), 90)];
+      if (f.serverContent?.interrupted) return ['перебили', ''];
+      if (f.serverContent?.turnComplete) return ['ход завершён', ''];
+      if (f.toolCall) return ['Gemini зовёт инструмент', (f.toolCall.functionCalls || []).map(c => c.name).join(', ')];
+      if (f.toolResponse) return ['ответ инструмента отправлен', ''];
+      if (f.setup) return ['Gemini: настройка сессии', f.setup.model || ''];
+      return ['кадр Gemini', short(JSON.stringify(f), 140)];
+    }
     case 'error': return ['ОШИБКА', p.error?.message || short(JSON.stringify(p), 200)];
   }
   if (entry.type.endsWith('response.output_text.done')) return ['ОТВЕТ ← модели', inner.text || ''];
@@ -133,7 +155,9 @@ function render() {
   if (!shown.length) { list.innerHTML = '<li class="empty">Записей нет.</li>'; return; }
   for (const entry of shown) {
     const [kind, detail] = gist(entry);
-    const speech = entry.type === 'vl.speech' || entry.type === 'vl.backend_text';
+    const transcript = entry.type === 'gm.frame' &&
+      (entry.payload?.frame?.serverContent?.inputTranscription?.text || entry.payload?.frame?.serverContent?.outputTranscription?.text);
+    const speech = entry.type === 'vl.speech' || entry.type === 'vl.backend_text' || Boolean(transcript);
     const li = document.createElement('li');
     const row = document.createElement('div');
     const model = entry.type === 'vl.backend_input' || entry.type.endsWith('response.output_text.done');
