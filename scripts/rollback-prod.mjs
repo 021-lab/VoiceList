@@ -17,7 +17,8 @@ const index = versionIndex();
 
 if (args.includes('--list') || args.includes('-l')) {
   console.log(`\nПрод: ${PROD_HOST}\nБыло на проде, от старого к новому:\n`);
-  for (const id of history) console.log(`  ${id === current ? '→' : ' '} ${describeVersion(id, index)}`);
+  // A version returned to appears in the history twice; the arrow belongs to the last one.
+  history.forEach((id, position) => console.log(`  ${position === history.length - 1 ? '→' : ' '} ${describeVersion(id, index)}`));
   console.log('\nОткат: npm run rollback:prod -- <version-id>');
   process.exit(0);
 }
