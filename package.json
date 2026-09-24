@@ -17,6 +17,9 @@
     "test:v2:worker": "node tests/v2/worker-integration.mjs",
     "test:v2:browser": "playwright test --config tests/v2-browser/playwright.config.js",
     "smoke:live": "node scripts/live-smoke.mjs",
+    "deploy:prod": "node scripts/deploy-prod.mjs",
+    "rollback:prod": "node scripts/rollback-prod.mjs",
+    "versions:prod": "node scripts/rollback-prod.mjs --list",
     "serve:test": "node scripts/static-server.mjs"
   },
   "devDependencies": {

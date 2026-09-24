@@ -1,0 +1,22 @@
+{
+  // Production for v2. A worker of its own rather than a switch of main in wrangler.jsonc:
+  // that file belongs to v1 (vlist-cloudflare-backend) and another agent deploys it, so a
+  // shared config would mean a race in which either side can publish over the other.
+  //
+  // The Durable Object lives with the worker, so production data is untouched by a deploy
+  // or a rollback of code. Two things would destroy it, and both are deliberately absent:
+  // a TEST_RESET_TOKEN binding (which opens /reset) and any rename of the DO class or its
+  // migration tag (which would hand the worker a different, empty object).
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "vlist-v02-prod",
+  "account_id": "7d501365312b59f08d08b766d32d9219",
+  "main": "worker/v2/index.js",
+  "compatibility_date": "2026-08-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "vlist-v02-prod.smileme.ai", "custom_domain": true }],
+  "durable_objects": { "bindings": [{ "name": "LIST_DOCUMENT", "class_name": "ListDocumentDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ListDocumentDO"] }],
+  "observability": { "enabled": true },
+  "vars": { "AGENT_MODEL": "gpt-4.1-mini", "MCP_ALLOWED_HOSTS": "vlist-v02-prod.smileme.ai" }
+}
