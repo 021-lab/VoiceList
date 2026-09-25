@@ -128,3 +128,47 @@ describe('mirroring what the page saw', () => {
     expect(host.mirror(flood).received).toBe(200);
   });
 });
+
+describe('proving a key before it is kept', () => {
+  function keyHarness(replies) {
+    const seen = [];
+    const host = new GeminiHost({
+      log: { append: () => {} },
+      settings: new LiveSettings(memory()),
+      apiKey: '',
+      fetchImpl: async (url, options) => {
+        seen.push({ url: String(url), key: options.headers['x-goog-api-key'] });
+        const reply = replies[seen.length - 1] ?? replies.at(-1);
+        return reply.ok
+          ? { ok: true, status: 200, text: async () => '{"models":[]}' }
+          : { ok: false, status: reply.status || 400, text: async () => reply.detail || 'API key not valid' };
+      },
+      services: { readItems: async () => [], readFrontier: async () => [], applyCommand: async () => ({ status: 'applied' }) }
+    });
+    return { host, seen };
+  }
+
+  it('reports a working key', async () => {
+    const { host, seen } = keyHarness([{ ok: true }]);
+    await expect(host.verifyKey('AIzaGood')).resolves.toEqual({ ok: true });
+    expect(seen[0].url).toContain('/v1beta/models');
+    expect(seen[0].key).toBe('AIzaGood');
+  });
+
+  it('reports why Google refused, so a typo is not stored as configured', async () => {
+    const { host } = keyHarness([{ ok: false, status: 400, detail: 'API key not valid' }]);
+    const result = await host.verifyKey('AIzaBad');
+    expect(result).toEqual({ ok: false, status: 400, detail: 'API key not valid' });
+  });
+
+  it('treats an unreachable Google as a failed check rather than a pass', async () => {
+    const host = new GeminiHost({
+      log: { append: () => {} },
+      settings: new LiveSettings(memory()),
+      apiKey: '',
+      fetchImpl: async () => { throw new Error('network down'); },
+      services: { readItems: async () => [], readFrontier: async () => [], applyCommand: async () => ({ status: 'applied' }) }
+    });
+    expect((await host.verifyKey('AIzaAny')).ok).toBe(false);
+  });
+});

@@ -52,13 +52,17 @@ export default {
       }
       // Gemini Live: the browser holds the socket to Google, so what lives here is the key,
       // the session the token seals, the execution of every tool call, and the log.
-      if (url.pathname === '/api/live/gemini/key/status') { const configured = await stub.isGeminiKeyConfigured(); return json({configured,setupAvailable:!configured}); }
+      if (url.pathname === '/api/live/gemini/key/status') return json(await stub.geminiKeyStatus());
       if (url.pathname === '/api/live/gemini/key' && request.method === 'POST') {
         const body = await readBoundedJson(request,2048);
-        const apiKey = String(body.apiKey || '');
-        if (!/^[A-Za-z0-9_-]{20,128}$/.test(apiKey)) return json({error:'Invalid Gemini API key'},400);
-        const configured = await stub.configureGeminiApiKey(apiKey);
-        return json(configured ? {configured:true} : {error:'Gemini API key is already configured'}, configured ? 200 : 409);
+        // Pasted keys arrive with whitespace far more often than they arrive malformed.
+        const apiKey = String(body.apiKey || '').trim();
+        if (!/^[A-Za-z0-9_-]{20,128}$/.test(apiKey)) return json({error:'Ключ не похож на ключ Gemini API: ожидаются 20–128 символов из латиницы, цифр, дефиса и подчёркивания.'},400);
+        const result = await stub.configureGeminiApiKey(apiKey);
+        if (result.configured) return json(result);
+        if (result.reason === 'already') return json({error:'Ключ Gemini уже настроен и работает.'},409);
+        if (result.reason === 'env') return json({error:'Ключ Gemini задан секретом воркера; замените его там.'},409);
+        return json({error:`Google отклонил ключ${result.status ? ` (${result.status})` : ''}: ${result.detail || 'нет подробностей'}`},400);
       }
       if (url.pathname === '/api/live/gemini/session') {
         if (request.method === 'POST') return json(await stub.startGeminiSession(),201);

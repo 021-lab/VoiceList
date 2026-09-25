@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-895093fe78156ad6">
+<meta name="preview-build-hash" content="v02-6a53a534e1e4021e">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-895093fe78156ad6";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-6a53a534e1e4021e";
 </script>
 <script>
 (() => {
@@ -2672,9 +2672,9 @@ ${text}`;
         say(backendPromptStatus, settings.defaults.backendPrompt ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." : "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0441\u0432\u043E\u044F \u0440\u0435\u0434\u0430\u043A\u0446\u0438\u044F.");
         say(backendModelStatus, settings.defaults.backendModel ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043C\u043E\u0434\u0435\u043B\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E." : "\u0417\u0430\u0434\u0430\u043D\u0430 \u0441\u0432\u043E\u044F \u043C\u043E\u0434\u0435\u043B\u044C.");
         say(reasoningStatus, settings.defaults.reasoningEffort ? "\u0413\u043B\u0443\u0431\u0438\u043D\u0443 \u0437\u0430\u0434\u0430\u0451\u0442 \u0441\u0430\u043C\u0430 \u043C\u043E\u0434\u0435\u043B\u044C." : `\u0413\u043B\u0443\u0431\u0438\u043D\u0430: ${settings.reasoningEffort}.`);
-        if (geminiKeyField) geminiKeyField.hidden = geminiKey.configured;
-        if (geminiKeySave) geminiKeySave.hidden = geminiKey.configured;
-        say(geminiKeyStatus, geminiKey.configured ? "\u041A\u043B\u044E\u0447 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D." : "\u041A\u043B\u044E\u0447 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D.");
+        if (geminiKeyField) geminiKeyField.hidden = !geminiKey.setupAvailable;
+        if (geminiKeySave) geminiKeySave.hidden = !geminiKey.setupAvailable;
+        say(geminiKeyStatus, geminiKey.configured ? "\u041A\u043B\u044E\u0447 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D \u0438 \u043F\u0440\u0438\u043D\u044F\u0442 Google." : geminiKey.detail || "\u041A\u043B\u044E\u0447 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D.");
         if (geminiPromptInput) geminiPromptInput.value = settings.geminiPrompt;
         if (geminiModelInput) geminiModelInput.value = settings.geminiModel;
         say(geminiPromptStatus, settings.defaults.geminiPrompt ? "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u043F\u0442." : "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u0441\u0432\u043E\u044F \u0440\u0435\u0434\u0430\u043A\u0446\u0438\u044F.");
@@ -3303,7 +3303,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-895093fe78156ad6";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-6a53a534e1e4021e";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

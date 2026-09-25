@@ -136,11 +136,40 @@ export class ListDocumentDO extends Agent {
   mirrorGeminiFrames(frames) { return this.geminiHost().mirror(frames); }
   async getGeminiApiKey() { return await this.ctx.storage.get(GEMINI_KEY) || ''; }
   async isGeminiKeyConfigured() { return Boolean(this.env.GEMINI_API_KEY || await this.getGeminiApiKey()); }
+  /** "Configured" has to mean "works". A stored key that Google refuses is the same as no key
+   *  at all for everyone using the app, and reporting it as configured hides the field that
+   *  would replace it. The answer is remembered briefly so opening settings is not a round
+   *  trip to Google every time. */
+  async geminiKeyStatus() {
+    const key = this.env.GEMINI_API_KEY || await this.getGeminiApiKey();
+    if (!key) return {configured:false, setupAvailable:true};
+    const fresh = this.geminiKeyChecked && Date.now() - this.geminiKeyChecked.at < 60_000 && this.geminiKeyChecked.key === key;
+    const result = fresh ? this.geminiKeyChecked.result : await this.geminiHost().verifyKey(key);
+    this.geminiKeyChecked = {key, at:Date.now(), result};
+    return {
+      configured: result.ok,
+      setupAvailable: !result.ok && !this.env.GEMINI_API_KEY,
+      ...(result.ok ? {} : {detail:`Сохранённый ключ отклонён Google${result.status ? ` (${result.status})` : ''}.`})
+    };
+  }
+  /** A key is kept only once Google has confirmed it, and a stored key that no longer works
+   *  does not block its replacement. Without both, a single typo closes the door: the app
+   *  reports the key as configured and nothing in the interface can take it back. */
   async configureGeminiApiKey(apiKey) {
-    if (await this.isGeminiKeyConfigured()) return false;
+    const host = this.geminiHost();
+    const candidate = await host.verifyKey(apiKey);
+    if (!candidate.ok) return {configured:false, reason:'rejected', status:candidate.status || 0, detail:candidate.detail || ''};
+
+    const stored = this.env.GEMINI_API_KEY || await this.getGeminiApiKey();
+    if (stored && stored !== apiKey) {
+      const existing = await host.verifyKey(stored);
+      if (existing.ok) return {configured:false, reason:'already'};
+      if (this.env.GEMINI_API_KEY) return {configured:false, reason:'env'};
+    }
     await this.ctx.storage.put(GEMINI_KEY, apiKey);
-    if (this.gemini) this.gemini.apiKey = apiKey;
-    return true;
+    host.apiKey = apiKey;
+    this.geminiKeyChecked = {key:apiKey, at:Date.now(), result:{ok:true}};
+    return {configured:true, replaced:Boolean(stored && stored !== apiKey)};
   }
   async startLiveSession(body) {
     const host = this.liveHost();

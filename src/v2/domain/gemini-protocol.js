@@ -18,6 +18,8 @@ export const GEMINI_OUTPUT_SAMPLE_RATE = 24_000;
 export const GEMINI_WS_URL =
   'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained';
 export const GEMINI_TOKENS_URL = 'https://generativelanguage.googleapis.com/v1beta/auth_tokens';
+/** The cheapest authenticated read there is; used only to prove a key before storing it. */
+export const GEMINI_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /** The client's first frame. Everything else about the session already travelled in the
  *  token, so this only names the model. */

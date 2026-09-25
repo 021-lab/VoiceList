@@ -8,7 +8,7 @@
  *  A tool call reaches this host over the ordinary document channel, so a change made by
  *  voice travels the same path as one made by hand and lands in the same journal. */
 import {
-  GEMINI_MODEL, GEMINI_TOKENS_URL, buildTokenRequest, readToolCalls, isLoggableFrame
+  GEMINI_MODEL, GEMINI_MODELS_URL, GEMINI_TOKENS_URL, buildTokenRequest, readToolCalls, isLoggableFrame
 } from '../../src/v2/domain/gemini-live.js';
 import { toTaskCommand } from '../../src/v2/domain/live-session.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
@@ -18,13 +18,14 @@ import { fail, safeError } from '../../src/v2/domain/contracts.js';
 const MAX_FRAMES_PER_BATCH = 200;
 
 export class GeminiHost {
-  constructor({ log, settings, services, apiKey, fetchImpl = (...args) => fetch(...args), tokensUrl = GEMINI_TOKENS_URL, now = () => new Date() }) {
+  constructor({ log, settings, services, apiKey, fetchImpl = (...args) => fetch(...args), tokensUrl = GEMINI_TOKENS_URL, modelsUrl = GEMINI_MODELS_URL, now = () => new Date() }) {
     this.log = log;
     this.settings = settings;
     this.services = services;
     this.apiKey = apiKey;
     this.fetchImpl = fetchImpl;
     this.tokensUrl = tokensUrl;
+    this.modelsUrl = modelsUrl;
     this.now = now;
     this.session = null;
     // The sequence outlives a session: a browser that reconnects mid-conversation must not
@@ -39,6 +40,25 @@ export class GeminiHost {
 
   record(event, direction = 'in', sessionId = this.sessionId) {
     try { this.log.append(event, { sessionId, direction, at: this.stamp() }); } catch { /* the log must never break the call */ }
+  }
+
+  /** Asks Google whether the key works, by the cheapest read there is.
+   *
+   *  Storing an unverified key is how a one-time setup becomes a one-way door: a typo gets
+   *  saved, the app reports "configured", and nothing short of redeploying the object can
+   *  take it back. So a key proves itself before it is kept, and a stored key that stops
+   *  proving itself can be replaced. */
+  async verifyKey(apiKey) {
+    try {
+      const reply = await this.fetchImpl(`${this.modelsUrl}?pageSize=1`, {
+        headers: { 'x-goog-api-key': apiKey }
+      });
+      if (reply.ok) return { ok: true };
+      const detail = (await reply.text()).slice(0, 300);
+      return { ok: false, status: reply.status, detail };
+    } catch (error) {
+      return { ok: false, detail: safeError(error).message };
+    }
   }
 
   /** Mints a token that already carries the model, the prompt and the tools. The browser

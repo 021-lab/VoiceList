@@ -193,9 +193,9 @@ export function createSettingsPanel({
       say(backendPromptStatus, settings.defaults.backendPrompt ? 'Используется встроенный промпт.' : 'Сохранена своя редакция.');
       say(backendModelStatus, settings.defaults.backendModel ? 'Используется модель по умолчанию.' : 'Задана своя модель.');
       say(reasoningStatus, settings.defaults.reasoningEffort ? 'Глубину задаёт сама модель.' : `Глубина: ${settings.reasoningEffort}.`);
-      if (geminiKeyField) geminiKeyField.hidden = geminiKey.configured;
-      if (geminiKeySave) geminiKeySave.hidden = geminiKey.configured;
-      say(geminiKeyStatus, geminiKey.configured ? 'Ключ настроен.' : 'Ключ не настроен.');
+      if (geminiKeyField) geminiKeyField.hidden = !geminiKey.setupAvailable;
+      if (geminiKeySave) geminiKeySave.hidden = !geminiKey.setupAvailable;
+      say(geminiKeyStatus, geminiKey.configured ? 'Ключ настроен и принят Google.' : (geminiKey.detail || 'Ключ не настроен.'));
       if (geminiPromptInput) geminiPromptInput.value = settings.geminiPrompt;
       if (geminiModelInput) geminiModelInput.value = settings.geminiModel;
       say(geminiPromptStatus, settings.defaults.geminiPrompt ? 'Используется встроенный промпт.' : 'Сохранена своя редакция.');
