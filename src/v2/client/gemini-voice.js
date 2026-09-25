@@ -9,10 +9,12 @@
 import { AudioRecorder } from './vendor/live-api-web-console/audio-recorder.js';
 import { AudioStreamer } from './vendor/live-api-web-console/audio-streamer.js';
 import { audioContext, base64ToArrayBuffer } from './vendor/live-api-web-console/audio-context.js';
+// The protocol module only: importing the session module would pull the server domain, and
+// zod with it, into the page.
 import {
   GEMINI_WS_URL, GEMINI_INPUT_SAMPLE_RATE, GEMINI_OUTPUT_SAMPLE_RATE,
   buildClientSetup, buildToolResponse
-} from '../domain/gemini-live.js';
+} from '../domain/gemini-protocol.js';
 
 /** Frames are mirrored to the log in batches: one request per frame would outnumber the
  *  conversation itself. */

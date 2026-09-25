@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { renderPage } from './lib/render-page.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,10 +15,6 @@ const entryPath = path.join(repoRoot, process.env.VOICELIST_V02 === '1' ? 'src/v
 
 function generateBuildHash() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function escapeInlineScript(value) {
-  return value.replaceAll('</script>', '<\\/script>');
 }
 
 async function readExistingBuildHash() {
@@ -53,10 +50,7 @@ if (process.env.VOICELIST_V02 === '1') {
   buildHash = 'v02-' + createHash('sha256').update(template + css + inlineJs).digest('hex').slice(0,16);
   inlineJs = inlineJs.replaceAll('__V02_BUILD_ID__', buildHash);
 }
-const html = template
-  .replaceAll('__PREVIEW_BUILD_HASH__', buildHash)
-  .replace('__INLINE_CSS__', css.trim())
-  .replace('__INLINE_JS__', escapeInlineScript(inlineJs.trim()));
+const html = renderPage({ template, css, js: inlineJs, buildHash });
 
 await writeFile(outputPath, `${html}\n`);
 process.stdout.write(`${buildHash}\n`);

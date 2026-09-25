@@ -6,14 +6,11 @@
  *  constraints, and the client can only open a socket against them. */
 import { LIVE_TOOLS, composeVoiceInstructions, formatTaskSnapshot } from './live-session.js';
 import { fail } from './contracts.js';
+import { GEMINI_MODEL, GEMINI_TOKENS_URL, GEMINI_VOICE, GEMINI_LANGUAGE } from './gemini-protocol.js';
 
-export const GEMINI_MODEL = 'gemini-3.8-live';
-export const GEMINI_VOICE = 'Zephyr';
-export const GEMINI_LANGUAGE = 'ru-RU';
-
-/** Live API fixes these: raw PCM16 little-endian, 16 kHz up, 24 kHz down. */
-export const GEMINI_INPUT_SAMPLE_RATE = 16_000;
-export const GEMINI_OUTPUT_SAMPLE_RATE = 24_000;
+// The wire protocol lives in its own module so the page can import it without dragging the
+// server domain — and zod behind it — into the bundle.
+export * from './gemini-protocol.js';
 
 /** The voice layer here holds the tools itself, so nothing has to be said aloud for a
  *  backend to overhear: the identifier travels as an argument. What remains is the part that
@@ -135,47 +132,3 @@ export function buildTokenRequest({ items = [], prompt, model = GEMINI_MODEL, no
   };
 }
 
-/** The frame carrying tool calls. Gemini sends them together, and each one answers with its
- *  own id, so the shape is a list both ways. */
-export function readToolCalls(frame) {
-  const calls = frame?.toolCall?.functionCalls;
-  if (!Array.isArray(calls)) return [];
-  return calls
-    .filter(call => call?.name)
-    .map(call => ({ id: call.id || '', name: String(call.name), arguments: call.args && typeof call.args === 'object' ? call.args : {} }));
-}
-
-/** The API expects each answer wrapped in a result object, so what the tool returned travels
- *  under `result` rather than as the response itself. */
-export function buildToolResponse(results) {
-  return {
-    toolResponse: {
-      functionResponses: results.map(result => ({
-        id: result.id,
-        name: result.name,
-        response: { result: result.response },
-        ...(result.scheduling ? { scheduling: result.scheduling } : {})
-      }))
-    }
-  };
-}
-
-/** Audio frames are the bulk of the traffic and say nothing a transcript does not; the
- *  log keeps what can be read. */
-export function isLoggableFrame(frame) {
-  if (!frame || typeof frame !== 'object') return false;
-  const parts = frame.serverContent?.modelTurn?.parts;
-  if (Array.isArray(parts) && parts.every(part => part?.inlineData)) return false;
-  return true;
-}
-
-/** The constrained endpoint is the one an ephemeral token opens: it enforces what the token
- *  was minted with. The plain BidiGenerateContent endpoint takes an API key instead, which is
- *  exactly what must not reach a browser. */
-export const GEMINI_WS_URL =
-  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained';
-export const GEMINI_TOKENS_URL = 'https://generativelanguage.googleapis.com/v1beta/auth_tokens';
-
-/** The client's first frame. Everything else about the session already travelled in the
- *  token, so this only names the model. */
-export const buildClientSetup = (model = GEMINI_MODEL) => ({ setup: { model: `models/${model}` } });
