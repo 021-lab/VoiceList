@@ -13,7 +13,7 @@ import { base64ToArrayBuffer } from './vendor/live-api-web-console/audio-context
 // zod with it, into the page.
 import {
   GEMINI_WS_URL, GEMINI_INPUT_SAMPLE_RATE, GEMINI_OUTPUT_SAMPLE_RATE,
-  buildClientSetup, buildToolResponse
+  buildClientSetup, buildToolResponse, stripAudio
 } from '../domain/gemini-protocol.js';
 
 /** Frames are mirrored to the log in batches: one request per frame would outnumber the
@@ -96,7 +96,7 @@ export function createGeminiVoice({
   }
 
   function remember(current, frame, direction) {
-    current.frames.push({ direction, frame });
+    current.frames.push({ direction, frame: stripAudio(frame) });
     if (current.frames.length >= MIRROR_LIMIT) mirror(current);
   }
 

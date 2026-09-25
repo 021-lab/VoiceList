@@ -8,7 +8,8 @@
  *  A tool call reaches this host over the ordinary document channel, so a change made by
  *  voice travels the same path as one made by hand and lands in the same journal. */
 import {
-  GEMINI_MODEL, GEMINI_MODELS_URL, GEMINI_TOKENS_URL, buildTokenRequest, readToolCalls, isLoggableFrame
+  GEMINI_MODEL, GEMINI_MODELS_URL, GEMINI_TOKENS_URL, buildTokenRequest, readToolCalls,
+  isLoggableFrame, stripAudio
 } from '../../src/v2/domain/gemini-live.js';
 import { toTaskCommand } from '../../src/v2/domain/live-session.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
@@ -150,7 +151,8 @@ export class GeminiHost {
     for (const entry of batch) {
       const frame = entry?.frame ?? entry;
       if (!isLoggableFrame(frame)) continue;
-      this.record({ type: 'gm.frame', direction: entry?.direction || 'in', frame }, entry?.direction === 'out' ? 'out' : 'in', sessionId);
+      // The page strips audio before sending; a client that did not is stripped here.
+      this.record({ type: 'gm.frame', direction: entry?.direction || 'in', frame: stripAudio(frame) }, entry?.direction === 'out' ? 'out' : 'in', sessionId);
       kept += 1;
     }
     return { received: batch.length, kept };

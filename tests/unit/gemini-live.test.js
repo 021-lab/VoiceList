@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GEMINI_PROMPT, GEMINI_MODEL, buildClientSetup, buildGeminiSetup, buildTokenRequest,
-  buildToolResponse, geminiFunctionDeclarations, isLoggableFrame, readToolCalls
+  buildToolResponse, geminiFunctionDeclarations, isLoggableFrame, readToolCalls, stripAudio
 } from '../../src/v2/domain/gemini-live.js';
 
 const task = (id, parentId, status, line1) => ({ id, parentId, order: 10, status, line1, line2: '', collapsed: false, tags: [] });
@@ -83,6 +83,11 @@ describe('frames', () => {
 
   it('keeps what can be read and drops the audio', () => {
     expect(isLoggableFrame({ serverContent: { modelTurn: { parts: [{ inlineData: { data: 'AAAA' } }] } } })).toBe(false);
+    // The reply's transcript rides along with its audio; dropping the frame lost every answer.
+    const spoken = { serverContent: { modelTurn: { parts: [{ inlineData: { data: 'AAAA' } }] }, outputTranscription: { text: 'Готово' } } };
+    expect(isLoggableFrame(spoken)).toBe(true);
+    expect(stripAudio(spoken).serverContent.modelTurn.parts).toEqual([]);
+    expect(stripAudio(spoken).serverContent.outputTranscription.text).toBe('Готово');
     expect(isLoggableFrame({ serverContent: { outputTranscription: { text: 'Готово' } } })).toBe(true);
     expect(isLoggableFrame({ toolCall: { functionCalls: [] } })).toBe(true);
   });

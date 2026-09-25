@@ -50,11 +50,24 @@ export function buildToolResponse(results) {
   };
 }
 
-/** Audio frames are the bulk of the traffic and say nothing a transcript does not; the
- *  log keeps what can be read. */
+/** Audio bytes are the bulk of the traffic and say nothing a transcript does not, so they are
+ *  stripped — but only they. Dropping the whole frame loses the transcript that rides along
+ *  with the audio, which is why the log showed every question and not one answer. */
+export function stripAudio(frame) {
+  const parts = frame?.serverContent?.modelTurn?.parts;
+  if (!Array.isArray(parts) || !parts.some(part => part?.inlineData)) return frame;
+  const kept = parts.filter(part => !part?.inlineData);
+  const modelTurn = { ...frame.serverContent.modelTurn, parts: kept };
+  return { ...frame, serverContent: { ...frame.serverContent, modelTurn, audioParts: parts.length - kept.length } };
+}
+
 export function isLoggableFrame(frame) {
   if (!frame || typeof frame !== 'object') return false;
-  const parts = frame.serverContent?.modelTurn?.parts;
-  if (Array.isArray(parts) && parts.every(part => part?.inlineData)) return false;
-  return true;
+  const content = frame.serverContent;
+  if (!content) return true;
+  // A frame that carried nothing but audio has nothing left once the audio is gone.
+  const parts = content.modelTurn?.parts;
+  const onlyAudio = Array.isArray(parts) && parts.length > 0 && parts.every(part => part?.inlineData);
+  if (!onlyAudio) return true;
+  return Boolean(content.outputTranscription || content.inputTranscription || content.interrupted || content.turnComplete);
 }

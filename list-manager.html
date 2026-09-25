@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-11811625ed577591">
+<meta name="preview-build-hash" content="v02-36243b60a640bf4b">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-11811625ed577591";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-36243b60a640bf4b";
 </script>
 <script>
 (() => {
@@ -3176,6 +3176,13 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       }
     };
   }
+  function stripAudio(frame) {
+    const parts = frame?.serverContent?.modelTurn?.parts;
+    if (!Array.isArray(parts) || !parts.some((part) => part?.inlineData)) return frame;
+    const kept = parts.filter((part) => !part?.inlineData);
+    const modelTurn = { ...frame.serverContent.modelTurn, parts: kept };
+    return { ...frame, serverContent: { ...frame.serverContent, modelTurn, audioParts: parts.length - kept.length } };
+  }
 
   // src/v2/client/gemini-voice.js
   var MIRROR_INTERVAL_MS = 2e3;
@@ -3242,7 +3249,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       });
     }
     function remember(current, frame, direction) {
-      current.frames.push({ direction, frame });
+      current.frames.push({ direction, frame: stripAudio(frame) });
       if (current.frames.length >= MIRROR_LIMIT) mirror(current);
     }
     function send(current, message, { log = true } = {}) {
@@ -3374,7 +3381,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-11811625ed577591";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-36243b60a640bf4b";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
