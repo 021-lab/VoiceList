@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-397c787b9e1a46d5">
+<meta name="preview-build-hash" content="v02-85428c6dcc9bdbcf">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-397c787b9e1a46d5";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-85428c6dcc9bdbcf";
 </script>
 <script>
 (() => {
@@ -2934,12 +2934,18 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       this.onVolume = () => {
       };
     }
-    async start() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    /** PATCH: takes an already-granted stream, and rejects instead of hanging.
+     *
+     *  Upstream builds this promise as `new Promise(async (resolve) => ...)`, so anything the
+     *  body throws — a refused microphone, above all — is swallowed and the promise never
+     *  settles. The caller then cannot tell "denied" from "slow", which is how a permission
+     *  error reached the user as a timeout with no cause. */
+    async start(stream) {
+      if (!stream && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
         throw new Error("Could not request user media");
       }
-      this.starting = new Promise(async (resolve) => {
-        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.starting = (async () => {
+        this.stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
         this.audioContext = await audioContext({ sampleRate: this.sampleRate });
         this.source = this.audioContext.createMediaStreamSource(this.stream);
         const workletName = "audio-recorder-worklet";
@@ -2963,10 +2969,12 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         };
         this.source.connect(this.vuWorklet);
         this.recording = true;
-        resolve();
+      })();
+      try {
+        await this.starting;
+      } finally {
         this.starting = null;
-      });
-      return this.starting;
+      }
     }
     stop() {
       const handleStop = () => {
@@ -3181,6 +3189,22 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     }
     return outputContext;
   }
+  async function requestMicrophone() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("\u042D\u0442\u043E\u0442 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u0434\u0430\u0451\u0442 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0430\u0434\u0440\u0435\u0441 \u0432 Safari \u0438\u043B\u0438 Chrome, \u0430 \u043D\u0435 \u0432\u043D\u0443\u0442\u0440\u0438 \u0434\u0440\u0443\u0433\u043E\u0433\u043E \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F.");
+    }
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error) {
+      const name = error?.name || "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        throw new Error("\u0414\u043E\u0441\u0442\u0443\u043F \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443 \u0437\u0430\u043F\u0440\u0435\u0449\u0451\u043D. \u0420\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u0435 \u0435\u0433\u043E \u0434\u043B\u044F \u0441\u0430\u0439\u0442\u0430, \u043B\u0438\u0431\u043E \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0430\u0434\u0440\u0435\u0441 \u0432 Safari \u0438\u043B\u0438 Chrome, \u0430 \u043D\u0435 \u0432\u043D\u0443\u0442\u0440\u0438 \u0434\u0440\u0443\u0433\u043E\u0433\u043E \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F.");
+      }
+      if (name === "NotFoundError" || name === "OverconstrainedError") throw new Error("\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D.");
+      if (name === "NotReadableError") throw new Error("\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D \u0437\u0430\u043D\u044F\u0442 \u0434\u0440\u0443\u0433\u0438\u043C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435\u043C.");
+      throw new Error(`\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${error?.message || name || "\u043F\u0440\u0438\u0447\u0438\u043D\u0430 \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430"}`);
+    }
+  }
   var audioPartsOf = (frame) => (frame?.serverContent?.modelTurn?.parts || []).map((part) => part?.inlineData?.data).filter(Boolean);
   function createGeminiVoice({
     button,
@@ -3265,11 +3289,12 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         current.streamer = new AudioStreamer(openOutputContext());
         await within(current.streamer.resume(), 5e3, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0438\u043B \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u0435. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443 \u0435\u0449\u0451 \u0440\u0430\u0437.");
         setStatus("\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u2026");
+        const stream = await within(requestMicrophone(), 3e4, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u0437\u0430\u043F\u0440\u043E\u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
         current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
         current.recorder.onData = (data) => {
           send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
         };
-        await within(current.recorder.start(), 15e3, "\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D \u043D\u0435 \u043E\u0442\u0432\u0435\u0447\u0430\u0435\u0442. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u0434\u043B\u044F \u0441\u0430\u0439\u0442\u0430.");
+        await within(current.recorder.start(stream), 1e4, "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0443 \u0437\u0432\u0443\u043A\u0430 \u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
         setStatus("\u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u0441\u0435\u0441\u0441\u0438\u044E\u2026");
         const { token, model } = await post("/api/live/gemini/session");
         setStatus("\u0421\u043E\u0435\u0434\u0438\u043D\u044F\u044E\u0441\u044C \u0441 Gemini\u2026");
@@ -3338,7 +3363,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-397c787b9e1a46d5";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-85428c6dcc9bdbcf";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

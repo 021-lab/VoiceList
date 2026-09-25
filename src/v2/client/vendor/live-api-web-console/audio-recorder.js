@@ -47,13 +47,19 @@ export class AudioRecorder {
     this.onVolume = () => {};
   }
 
-  async start() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  /** PATCH: takes an already-granted stream, and rejects instead of hanging.
+   *
+   *  Upstream builds this promise as `new Promise(async (resolve) => ...)`, so anything the
+   *  body throws — a refused microphone, above all — is swallowed and the promise never
+   *  settles. The caller then cannot tell "denied" from "slow", which is how a permission
+   *  error reached the user as a timeout with no cause. */
+  async start(stream) {
+    if (!stream && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
       throw new Error('Could not request user media');
     }
 
-    this.starting = new Promise(async (resolve) => {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.starting = (async () => {
+      this.stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
       this.audioContext = await audioContext({ sampleRate: this.sampleRate });
       this.source = this.audioContext.createMediaStreamSource(this.stream);
 
@@ -85,10 +91,8 @@ export class AudioRecorder {
 
       this.source.connect(this.vuWorklet);
       this.recording = true;
-      resolve();
-      this.starting = null;
-    });
-    return this.starting;
+    })();
+    try { await this.starting; } finally { this.starting = null; }
   }
 
   stop() {

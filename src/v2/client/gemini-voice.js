@@ -36,6 +36,27 @@ function openOutputContext() {
   return outputContext;
 }
 
+/** Asks for the microphone here rather than inside the recorder, so the browser's own reason
+ *  survives. The two that actually happen are a refusal and an embedded web view: an in-app
+ *  browser opened from a messenger usually has no microphone at all, and the page cannot tell
+ *  the user that unless it looks. */
+async function requestMicrophone() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('Этот браузер не даёт странице микрофон. Откройте адрес в Safari или Chrome, а не внутри другого приложения.');
+  }
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    const name = error?.name || '';
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      throw new Error('Доступ к микрофону запрещён. Разрешите его для сайта, либо откройте адрес в Safari или Chrome, а не внутри другого приложения.');
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') throw new Error('Микрофон не найден.');
+    if (name === 'NotReadableError') throw new Error('Микрофон занят другим приложением.');
+    throw new Error(`Микрофон недоступен: ${error?.message || name || 'причина неизвестна'}`);
+  }
+}
+
 const audioPartsOf = (frame) =>
   (frame?.serverContent?.modelTurn?.parts || [])
     .map(part => part?.inlineData?.data)
@@ -143,13 +164,14 @@ export function createGeminiVoice({
       await within(current.streamer.resume(), 5_000, 'Браузер не включил воспроизведение. Нажмите кнопку ещё раз.');
 
       setStatus('Микрофон…');
+      const stream = await within(requestMicrophone(), 30_000, 'Браузер не ответил на запрос микрофона.');
       current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
       current.recorder.onData = (data) => {
         // Audio frames are the bulk of the traffic and say nothing a transcript does not.
         // Before the socket is open they are dropped: a second of lost silence costs nothing.
         send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
       };
-      await within(current.recorder.start(), 15_000, 'Микрофон не отвечает. Проверьте разрешение для сайта.');
+      await within(current.recorder.start(stream), 10_000, 'Не удалось запустить обработку звука с микрофона.');
 
       setStatus('Открываю сессию…');
       const { token, model } = await post('/api/live/gemini/session');
