@@ -154,8 +154,22 @@ function render() {
   const picked = $('session').value;
   const shown = rows.filter(entry => !picked || entry.liveSessionId === picked);
   if (!shown.length) { list.innerHTML = '<li class="empty">Записей нет.</li>'; return; }
+  // Speech arrives as streamed fragments — «В текущем списке », «нет задачи «Метро».» — and a
+  // row per fragment makes a conversation unreadable. Neighbouring fragments of one speaker
+  // are shown as one line; the records themselves are untouched.
+  const merged = [];
   for (const entry of shown) {
     const [kind, detail] = gist(entry);
+    const previous = merged[merged.length - 1];
+    const joinable = (kind === 'речь' || kind === 'ответ') && detail;
+    if (joinable && previous && previous.kind === kind && previous.joinable &&
+        Date.parse(entry.at) - Date.parse(previous.entry.at) < 15000) {
+      previous.detail = (previous.detail + ' ' + detail).replace(/\s+/g, ' ').trim();
+      continue;
+    }
+    merged.push({ entry, kind, detail, joinable });
+  }
+  for (const { entry, kind, detail } of merged) {
     const transcript = entry.type === 'gm.frame' &&
       (entry.payload?.frame?.serverContent?.inputTranscription?.text || entry.payload?.frame?.serverContent?.outputTranscription?.text);
     const speech = entry.type === 'vl.speech' || entry.type === 'vl.backend_text' || Boolean(transcript);

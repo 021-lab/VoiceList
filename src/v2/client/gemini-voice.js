@@ -49,7 +49,18 @@ async function requestMicrophone() {
     throw new Error('Этот браузер не даёт странице микрофон. Откройте адрес в Safari или Chrome, а не внутри другого приложения.');
   }
   try {
-    return await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Asking for bare `audio: true` leaves the phone's own loudspeaker in the recording:
+    // the model's voice comes back into the microphone and lands in the same 16 kHz stream
+    // as the user's. Recognition of a short Russian task name does not survive that.
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+        sampleRate: GEMINI_INPUT_SAMPLE_RATE
+      }
+    });
   } catch (error) {
     const name = error?.name || '';
     if (name === 'NotAllowedError' || name === 'SecurityError') {
