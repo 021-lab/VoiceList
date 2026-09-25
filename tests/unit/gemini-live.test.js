@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_GEMINI_PROMPT, GEMINI_MODEL, buildClientSetup, buildGeminiConfig, buildTokenRequest,
+  DEFAULT_GEMINI_PROMPT, GEMINI_MODEL, buildClientSetup, buildGeminiSetup, buildTokenRequest,
   buildToolResponse, geminiFunctionDeclarations, isLoggableFrame, readToolCalls
 } from '../../src/v2/domain/gemini-live.js';
 
@@ -33,17 +33,18 @@ describe('gemini tool declarations', () => {
 
 describe('the connect config', () => {
   it('carries the prompt and the task table, and asks for both transcripts', () => {
-    const config = buildGeminiConfig({ items: sample });
+    const config = buildGeminiSetup({ items: sample });
     const instruction = config.systemInstruction.parts[0].text;
     expect(instruction).toContain('rt\trs\tO\tГолден');
     expect(instruction).toContain('Выбор задачи');
     expect(config.inputAudioTranscription).toEqual({});
     expect(config.outputAudioTranscription).toEqual({});
-    expect(config.responseModalities).toEqual(['AUDIO']);
+    expect(config.generationConfig.responseModalities).toEqual(['AUDIO']);
+    expect(config.generationConfig.speechConfig.languageCode).toBe('ru-RU');
   });
 
   it('keeps a saved prompt instead of the built-in one', () => {
-    const config = buildGeminiConfig({ items: sample, prompt: 'Своя редакция' });
+    const config = buildGeminiSetup({ items: sample, prompt: 'Своя редакция' });
     expect(config.systemInstruction.parts[0].text).toContain('Своя редакция');
     expect(config.systemInstruction.parts[0].text).not.toContain(DEFAULT_GEMINI_PROMPT);
   });
@@ -54,14 +55,17 @@ describe('the token request', () => {
     const now = () => new Date('2026-09-24T10:00:00.000Z');
     const request = buildTokenRequest({ items: sample, now });
     expect(request.uses).toBe(1);
-    expect(request.liveConnectConstraints.model).toBe(`models/${GEMINI_MODEL}`);
-    expect(request.liveConnectConstraints.config.tools[0].functionDeclarations.length).toBeGreaterThan(0);
+    // The API knows this field and not liveConnectConstraints; it answers "Cannot find field"
+    // to the latter, so the name is pinned here rather than trusted to the guide.
+    expect(Object.keys(request)).toContain('bidiGenerateContentSetup');
+    expect(request.bidiGenerateContentSetup.model).toBe(`models/${GEMINI_MODEL}`);
+    expect(request.bidiGenerateContentSetup.tools[0].functionDeclarations.length).toBeGreaterThan(0);
     expect(new Date(request.newSessionExpireTime) < new Date(request.expireTime)).toBe(true);
   });
 
   it('names the model the settings chose', () => {
     const request = buildTokenRequest({ items: sample, model: 'gemini-3.8-live-extended-thinking' });
-    expect(request.liveConnectConstraints.model).toBe('models/gemini-3.8-live-extended-thinking');
+    expect(request.bidiGenerateContentSetup.model).toBe('models/gemini-3.8-live-extended-thinking');
   });
 });
 

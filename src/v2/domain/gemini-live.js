@@ -99,14 +99,18 @@ export function geminiFunctionDeclarations(tools = LIVE_TOOLS) {
     }));
 }
 
-/** Transcription of both sides is switched on because the log is the point: without it the
- *  session leaves nothing readable behind, only audio nobody stores. */
-export function buildGeminiConfig({ items = [], prompt, voice = GEMINI_VOICE } = {}) {
+/** The setup a session starts with — the same object either side would send as its first
+ *  frame. Transcription of both sides is switched on because the log is the point: without it
+ *  the session leaves nothing readable behind, only audio nobody stores. */
+export function buildGeminiSetup({ items = [], prompt, model = GEMINI_MODEL, voice = GEMINI_VOICE } = {}) {
   return {
-    responseModalities: ['AUDIO'],
-    speechConfig: {
-      languageCode: GEMINI_LANGUAGE,
-      voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
+    model: `models/${model}`,
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        languageCode: GEMINI_LANGUAGE,
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
+      }
     },
     systemInstruction: {
       parts: [{ text: composeVoiceInstructions(prompt || DEFAULT_GEMINI_PROMPT, formatTaskSnapshot(items)) }]
@@ -117,18 +121,19 @@ export function buildGeminiConfig({ items = [], prompt, voice = GEMINI_VOICE } =
   };
 }
 
-/** What the worker asks Google for. The constraints travel inside the token, so the model,
- *  the instructions and the tool list are settled before the browser has anything to say. */
+/** What the worker asks Google for.
+ *
+ *  The setup travels inside the token under `bidiGenerateContentSetup`. The field is not
+ *  `liveConnectConstraints`, whatever the guide says: the API answers "Cannot find field" to
+ *  that name in both v1beta and v1alpha, and responseModalities and speechConfig belong under
+ *  generationConfig rather than beside it. Verified against the live endpoint. */
 export function buildTokenRequest({ items = [], prompt, model = GEMINI_MODEL, now = () => new Date(), sessionMinutes = 30, startMinutes = 2 } = {}) {
   const at = now().getTime();
   return {
     uses: 1,
     expireTime: new Date(at + sessionMinutes * 60_000).toISOString(),
     newSessionExpireTime: new Date(at + startMinutes * 60_000).toISOString(),
-    liveConnectConstraints: {
-      model: `models/${model}`,
-      config: buildGeminiConfig({ items, prompt })
-    }
+    bidiGenerateContentSetup: buildGeminiSetup({ items, prompt, model })
   };
 }
 

@@ -49,7 +49,7 @@ describe('minting the session token', () => {
   it('sends the task table inside the token constraints, not to the page', async () => {
     const { host, calls } = harness();
     await host.mintToken();
-    const instruction = calls[0].body.liveConnectConstraints.config.systemInstruction.parts[0].text;
+    const instruction = calls[0].body.bidiGenerateContentSetup.systemInstruction.parts[0].text;
     expect(instruction).toContain('rt\trs\tO\tГолден');
   });
 

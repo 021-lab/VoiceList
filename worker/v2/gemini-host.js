@@ -101,8 +101,8 @@ export class GeminiHost {
     this.record({
       type: 'gm.session.started', model: model || GEMINI_MODEL,
       expireTime: request.expireTime, newSessionExpireTime: request.newSessionExpireTime,
-      promptChars: request.liveConnectConstraints.config.systemInstruction.parts[0].text.length,
-      tools: request.liveConnectConstraints.config.tools[0].functionDeclarations.map(tool => tool.name)
+      promptChars: request.bidiGenerateContentSetup.systemInstruction.parts[0].text.length,
+      tools: request.bidiGenerateContentSetup.tools[0].functionDeclarations.map(tool => tool.name)
     }, 'in', sessionId);
 
     return { sessionId, token, model: model || GEMINI_MODEL, expireTime: request.expireTime };

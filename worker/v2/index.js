@@ -57,7 +57,8 @@ export default {
         const body = await readBoundedJson(request,2048);
         // Pasted keys arrive with whitespace far more often than they arrive malformed.
         const apiKey = String(body.apiKey || '').trim();
-        if (!/^[A-Za-z0-9_-]{20,128}$/.test(apiKey)) return json({error:'Ключ не похож на ключ Gemini API: ожидаются 20–128 символов из латиницы, цифр, дефиса и подчёркивания.'},400);
+        // AI Studio issues keys in two shapes: AIza… and AQ.… — the dot is part of the key.
+        if (!/^[A-Za-z0-9._-]{20,200}$/.test(apiKey)) return json({error:'Ключ не похож на ключ Gemini API.'},400);
         const result = await stub.configureGeminiApiKey(apiKey);
         if (result.configured) return json(result);
         if (result.reason === 'already') return json({error:'Ключ Gemini уже настроен и работает.'},409);
