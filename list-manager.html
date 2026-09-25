@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-85428c6dcc9bdbcf">
+<meta name="preview-build-hash" content="v02-11811625ed577591">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-85428c6dcc9bdbcf";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-11811625ed577591";
 </script>
 <script>
 (() => {
@@ -2940,13 +2940,13 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
      *  body throws — a refused microphone, above all — is swallowed and the promise never
      *  settles. The caller then cannot tell "denied" from "slow", which is how a permission
      *  error reached the user as a timeout with no cause. */
-    async start(stream) {
+    async start(stream, context) {
       if (!stream && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
         throw new Error("Could not request user media");
       }
       this.starting = (async () => {
         this.stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.audioContext = await audioContext({ sampleRate: this.sampleRate });
+        this.audioContext = context || await audioContext({ sampleRate: this.sampleRate });
         this.source = this.audioContext.createMediaStreamSource(this.stream);
         const workletName = "audio-recorder-worklet";
         const src = createWorketFromSrc(workletName, AudioRecordingWorklet);
@@ -3180,14 +3180,18 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   // src/v2/client/gemini-voice.js
   var MIRROR_INTERVAL_MS = 2e3;
   var MIRROR_LIMIT = 100;
-  var outputContext = null;
-  function openOutputContext() {
+  var contexts = { input: null, output: null };
+  function openContext(which, sampleRate) {
     const Ctor = window.AudioContext || window.webkitAudioContext;
     if (!Ctor) throw new Error("\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 Web Audio.");
-    if (!outputContext || outputContext.state === "closed") {
-      outputContext = new Ctor({ sampleRate: GEMINI_OUTPUT_SAMPLE_RATE });
+    if (!contexts[which] || contexts[which].state === "closed") {
+      try {
+        contexts[which] = new Ctor({ sampleRate });
+      } catch (error) {
+        throw new Error(`\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043E\u0442\u043A\u0440\u044B\u043B \u0430\u0443\u0434\u0438\u043E \u043D\u0430 ${sampleRate} \u0413\u0446: ${error?.message || "\u043E\u0442\u043A\u0430\u0437"}`);
+      }
     }
-    return outputContext;
+    return contexts[which];
   }
   async function requestMicrophone() {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -3286,15 +3290,22 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       session = current;
       try {
         setStatus("\u0413\u043E\u0442\u043E\u0432\u043B\u044E \u0437\u0432\u0443\u043A\u2026");
-        current.streamer = new AudioStreamer(openOutputContext());
+        const input = openContext("input", GEMINI_INPUT_SAMPLE_RATE);
+        current.streamer = new AudioStreamer(openContext("output", GEMINI_OUTPUT_SAMPLE_RATE));
         await within(current.streamer.resume(), 5e3, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0438\u043B \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u0435. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443 \u0435\u0449\u0451 \u0440\u0430\u0437.");
+        await within(input.resume(), 5e3, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0438\u043B \u0437\u0430\u043F\u0438\u0441\u044C. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443 \u0435\u0449\u0451 \u0440\u0430\u0437.");
         setStatus("\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u2026");
         const stream = await within(requestMicrophone(), 3e4, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u0437\u0430\u043F\u0440\u043E\u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
         current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
         current.recorder.onData = (data) => {
           send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
         };
-        await within(current.recorder.start(stream), 1e4, "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0443 \u0437\u0432\u0443\u043A\u0430 \u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
+        setStatus("\u0417\u0430\u043F\u0443\u0441\u043A\u0430\u044E \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0443\u2026");
+        await within(
+          current.recorder.start(stream, input),
+          15e3,
+          `\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0437\u0432\u0443\u043A\u0430 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B\u0430\u0441\u044C (\u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442 ${input.state}, ${Math.round(input.sampleRate)} \u0413\u0446).`
+        );
         setStatus("\u041E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u0441\u0435\u0441\u0441\u0438\u044E\u2026");
         const { token, model } = await post("/api/live/gemini/session");
         setStatus("\u0421\u043E\u0435\u0434\u0438\u043D\u044F\u044E\u0441\u044C \u0441 Gemini\u2026");
@@ -3363,7 +3374,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-85428c6dcc9bdbcf";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-11811625ed577591";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

@@ -53,14 +53,17 @@ export class AudioRecorder {
    *  body throws — a refused microphone, above all — is swallowed and the promise never
    *  settles. The caller then cannot tell "denied" from "slow", which is how a permission
    *  error reached the user as a timeout with no cause. */
-  async start(stream) {
+  async start(stream, context) {
     if (!stream && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
       throw new Error('Could not request user media');
     }
 
     this.starting = (async () => {
       this.stream = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.audioContext = await audioContext({ sampleRate: this.sampleRate });
+      // PATCH: an already-running context may be supplied. addModule() on a context that is
+      // still suspended does not complete on iOS, and the helper this replaced spends the
+      // user's gesture probing autoplay before the context even exists.
+      this.audioContext = context || await audioContext({ sampleRate: this.sampleRate });
       this.source = this.audioContext.createMediaStreamSource(this.stream);
 
       const workletName = 'audio-recorder-worklet';

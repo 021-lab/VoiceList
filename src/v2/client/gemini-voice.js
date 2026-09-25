@@ -26,14 +26,18 @@ const MIRROR_LIMIT = 100;
  *  The vendored helper probes autoplay with an Audio element and awaits it, which spends the
  *  user's gesture before the context exists — the one thing Safari will not forgive. Browsers
  *  also cap how many contexts a page may open, so it is created once and reused. */
-let outputContext = null;
-function openOutputContext() {
+const contexts = { input: null, output: null };
+function openContext(which, sampleRate) {
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) throw new Error('Браузер не поддерживает Web Audio.');
-  if (!outputContext || outputContext.state === 'closed') {
-    outputContext = new Ctor({ sampleRate: GEMINI_OUTPUT_SAMPLE_RATE });
+  if (!contexts[which] || contexts[which].state === 'closed') {
+    try {
+      contexts[which] = new Ctor({ sampleRate });
+    } catch (error) {
+      throw new Error(`Браузер не открыл аудио на ${sampleRate} Гц: ${error?.message || 'отказ'}`);
+    }
   }
-  return outputContext;
+  return contexts[which];
 }
 
 /** Asks for the microphone here rather than inside the recorder, so the browser's own reason
@@ -159,9 +163,15 @@ export function createGeminiVoice({
       // user's gesture is still in effect. Asking the worker for a token first spends that
       // gesture on a network round trip, and resume() then never settles — no error, no
       // sound, the status line stuck on "connecting" forever.
+      // Both contexts are opened and started here, before anything that can take time.
+      // Asking for the microphone shows a permission sheet, and after it the gesture is
+      // spent: a context resumed later stays suspended, and loading a worklet into a
+      // suspended context never finishes on iOS.
       setStatus('Готовлю звук…');
-      current.streamer = new AudioStreamer(openOutputContext());
+      const input = openContext('input', GEMINI_INPUT_SAMPLE_RATE);
+      current.streamer = new AudioStreamer(openContext('output', GEMINI_OUTPUT_SAMPLE_RATE));
       await within(current.streamer.resume(), 5_000, 'Браузер не включил воспроизведение. Нажмите кнопку ещё раз.');
+      await within(input.resume(), 5_000, 'Браузер не включил запись. Нажмите кнопку ещё раз.');
 
       setStatus('Микрофон…');
       const stream = await within(requestMicrophone(), 30_000, 'Браузер не ответил на запрос микрофона.');
@@ -171,7 +181,9 @@ export function createGeminiVoice({
         // Before the socket is open they are dropped: a second of lost silence costs nothing.
         send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
       };
-      await within(current.recorder.start(stream), 10_000, 'Не удалось запустить обработку звука с микрофона.');
+      setStatus('Запускаю обработку…');
+      await within(current.recorder.start(stream, input), 15_000,
+        `Обработка звука не запустилась (контекст ${input.state}, ${Math.round(input.sampleRate)} Гц).`);
 
       setStatus('Открываю сессию…');
       const { token, model } = await post('/api/live/gemini/session');
