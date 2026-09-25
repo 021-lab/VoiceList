@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-14e4473304423860">
+<meta name="preview-build-hash" content="v02-9b3e8688c7008fa4">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-14e4473304423860";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-9b3e8688c7008fa4";
 </script>
 <script>
 (() => {
@@ -2839,8 +2839,11 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     const l = float32Array.length;
 
     for (let i = 0; i < l; i++) {
-      // convert float32 -1 to 1 to int16 -32768 to 32767
-      const int16Value = float32Array[i] * 32768;
+      // PATCH: clamp before converting. Upstream multiplies by 32768, so a sample at or past
+      // full scale wraps to the opposite sign \u2014 a loud syllable turns into a burst of noise
+      // exactly where the word is, which is what mangles short task names.
+      const sample = float32Array[i];
+      const int16Value = sample >= 1 ? 32767 : sample <= -1 ? -32768 : Math.round(sample * 32767);
       this.buffer[this.bufferWriteIndex++] = int16Value;
       if(this.bufferWriteIndex >= this.buffer.length) {
         this.sendAndClearBuffer();
@@ -3236,8 +3239,14 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       stack.append(transcriptNode);
     }
     transcriptNode.textContent = text;
+    delete transcriptNode.dataset.pending;
     clearTimeout(transcriptTimer);
     transcriptTimer = setTimeout(hideHeard, 6e3);
+  }
+  function showListening() {
+    if (transcriptNode && transcriptNode.isConnected && !transcriptNode.dataset.pending) return;
+    showHeard("\u0421\u043B\u0443\u0448\u0430\u044E\u2026");
+    if (transcriptNode) transcriptNode.dataset.pending = "true";
   }
   function hideHeard() {
     clearTimeout(transcriptTimer);
@@ -3337,6 +3346,9 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         setStatus("\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u2026");
         const stream = await within(requestMicrophone(), 3e4, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u0437\u0430\u043F\u0440\u043E\u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
         current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
+        current.recorder.onVolume = (volume) => {
+          if (volume > 0.02) showListening();
+        };
         current.recorder.onData = (data) => {
           send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
         };
@@ -3415,7 +3427,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-14e4473304423860";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-9b3e8688c7008fa4";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

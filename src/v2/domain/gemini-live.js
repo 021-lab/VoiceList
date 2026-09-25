@@ -49,7 +49,9 @@ export const DEFAULT_GEMINI_PROMPT = `
 
 Ответ на твой уточняющий вопрос — это название задачи, а не текст для неё. Услышав в ответ
 «молоко», ищи в таблице задачу «Молоко», а не создавай подзадачу с названием «молоко».
-Название новой задачи берётся только из того, что пользователь продиктовал как название.
+Название новой задачи берётся дословно из того, что пользователь продиктовал. Не перефразируй,
+не исправляй и не улучшай его: «приехал в Бангкок» не превращается в «прилетел в Бангкок».
+Слышишь название существующей задачи — бери написание из таблицы, а не из расшифровки.
 
 Речь распознаётся с ошибками, особенно короткие названия. Сопоставляя услышанное с таблицей,
 допускай искажения: «молотого» и «малого» — это, скорее всего, «Молоко».
@@ -149,7 +151,18 @@ export function buildGeminiSetup({ items = [], prompt, model = GEMINI_MODEL, voi
     // Recognition is pinned to one language. Left open it drifts: whole turns came back as
     // Spanish. The field takes a list, and a list of one is the block on everything else.
     inputAudioTranscription: { languageCodes: [GEMINI_LANGUAGE] },
-    outputAudioTranscription: {}
+    outputAudioTranscription: {},
+    // The model decides where an utterance starts and ends. Left at its defaults it clips
+    // both: the first syllables of «задача Кофе» vanish and a mid-phrase pause ends the turn.
+    // Sensitive to the start, patient about the end, with padding kept ahead of the trigger.
+    realtimeInputConfig: {
+      automaticActivityDetection: {
+        startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+        endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+        prefixPaddingMs: 400,
+        silenceDurationMs: 900
+      }
+    }
   };
 }
 

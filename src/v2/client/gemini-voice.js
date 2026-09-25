@@ -89,9 +89,19 @@ function showHeard(text) {
     stack.append(transcriptNode);
   }
   transcriptNode.textContent = text;
+  delete transcriptNode.dataset.pending;
   clearTimeout(transcriptTimer);
   transcriptTimer = setTimeout(hideHeard, 6_000);
 }
+/** Shown the moment the microphone hears something. The transcript itself only arrives once
+ *  the model has closed the turn, which is a second or more later; without this the page
+ *  looks like it is not listening. */
+function showListening() {
+  if (transcriptNode && transcriptNode.isConnected && !transcriptNode.dataset.pending) return;
+  showHeard('Слушаю…');
+  if (transcriptNode) transcriptNode.dataset.pending = 'true';
+}
+
 function hideHeard() {
   clearTimeout(transcriptTimer);
   transcriptNode?.remove();
@@ -219,6 +229,8 @@ export function createGeminiVoice({
       setStatus('Микрофон…');
       const stream = await within(requestMicrophone(), 30_000, 'Браузер не ответил на запрос микрофона.');
       current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
+      // The meter fires every 25 ms; it is the only signal available before the model speaks.
+      current.recorder.onVolume = (volume) => { if (volume > 0.02) showListening(); };
       current.recorder.onData = (data) => {
         // Audio frames are the bulk of the traffic and say nothing a transcript does not.
         // Before the socket is open they are dropped: a second of lost silence costs nothing.

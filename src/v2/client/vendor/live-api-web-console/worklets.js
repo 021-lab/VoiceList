@@ -59,8 +59,11 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     const l = float32Array.length;
 
     for (let i = 0; i < l; i++) {
-      // convert float32 -1 to 1 to int16 -32768 to 32767
-      const int16Value = float32Array[i] * 32768;
+      // PATCH: clamp before converting. Upstream multiplies by 32768, so a sample at or past
+      // full scale wraps to the opposite sign — a loud syllable turns into a burst of noise
+      // exactly where the word is, which is what mangles short task names.
+      const sample = float32Array[i];
+      const int16Value = sample >= 1 ? 32767 : sample <= -1 ? -32768 : Math.round(sample * 32767);
       this.buffer[this.bufferWriteIndex++] = int16Value;
       if(this.bufferWriteIndex >= this.buffer.length) {
         this.sendAndClearBuffer();

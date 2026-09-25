@@ -91,6 +91,11 @@ describe('frames', () => {
     expect(stripAudio(spoken).serverContent.outputTranscription.text).toBe('Готово');
     expect(isLoggableFrame({ serverContent: { outputTranscription: { text: 'Готово' } } })).toBe(true);
     expect(isLoggableFrame({ toolCall: { functionCalls: [] } })).toBe(true);
+    // Turn bookkeeping is noise between the two things the log exists for.
+    expect(isLoggableFrame({ serverContent: { turnComplete: true } })).toBe(false);
+    expect(isLoggableFrame({ serverContent: { interrupted: true } })).toBe(false);
+    expect(isLoggableFrame({ sessionResumptionUpdate: { resumable: true } })).toBe(false);
+    expect(isLoggableFrame({})).toBe(false);
   });
 
   it('names the model in the first client frame', () => {

@@ -61,13 +61,12 @@ export function stripAudio(frame) {
   return { ...frame, serverContent: { ...frame.serverContent, modelTurn, audioParts: parts.length - kept.length } };
 }
 
+/** The log is read to see what was said and what was done. Turn bookkeeping — empty frames,
+ *  "interrupted", "turn complete", resumption handles — is noise between those two, so only
+ *  speech, tool traffic and failures are kept. */
 export function isLoggableFrame(frame) {
   if (!frame || typeof frame !== 'object') return false;
+  if (frame.toolCall || frame.toolResponse || frame.clientError || frame.goAway) return true;
   const content = frame.serverContent;
-  if (!content) return true;
-  // A frame that carried nothing but audio has nothing left once the audio is gone.
-  const parts = content.modelTurn?.parts;
-  const onlyAudio = Array.isArray(parts) && parts.length > 0 && parts.every(part => part?.inlineData);
-  if (!onlyAudio) return true;
-  return Boolean(content.outputTranscription || content.inputTranscription || content.interrupted || content.turnComplete);
+  return Boolean(content?.inputTranscription?.text || content?.outputTranscription?.text);
 }
