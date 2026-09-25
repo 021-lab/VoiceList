@@ -2,6 +2,7 @@ export const clientStyles = `
 [hidden]{display:none!important}
 #app-root[data-view-mode=log] #action-log-panel{position:fixed;top:var(--v02-header-height,65px);right:0;bottom:0;left:0;overflow-y:auto;overscroll-behavior:contain;z-index:80;background:#f0f2f5;-webkit-overflow-scrolling:touch}
 .v02-toast-stack{position:fixed;top:70px;left:12px;right:12px;z-index:2200;display:flex;flex-direction:column;gap:8px;pointer-events:none;align-items:center}
+.v02-heard{background:#2d6cdf;font-style:normal}
 .v02-toast{pointer-events:auto;border:0;border-radius:12px;padding:13px 18px;max-width:540px;background:#1a1a2e;color:white;box-shadow:0 5px 20px #0002;font:inherit;text-align:left;cursor:pointer}
 .v02-voice-target{outline:2px solid #007aff;outline-offset:2px}
 .v02-transcript{position:fixed;z-index:2300;max-width:min(420px,90vw);padding:10px 14px;background:#fff;border:1px solid #007aff;border-radius:12px;box-shadow:0 5px 20px #0002;color:#1a1a2e;pointer-events:none;font-size:15px}

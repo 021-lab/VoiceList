@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-5908ced3d3f954bb">
+<meta name="preview-build-hash" content="v02-14e4473304423860">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-5908ced3d3f954bb";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-14e4473304423860";
 </script>
 <script>
 (() => {
@@ -1521,6 +1521,7 @@ window.__LIST_MANAGER_BUILD_HASH__ = "v02-5908ced3d3f954bb";
 [hidden]{display:none!important}
 #app-root[data-view-mode=log] #action-log-panel{position:fixed;top:var(--v02-header-height,65px);right:0;bottom:0;left:0;overflow-y:auto;overscroll-behavior:contain;z-index:80;background:#f0f2f5;-webkit-overflow-scrolling:touch}
 .v02-toast-stack{position:fixed;top:70px;left:12px;right:12px;z-index:2200;display:flex;flex-direction:column;gap:8px;pointer-events:none;align-items:center}
+.v02-heard{background:#2d6cdf;font-style:normal}
 .v02-toast{pointer-events:auto;border:0;border-radius:12px;padding:13px 18px;max-width:540px;background:#1a1a2e;color:white;box-shadow:0 5px 20px #0002;font:inherit;text-align:left;cursor:pointer}
 .v02-voice-target{outline:2px solid #007aff;outline-offset:2px}
 .v02-transcript{position:fixed;z-index:2300;max-width:min(420px,90vw);padding:10px 14px;background:#fff;border:1px solid #007aff;border-radius:12px;box-shadow:0 5px 20px #0002;color:#1a1a2e;pointer-events:none;font-size:15px}
@@ -3224,6 +3225,25 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       throw new Error(`\u041C\u0438\u043A\u0440\u043E\u0444\u043E\u043D \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${error?.message || name || "\u043F\u0440\u0438\u0447\u0438\u043D\u0430 \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430"}`);
     }
   }
+  var transcriptNode = null;
+  var transcriptTimer = null;
+  function showHeard(text) {
+    const stack = document.getElementById("v02-toast-stack");
+    if (!stack || !text) return;
+    if (!transcriptNode || !transcriptNode.isConnected) {
+      transcriptNode = document.createElement("div");
+      transcriptNode.className = "v02-toast v02-heard";
+      stack.append(transcriptNode);
+    }
+    transcriptNode.textContent = text;
+    clearTimeout(transcriptTimer);
+    transcriptTimer = setTimeout(hideHeard, 6e3);
+  }
+  function hideHeard() {
+    clearTimeout(transcriptTimer);
+    transcriptNode?.remove();
+    transcriptNode = null;
+  }
   var audioPartsOf = (frame) => (frame?.serverContent?.modelTurn?.parts || []).map((part) => part?.inlineData?.data).filter(Boolean);
   function createGeminiVoice({
     button,
@@ -3277,8 +3297,13 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       for (const chunk of audio) current.streamer.addPCM16(new Uint8Array(base64ToArrayBuffer(chunk)));
       const input = frame.serverContent?.inputTranscription?.text;
       const output = frame.serverContent?.outputTranscription?.text;
-      if (input) onTranscript({ role: "user", text: input });
+      if (input) {
+        current.heard = `${current.heard || ""} ${input}`.replace(/\s+/g, " ").trim();
+        showHeard(current.heard);
+        onTranscript({ role: "user", text: input });
+      }
       if (output) onTranscript({ role: "assistant", text: output });
+      if (frame.serverContent?.turnComplete) current.heard = "";
       if (frame.serverContent?.interrupted) current.streamer.stop();
       if (frame.toolCall) {
         const { results } = await post("/api/live/gemini/tools", frame);
@@ -3301,7 +3326,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     }
     async function start() {
       if (session) return;
-      const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false };
+      const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: "" };
       session = current;
       try {
         setStatus("\u0413\u043E\u0442\u043E\u0432\u043B\u044E \u0437\u0432\u0443\u043A\u2026");
@@ -3367,6 +3392,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       if (!current) return;
       clearInterval(current.timer);
       clearTimeout(current.watchdog);
+      hideHeard();
       current.recorder?.stop();
       current.streamer?.stop();
       try {
@@ -3389,7 +3415,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-5908ced3d3f954bb";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-14e4473304423860";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
@@ -3435,10 +3461,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     });
     const gemini = createGeminiVoice({
       button: $("gemini-voice-btn"),
-      status: $("gemini-voice-status"),
-      onTranscript: ({ role, text }) => {
-        if (text) console.debug("gemini", role, text);
-      }
+      status: $("gemini-voice-status")
     });
     window.__geminiVoice = gemini;
     client.realtime = live;

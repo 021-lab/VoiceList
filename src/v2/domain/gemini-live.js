@@ -52,9 +52,12 @@ export const DEFAULT_GEMINI_PROMPT = `
 Название новой задачи берётся только из того, что пользователь продиктовал как название.
 
 Речь распознаётся с ошибками, особенно короткие названия. Сопоставляя услышанное с таблицей,
-допускай искажения: «молотого» и «малого» — это, скорее всего, «Молоко». Если похожих
-несколько, спроси, какая из них; если ни одна не похожа, скажи, что не расслышал, и попроси
-повторить. Дважды подряд не расслышал — попроси произнести по буквам.
+допускай искажения: «молотого» и «малого» — это, скорее всего, «Молоко».
+
+Понял, что тебя просят изменить список, но не понял какую задачу — не отказывайся и не
+переспрашивай впустую. Подбери по таблице задачи, созвучные услышанному, и спроси, какая из
+них: «Молоко или Молотый кофе?» Больше трёх за раз не называй. Если созвучных нет вовсе,
+скажи, что не расслышал название, и попроси повторить.
 
 Идентификаторы вслух не произноси, они нужны инструменту, а не человеку. Говори названиями.
 
@@ -143,7 +146,9 @@ export function buildGeminiSetup({ items = [], prompt, model = GEMINI_MODEL, voi
       parts: [{ text: composeGeminiInstructions(prompt || DEFAULT_GEMINI_PROMPT, formatTaskSnapshot(items)) }]
     },
     tools: [{ functionDeclarations: geminiFunctionDeclarations() }],
-    inputAudioTranscription: {},
+    // Recognition is pinned to one language. Left open it drifts: whole turns came back as
+    // Spanish. The field takes a list, and a list of one is the block on everything else.
+    inputAudioTranscription: { languageCodes: [GEMINI_LANGUAGE] },
     outputAudioTranscription: {}
   };
 }

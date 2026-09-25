@@ -31,8 +31,7 @@ async function bootstrap() {
   // Gemini holds the socket in the page rather than on the server: it speaks WebSocket, not
   // WebRTC, and an ephemeral token lets the browser open the session the worker defined.
   const gemini = createGeminiVoice({
-    button: $('gemini-voice-btn'), status: $('gemini-voice-status'),
-    onTranscript: ({ role, text }) => { if (text) console.debug('gemini', role, text); }
+    button: $('gemini-voice-btn'), status: $('gemini-voice-status')
   });
   window.__geminiVoice = gemini;
   client.realtime = live;

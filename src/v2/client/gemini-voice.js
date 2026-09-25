@@ -72,6 +72,32 @@ async function requestMicrophone() {
   }
 }
 
+/** The user's own words, shown while the conversation runs.
+ *
+ *  Recognition is the weak link — a short task name comes back distorted — and the person
+ *  cannot tell a misheard name from a misunderstood request unless they see what was heard.
+ *  One toast per turn, rewritten in place: a toast per streamed fragment would flood the
+ *  screen three words at a time. */
+let transcriptNode = null;
+let transcriptTimer = null;
+function showHeard(text) {
+  const stack = document.getElementById('v02-toast-stack');
+  if (!stack || !text) return;
+  if (!transcriptNode || !transcriptNode.isConnected) {
+    transcriptNode = document.createElement('div');
+    transcriptNode.className = 'v02-toast v02-heard';
+    stack.append(transcriptNode);
+  }
+  transcriptNode.textContent = text;
+  clearTimeout(transcriptTimer);
+  transcriptTimer = setTimeout(hideHeard, 6_000);
+}
+function hideHeard() {
+  clearTimeout(transcriptTimer);
+  transcriptNode?.remove();
+  transcriptNode = null;
+}
+
 const audioPartsOf = (frame) =>
   (frame?.serverContent?.modelTurn?.parts || [])
     .map(part => part?.inlineData?.data)
@@ -131,8 +157,14 @@ export function createGeminiVoice({
 
     const input = frame.serverContent?.inputTranscription?.text;
     const output = frame.serverContent?.outputTranscription?.text;
-    if (input) onTranscript({ role: 'user', text: input });
+    if (input) {
+      // Fragments of one turn belong to one line; the turn ends, the line starts over.
+      current.heard = `${current.heard || ''} ${input}`.replace(/\s+/g, ' ').trim();
+      showHeard(current.heard);
+      onTranscript({ role: 'user', text: input });
+    }
     if (output) onTranscript({ role: 'assistant', text: output });
+    if (frame.serverContent?.turnComplete) current.heard = '';
 
     // The model stopped because the user spoke over it; what is already queued is stale.
     if (frame.serverContent?.interrupted) current.streamer.stop();
@@ -164,7 +196,7 @@ export function createGeminiVoice({
 
   async function start() {
     if (session) return;
-    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false };
+    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: '' };
     session = current;
 
     try {
@@ -236,6 +268,7 @@ export function createGeminiVoice({
     if (!current) return;
     clearInterval(current.timer);
     clearTimeout(current.watchdog);
+    hideHeard();
     current.recorder?.stop();
     current.streamer?.stop();
     try { current.socket?.close(); } catch { /* already gone */ }

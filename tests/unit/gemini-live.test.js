@@ -37,7 +37,8 @@ describe('the connect config', () => {
     const instruction = config.systemInstruction.parts[0].text;
     expect(instruction).toContain('rt\trs\tO\tГолден');
     expect(instruction).toContain('Выбор задачи');
-    expect(config.inputAudioTranscription).toEqual({});
+    // Recognition is pinned to one language: left open, whole turns came back as Spanish.
+    expect(config.inputAudioTranscription).toEqual({ languageCodes: ['ru-RU'] });
     expect(config.outputAudioTranscription).toEqual({});
     expect(config.generationConfig.responseModalities).toEqual(['AUDIO']);
     expect(config.generationConfig.speechConfig.languageCode).toBe('ru-RU');
