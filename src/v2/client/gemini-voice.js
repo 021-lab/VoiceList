@@ -8,7 +8,7 @@
  *  Audio capture and playback come from Google's own Live API console (see vendor/). */
 import { AudioRecorder } from './vendor/live-api-web-console/audio-recorder.js';
 import { AudioStreamer } from './vendor/live-api-web-console/audio-streamer.js';
-import { audioContext, base64ToArrayBuffer } from './vendor/live-api-web-console/audio-context.js';
+import { base64ToArrayBuffer } from './vendor/live-api-web-console/audio-context.js';
 // The protocol module only: importing the session module would pull the server domain, and
 // zod with it, into the page.
 import {
@@ -20,6 +20,21 @@ import {
  *  conversation itself. */
 const MIRROR_INTERVAL_MS = 2_000;
 const MIRROR_LIMIT = 100;
+
+/** The output context, made synchronously and kept.
+ *
+ *  The vendored helper probes autoplay with an Audio element and awaits it, which spends the
+ *  user's gesture before the context exists — the one thing Safari will not forgive. Browsers
+ *  also cap how many contexts a page may open, so it is created once and reused. */
+let outputContext = null;
+function openOutputContext() {
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  if (!Ctor) throw new Error('Браузер не поддерживает Web Audio.');
+  if (!outputContext || outputContext.state === 'closed') {
+    outputContext = new Ctor({ sampleRate: GEMINI_OUTPUT_SAMPLE_RATE });
+  }
+  return outputContext;
+}
 
 const audioPartsOf = (frame) =>
   (frame?.serverContent?.modelTurn?.parts || [])
@@ -69,8 +84,9 @@ export function createGeminiVoice({
 
   async function handleFrame(current, frame) {
     if (frame.setupComplete) {
+      current.ready = true;
+      clearTimeout(current.watchdog);
       setStatus('Слушаю', 'active');
-      await current.recorder.start();
       return;
     }
 
@@ -94,24 +110,51 @@ export function createGeminiVoice({
     if (frame.goAway) setStatus('Сессия истекает, начните заново', 'warn');
   }
 
+  /** A promise that cannot hang forever. Two of the calls below are known to never settle
+   *  when the browser decides audio is not allowed, and a hung promise looks exactly like a
+   *  slow network from the outside. */
+  const within = (promise, ms, message) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+  ]);
+
+  /** A failure the page cannot show to itself: put it in the status line and in the server
+   *  log, so it is readable without a browser console. */
+  function report(current, message) {
+    setStatus(message, 'error');
+    try { post('/api/live/gemini/frames', { frames: [{ direction: 'out', frame: { clientError: message } }] }).catch(() => {}); } catch { /* nothing left to do */ }
+    if (session === current) stop('error');
+  }
+
   async function start() {
     if (session) return;
-    setStatus('Подключаюсь…');
-    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null };
+    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false };
     session = current;
 
     try {
-      const { token, model } = await post('/api/live/gemini/session');
-      const context = await audioContext({ id: 'gemini-output', sampleRate: GEMINI_OUTPUT_SAMPLE_RATE });
-      current.streamer = new AudioStreamer(context);
-      await current.streamer.resume();
+      // Audio first, and before any await on the network.
+      //
+      // Safari and iOS only let a page open an AudioContext or take the microphone while the
+      // user's gesture is still in effect. Asking the worker for a token first spends that
+      // gesture on a network round trip, and resume() then never settles — no error, no
+      // sound, the status line stuck on "connecting" forever.
+      setStatus('Готовлю звук…');
+      current.streamer = new AudioStreamer(openOutputContext());
+      await within(current.streamer.resume(), 5_000, 'Браузер не включил воспроизведение. Нажмите кнопку ещё раз.');
 
+      setStatus('Микрофон…');
       current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
       current.recorder.onData = (data) => {
         // Audio frames are the bulk of the traffic and say nothing a transcript does not.
+        // Before the socket is open they are dropped: a second of lost silence costs nothing.
         send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
       };
+      await within(current.recorder.start(), 15_000, 'Микрофон не отвечает. Проверьте разрешение для сайта.');
 
+      setStatus('Открываю сессию…');
+      const { token, model } = await post('/api/live/gemini/session');
+
+      setStatus('Соединяюсь с Gemini…');
       current.socket = new WebSocketCtor(`${GEMINI_WS_URL}?access_token=${encodeURIComponent(token)}`);
       current.socket.addEventListener('open', () => send(current, buildClientSetup(model)));
       current.socket.addEventListener('message', async (event) => {
@@ -120,17 +163,25 @@ export function createGeminiVoice({
         try { frame = JSON.parse(raw); } catch { return; }
         remember(current, frame, 'in');
         try { await handleFrame(current, frame); }
-        catch (error) { setStatus(error.message || 'Ошибка обработки', 'error'); }
+        catch (error) { report(current, error.message || 'Ошибка обработки ответа'); }
       });
-      current.socket.addEventListener('close', () => { if (session === current) stop('closed'); });
-      current.socket.addEventListener('error', () => setStatus('Соединение с Gemini оборвалось', 'error'));
+      // A socket that opens and then says nothing is the failure that used to be invisible.
+      current.watchdog = setTimeout(() => {
+        if (session === current && !current.ready) report(current, 'Gemini не ответил на настройку сессии.');
+      }, 15_000);
+      current.socket.addEventListener('close', (event) => {
+        if (session !== current) return;
+        if (current.ready) { stop('closed'); return; }
+        report(current, `Gemini закрыл соединение до начала разговора (код ${event.code}${event.reason ? `: ${event.reason}` : ''}).`);
+      });
+      current.socket.addEventListener('error', () => {
+        if (session === current && !current.ready) report(current, 'Не удалось соединиться с Gemini.');
+      });
 
       current.timer = setInterval(() => mirror(current), MIRROR_INTERVAL_MS);
       if (button) button.dataset.active = 'true';
     } catch (error) {
-      session = null;
-      setStatus(error.message || 'Не удалось начать разговор', 'error');
-      if (button) delete button.dataset.active;
+      report(current, error.message || 'Не удалось начать разговор');
     }
   }
 
@@ -139,13 +190,15 @@ export function createGeminiVoice({
     session = null;
     if (!current) return;
     clearInterval(current.timer);
+    clearTimeout(current.watchdog);
     current.recorder?.stop();
     current.streamer?.stop();
     try { current.socket?.close(); } catch { /* already gone */ }
     mirror(current);
     post('/api/live/gemini/session/stop', { reason }).catch(() => {});
     if (button) delete button.dataset.active;
-    setStatus(reason === 'client' ? '' : 'Разговор завершён');
+    // An error already put its own text in the status line; do not talk over it.
+    if (reason !== 'error') setStatus(reason === 'client' ? '' : 'Разговор завершён');
   }
 
   button?.addEventListener('click', () => (session ? stop() : start()));

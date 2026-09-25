@@ -134,6 +134,7 @@ function gist(entry) {
       if (f.toolCall) return ['Gemini зовёт инструмент', (f.toolCall.functionCalls || []).map(c => c.name).join(', ')];
       if (f.toolResponse) return ['ответ инструмента отправлен', ''];
       if (f.setup) return ['Gemini: настройка сессии', f.setup.model || ''];
+      if (f.clientError) return ['ОШИБКА в браузере', f.clientError];
       return ['кадр Gemini', short(JSON.stringify(f), 140)];
     }
     case 'error': return ['ОШИБКА', p.error?.message || short(JSON.stringify(p), 200)];
@@ -161,7 +162,8 @@ function render() {
     const li = document.createElement('li');
     const row = document.createElement('div');
     const model = entry.type === 'vl.backend_input' || entry.type.endsWith('response.output_text.done');
-    row.className = [speech ? 'row plain' : 'row', model ? 'model' : '', entry.type === 'vl.delegation' ? 'context' : '', entry.type === 'error' ? 'bad' : ''].filter(Boolean).join(' ');
+    const bad = entry.type === 'error' || Boolean(entry.payload?.frame?.clientError);
+    row.className = [speech ? 'row plain' : 'row', model ? 'model' : '', entry.type === 'vl.delegation' ? 'context' : '', bad ? 'bad' : ''].filter(Boolean).join(' ');
     row.innerHTML = '<span class="at"></span><span class="dir"></span><span class="gist"></span>';
     row.querySelector('.at').textContent = entry.at.slice(11, 19);
     const dir = row.querySelector('.dir');
