@@ -18,6 +18,25 @@ import { fail, safeError } from '../../src/v2/domain/contracts.js';
  *  chatty or hostile page cannot fill the database in one request. */
 const MAX_FRAMES_PER_BATCH = 200;
 
+/** How long an identical change is treated as the same change.
+ *
+ *  The model calls a tool and waits for the answer. A round trip to the phone and back takes
+ *  a second or more, and when it takes too long the model calls again rather than waiting —
+ *  the same two tasks arrived twice, two seconds apart, under fresh call ids. Call ids cannot
+ *  catch that, so the guard is on what the call does. Long enough to cover a retry, short
+ *  enough that asking for the same thing again on purpose still works. */
+const REPEAT_WINDOW_MS = 30_000;
+
+/** Case and spacing differ between a call and its retry — «Йены» then «йены» — so they are
+ *  normalised away before comparing. */
+function changeKey(name, args) {
+  const normalised = Object.keys(args || {}).sort().map(key => {
+    const value = args[key];
+    return `${key}=${typeof value === 'string' ? value.trim().toLowerCase() : JSON.stringify(value)}`;
+  });
+  return `${name}(${normalised.join(',')})`;
+}
+
 export class GeminiHost {
   constructor({ log, settings, services, apiKey, fetchImpl = (...args) => fetch(...args), tokensUrl = GEMINI_TOKENS_URL, modelsUrl = GEMINI_MODELS_URL, now = () => new Date() }) {
     this.log = log;
@@ -29,6 +48,7 @@ export class GeminiHost {
     this.modelsUrl = modelsUrl;
     this.now = now;
     this.session = null;
+    this.recent = new Map();
     // The sequence outlives a session: a browser that reconnects mid-conversation must not
     // reuse a key the journal already settled.
     this.seq = 0;
@@ -115,6 +135,14 @@ export class GeminiHost {
     if (!call?.name) fail('INVALID_INPUT', 'Пустой вызов инструмента');
     this.record({ type: 'gm.tool.call', name: call.name, arguments: call.arguments || {}, callId: call.id || '' }, 'in', sessionId);
 
+    // A read changes nothing and its answer goes stale, so only changes are guarded.
+    const key = call.name === 'getFrontier' ? null : changeKey(call.name, call.arguments);
+    const seen = key ? this.recent.get(key) : null;
+    if (seen && this.now().getTime() - seen.at < REPEAT_WINDOW_MS) {
+      this.record({ type: 'gm.tool.repeat', name: call.name, callId: call.id || '', response: seen.response }, 'out', sessionId);
+      return { id: call.id || '', name: call.name, response: seen.response };
+    }
+
     let response;
     try {
       if (call.name === 'getFrontier') {
@@ -133,6 +161,12 @@ export class GeminiHost {
     }
 
     this.record({ type: 'gm.tool.result', name: call.name, callId: call.id || '', response }, 'out', sessionId);
+    if (key && response.status === 'applied') {
+      this.recent.set(key, { at: this.now().getTime(), response });
+      for (const [older, entry] of this.recent) {
+        if (this.now().getTime() - entry.at >= REPEAT_WINDOW_MS) this.recent.delete(older);
+      }
+    }
     return { id: call.id || '', name: call.name, response };
   }
 

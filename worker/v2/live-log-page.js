@@ -121,6 +121,7 @@ function gist(entry) {
     case 'gm.token.unreachable': return ['Gemini: не дозвонились', p.error?.message || ''];
     case 'gm.tool.call': return ['вызов ' + p.name, short(JSON.stringify(p.arguments || {}), 140)];
     case 'gm.tool.result': return ['результат ' + p.name, short(JSON.stringify(p.response || {}), 140)];
+    case 'gm.tool.repeat': return ['повтор ' + p.name + ' — не применён', short(JSON.stringify(p.response || {}), 120)];
     case 'gm.frame': {
       const f = p.frame || {};
       const said = f.serverContent?.outputTranscription?.text;

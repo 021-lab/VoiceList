@@ -172,3 +172,55 @@ describe('proving a key before it is kept', () => {
     expect((await host.verifyKey('AIzaAny')).ok).toBe(false);
   });
 });
+
+describe('a repeated change', () => {
+  /** The model does not wait forever: when the answer is slow it calls again with a fresh
+   *  call id, and the same two tasks were created twice two seconds apart. */
+  it('is answered from the first result instead of applied twice', async () => {
+    const { host, applied, rows } = harness();
+    await host.mintToken();
+    const call = { toolCall: { functionCalls: [{ id: 'first', name: 'addChild', args: { parentId: 'rs', line1: 'Йены' } }] } };
+    const retry = { toolCall: { functionCalls: [{ id: 'second', name: 'addChild', args: { parentId: 'rs', line1: 'йены' } }] } };
+
+    const [one] = await host.invokeAll(call);
+    const [two] = await host.invokeAll(retry);
+
+    expect(applied).toHaveLength(1);
+    expect(two.response).toEqual(one.response);
+    expect(two.id).toBe('second');
+    expect(rows.some(row => row.event.type === 'gm.tool.repeat')).toBe(true);
+  });
+
+  it('lets the same change through once the window has passed', async () => {
+    let clock = Date.parse('2026-09-25T10:00:00.000Z');
+    const { host, applied } = harness();
+    host.now = () => new Date(clock);
+    await host.mintToken();
+    const call = { toolCall: { functionCalls: [{ id: 'a', name: 'addItem', args: { line1: 'Хлеб' } }] } };
+
+    await host.invokeAll(call);
+    clock += 31_000;
+    await host.invokeAll(call);
+
+    expect(applied).toHaveLength(2);
+  });
+
+  it('does not deduplicate a read, whose answer goes stale', async () => {
+    const { host } = harness();
+    await host.mintToken();
+    const call = { toolCall: { functionCalls: [{ id: 'f', name: 'getFrontier', args: {} }] } };
+    const [one] = await host.invokeAll(call);
+    const [two] = await host.invokeAll(call);
+    expect(one.response.frontier).toHaveLength(1);
+    expect(two.response.frontier).toHaveLength(1);
+  });
+
+  it('does not remember a rejection, so a corrected call still runs', async () => {
+    const { host, applied } = harness({ ack: { status: 'rejected', reason: 'нет задачи' } });
+    await host.mintToken();
+    const call = { toolCall: { functionCalls: [{ id: 'r', name: 'addItem', args: { line1: 'Хлеб' } }] } };
+    await host.invokeAll(call);
+    await host.invokeAll(call);
+    expect(applied).toHaveLength(2);
+  });
+});
