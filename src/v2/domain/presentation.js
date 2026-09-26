@@ -86,6 +86,9 @@ function recordTaskIndex(entry, currentById) {
   return contextual;
 }
 
+/** How many actions the journal screen carries. */
+export const LOG_PAGE_SIZE = 30;
+
 export class Presentation {
   compose(graph, journal, context = {}) {
     const view = views.includes(context.view) ? context.view : 'list';
@@ -101,7 +104,11 @@ export class Presentation {
     });
     let body;
     if (view === 'log') {
-      body = node('action-list', 'screen:log', {}, journal.actions().map(a => node('action', 'action:' + a.id, a)));
+      // The journal screen shows the recent past, not the whole history: a list that grows
+      // without bound is downloaded in full every time it is opened and read at its end.
+      const recent = journal.actions().slice(-LOG_PAGE_SIZE);
+      body = node('action-list', 'screen:log', { total: journal.actions().length, shown: recent.length },
+        recent.map(a => node('action', 'action:' + a.id, a)));
     } else if (view === 'action') {
       const a = journal.actions().find(x => x.id === context.actionId);
       body = a ? node('action-page', 'action:' + a.id, {

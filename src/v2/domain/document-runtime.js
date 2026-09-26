@@ -98,10 +98,23 @@ export class DocumentRuntime {
   getDocument(context = {}) {
     return { ...this.presentation.compose(this.graph.read(), this.journal, context), cursor: this.state.technical.cursor };
   }
+  /** What changed since the client last looked.
+   *
+   *  Only what a toast needs travels here — an id, a label, how it ended. The full action
+   *  belongs to the journal screen, and sending it on every poll meant the journal was
+   *  downloaded continuously by a client that was looking at the task list. The action list
+   *  is also built once rather than once per event: rebuilding it inside the loop made a poll
+   *  quadratic in the number of events. */
   follow(cursor = 0, clientKey = '') {
-    const after = Math.max(0, Number(cursor) || 0), technical = this.state.technical, journal = this.journal;
+    const after = Math.max(0, Number(cursor) || 0), technical = this.state.technical;
     const events = technical.events.filter(event => event.cursor > after);
-    const actions = events.flatMap(event => event.publicActionId ? [journal.actions().find(action => action.id === event.publicActionId)].filter(Boolean) : []);
+    const announced = events.filter(event => event.publicActionId);
+    let byId = null;
+    if (announced.length) byId = new Map(this.journal.actions().map(action => [action.id, action]));
+    const actions = announced.flatMap(event => {
+      const action = byId.get(event.publicActionId);
+      return action ? [{ id: action.id, actionId: action.actionId, label: action.label, status: action.status, target: action.target }] : [];
+    });
     const uiEffects = events.filter(event => event.uiEffect && event.sessionId === clientKey).map(event => ({ ...event.uiEffect, actionId: event.entryId }));
     return { events: actions, actions, uiEffects, nextCursor: technical.cursor, revision: this.graph.revision };
   }
