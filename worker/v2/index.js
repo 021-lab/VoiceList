@@ -113,7 +113,7 @@ export default {
         const call = (calls) => stub.runGeminiTools({toolCall:{functionCalls:calls}});
         // The parts of one tool call, so the cost can be attributed rather than guessed.
         await took('пустой вызов объекта', () => stub.liveSessionStatus());
-        await took('снимок для рассылки', () => stub.benchSnapshot());
+        const snapshot = await took('снимок для рассылки', () => stub.benchSnapshot());
         await took('чтение фронтира', () => stub.getTaskFrontier());
         await took('вызов getFrontier целиком', () => call([{id:mark+'f',name:'getFrontier',args:{}}]));
         await took('чтение документа', () => stub.getDocument({}));
@@ -121,7 +121,7 @@ export default {
         const two = await took('две задачи', () => call([{id:mark+'2',name:'addItem',args:{line1:mark+' 2'}},{id:mark+'3',name:'addItem',args:{line1:mark+' 3'}}]));
         const made = [...one.results, ...two.results].map(item => item.response?.target).filter(Boolean);
         await took('уборка', async () => { for (const id of made) await stub.applyTaskCommand({command:'deleteItem',actId:id,actType:'task',payload:{}}); });
-        return json({edge: request.cf?.colo || 'unknown', object: env.DOCUMENT_NAME || 'main', phases, created: made.length});
+        return json({edge: request.cf?.colo || 'unknown', object: env.DOCUMENT_NAME || 'main', snapshot, phases, created: made.length});
       }
       // How far the object is, measured inside the worker so the client's own network is not
       // part of the number. A Durable Object is pinned to one region; this is the only way to

@@ -256,7 +256,15 @@ export class ListDocumentDO extends Agent {
   /** One command applied the way every other path applies one; used by the benchmark to undo
    *  what it measured. */
   /** What a broadcast has to build before it can send anything. */
-  benchSnapshot() { return JSON.stringify(this.port.getSnapshot()).length; }
+  benchSnapshot() {
+    const snapshot = this.port.getSnapshot();
+    return {
+      total: JSON.stringify(snapshot).length,
+      tasks: JSON.stringify(snapshot.content.snapshot.items).length,
+      actionLog: JSON.stringify(snapshot.content.actionLog).length,
+      actions: snapshot.content.actionLog.length
+    };
+  }
   async applyTaskCommand(command) {
     const ack = await this.port.applyCommand(command, {message:{clientKey:'bench:'+crypto.randomUUID(), seq:1}});
     this.broadcastState();
