@@ -102,14 +102,18 @@ describe('running a tool call', () => {
     expect(applied).toHaveLength(0);
   });
 
-  it('gives each call its own journal key, so two changes are two entries', async () => {
+  it('keys the journal by the call id, so a restart cannot collide with old entries', async () => {
     const { host, applied } = harness();
     await host.mintToken();
     await host.invokeAll({ toolCall: { functionCalls: [
       { id: 'a', name: 'editItem', args: { taskId: 'rt', line1: 'Голден новый' } },
       { id: 'b', name: 'setStatus', args: { taskId: 'rt', status: 'Pause' } }
     ] } });
-    expect(applied.map(entry => entry.message.seq)).toEqual([1, 2]);
+    const keys = applied.map(entry => entry.message.clientKey);
+    expect(keys[0]).toContain(':a');
+    expect(keys[1]).toContain(':b');
+    expect(new Set(keys).size).toBe(2);
+    expect(applied.every(entry => entry.message.seq === 1)).toBe(true);
   });
 });
 

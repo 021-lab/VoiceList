@@ -49,9 +49,6 @@ export class GeminiHost {
     this.now = now;
     this.session = null;
     this.recent = new Map();
-    // The sequence outlives a session: a browser that reconnects mid-conversation must not
-    // reuse a key the journal already settled.
-    this.seq = 0;
   }
 
   get active() { return Boolean(this.session); }
@@ -149,8 +146,15 @@ export class GeminiHost {
         response = { status: 'ok', frontier: await this.services.readFrontier() };
       } else {
         const command = toTaskCommand(call.name, call.arguments || {}, 'gemini-live');
+        // The journal key is the call's own id, not a counter.
+        //
+        // A counter lives in memory, and the object restarts on every deploy and after
+        // idleness: it went back to 1 and collided with entries already written under the
+        // same client key, so the first calls after a restart came back as "request id
+        // already used". A call id is unique by construction and makes a genuine retry of
+        // the same call idempotent for free.
         const ack = await this.services.applyCommand(command, {
-          clientKey: `gemini:${sessionId || 'session'}`, seq: (this.seq += 1)
+          clientKey: `gemini:${sessionId || 'session'}:${call.id || crypto.randomUUID()}`, seq: 1
         });
         response = ack?.status === 'rejected'
           ? { status: 'rejected', reason: ack.reason || 'Операция отклонена' }
