@@ -101,6 +101,21 @@ export default {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
         if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));
       }
+      // The same measurements, taken inside the worker. Run from the client they include the
+      // client's own network; run here they are edge-to-object and back, which is the part
+      // moving the object was meant to change. Cleans up the tasks it creates.
+      if (url.pathname === '/api/v2/bench') {
+        const mark = 'bench-' + Date.now().toString(36);
+        const phases = [];
+        const took = async (name, run) => { const at = Date.now(); const value = await run(); phases.push({name, ms: Date.now() - at}); return value; };
+        const call = (calls) => stub.runGeminiTools({toolCall:{functionCalls:calls}});
+        await took('чтение документа', () => stub.getDocument({}));
+        const one = await took('одна задача', () => call([{id:mark+'1',name:'addItem',args:{line1:mark+' 1'}}]));
+        const two = await took('две задачи', () => call([{id:mark+'2',name:'addItem',args:{line1:mark+' 2'}},{id:mark+'3',name:'addItem',args:{line1:mark+' 3'}}]));
+        const made = [...one.results, ...two.results].map(item => item.response?.target).filter(Boolean);
+        await took('уборка', async () => { for (const id of made) await stub.applyTaskCommand({command:'deleteItem',actId:id,actType:'task',payload:{}}); });
+        return json({edge: request.cf?.colo || 'unknown', object: env.DOCUMENT_NAME || 'main', phases, created: made.length});
+      }
       // How far the object is, measured inside the worker so the client's own network is not
       // part of the number. A Durable Object is pinned to one region; this is the only way to
       // see which side of the planet it ended up on.

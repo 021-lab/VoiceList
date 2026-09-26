@@ -245,6 +245,13 @@ export class ListDocumentDO extends Agent {
     const loaded = this.runtime.exportState();
     return { items: loaded.graph.items.length, entries: loaded.entries.length, revision: loaded.graph.revision };
   }
+  /** One command applied the way every other path applies one; used by the benchmark to undo
+   *  what it measured. */
+  async applyTaskCommand(command) {
+    const ack = await this.port.applyCommand(command, {message:{clientKey:'bench:'+crypto.randomUUID(), seq:1}});
+    this.broadcastState();
+    return ack;
+  }
   listLiveSessions(limit) { return {sessions:this.liveLog.sessions(limit),stats:this.liveLog.stats()}; }
   readLiveSettings() { return this.liveSettings.read(); }
   writeLivePrompt(target, body) { return this.liveSettings.writePrompt(target,{mode:body?.mode,text:body?.text,source:'settings'}); }
