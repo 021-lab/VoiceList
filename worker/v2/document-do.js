@@ -8,12 +8,21 @@ import { RuntimeStorage } from './runtime-storage.js';
 import { LiveLog } from './live-log.js';
 import { LiveHost } from './live-host.js';
 import { GeminiHost } from './gemini-host.js';
-import { LiveSettings } from '../../src/v2/domain/live-settings.js';
+import {
+  LiveSettings, VOICE_PROMPT_KEY, BACKEND_PROMPT_KEY, BACKEND_MODEL_KEY, REASONING_KEY,
+  GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, PROMPT_HISTORY_KEY
+} from '../../src/v2/domain/live-settings.js';
 import { taskTreeFromItems } from '../task-tree.js';
 import { taskFrontierFromItems } from '../task-frontier.js';
 
 const API_KEY = 'voicelist.openai-api-key.v1';
 const GEMINI_KEY = 'voicelist.gemini-api-key.v1';
+/** Carried along with the document when the object moves. */
+const LIVE_SETTINGS_KEYS = [
+  API_KEY, GEMINI_KEY, 'voicelist.openai-setup-used.v1',
+  VOICE_PROMPT_KEY, BACKEND_PROMPT_KEY, BACKEND_MODEL_KEY, REASONING_KEY,
+  GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, PROMPT_HISTORY_KEY
+];
 export class ListDocumentDO extends Agent {
   static options = { sendIdentityOnConnect: false };
   async onStart() {
@@ -202,6 +211,39 @@ export class ListDocumentDO extends Agent {
     const host = this.liveHost();
     if (!host.apiKey) host.apiKey = await this.getOpenAIApiKey();
     return host.readBackendInput(responseId);
+  }
+  /** Everything the document is, for a move to another object.
+   *
+   *  The task graph, the journal and the private ledgers travel; so do the prompts and the
+   *  keys, because a list that arrives without them looks migrated and works like a fresh
+   *  install. The voice log stays behind: it is a diagnostic record of one object's sessions,
+   *  not part of the document. */
+  async exportEverything() {
+    const runtime = this.runtime.exportState();
+    const settings = {};
+    for (const key of LIVE_SETTINGS_KEYS) {
+      const value = await this.ctx.storage.get(key);
+      if (value !== undefined) settings[key] = value;
+    }
+    return {
+      version: 1,
+      runtime,
+      settings,
+      counts: { items: runtime.graph.items.length, entries: runtime.entries.length, settings: Object.keys(settings).length }
+    };
+  }
+
+  /** Refuses a target that already holds a document. A move that silently overwrites is a
+   *  move that can destroy the thing it was copying. */
+  async importEverything(payload) {
+    if (payload?.version !== 1) fail('INVALID_INPUT','Неизвестный формат переноса');
+    const existing = this.runtimeStorage.load();
+    if (existing && existing.graph?.items?.length > 1) fail('CONFLICT','В целевом объекте уже есть документ');
+    await this.runtimeStorage.save(payload.runtime);
+    for (const [key, value] of Object.entries(payload.settings || {})) await this.ctx.storage.put(key, value);
+    this.initializeRuntime(this.runtimeStorage.load());
+    const loaded = this.runtime.exportState();
+    return { items: loaded.graph.items.length, entries: loaded.entries.length, revision: loaded.graph.revision };
   }
   listLiveSessions(limit) { return {sessions:this.liveLog.sessions(limit),stats:this.liveLog.stats()}; }
   readLiveSettings() { return this.liveSettings.read(); }

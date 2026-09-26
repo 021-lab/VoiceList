@@ -9,6 +9,14 @@ import { readBoundedJson } from './model.js';
 import { safeError } from '../../src/v2/domain/contracts.js';
 export { ListDocumentDO };
 const json = (data,status=200) => Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+/** Which object holds the document, and where it lives.
+ *
+ *  A Durable Object is created once and stays in the region it was created in; the hint is
+ *  read only at creation. Moving the document therefore means a new object under a new name,
+ *  which is why the name is configuration rather than a constant — flipping it back is the
+ *  way back. */
+const documentStub = (env) => getAgentByName(env.LIST_DOCUMENT, env.DOCUMENT_NAME || 'main',
+  env.DO_LOCATION_HINT ? { locationHint: env.DO_LOCATION_HINT } : undefined);
 const missing = () => new Response('Not found',{status:404});
 export default {
   async fetch(request, env) {
@@ -24,7 +32,7 @@ export default {
     try {
       if (!['/ws','/mcp','/reset'].includes(url.pathname) && !url.pathname.startsWith('/api/')) return missing();
       if (url.pathname === '/mcp' && !isMcpHostAllowed(request,env)) return missing();
-      const stub = await getAgentByName(env.LIST_DOCUMENT,'main');
+      const stub = await documentStub(env);
       if (url.pathname === '/api/v2/input' && request.method === 'POST') return json(await stub.submit(await readBoundedJson(request,64000)),202);
       if (url.pathname === '/api/v2/document' && request.method === 'GET') return json(await stub.getDocument(Object.fromEntries(url.searchParams)));
       if (url.pathname === '/api/v2/updates' && request.method === 'GET') return json(await stub.follow(Number(url.searchParams.get('cursor')||0),url.searchParams.get('clientKey')||''));
@@ -92,6 +100,37 @@ export default {
       if (url.pathname.startsWith('/api/live/log') && request.method === 'GET') {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
         if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));
+      }
+      // How far the object is, measured inside the worker so the client's own network is not
+      // part of the number. A Durable Object is pinned to one region; this is the only way to
+      // see which side of the planet it ended up on.
+      if (url.pathname === '/api/v2/where') {
+        const colo = request.cf?.colo || 'unknown';
+        const probes = (url.searchParams.get('names') || (env.DOCUMENT_NAME || 'main')).split(',').slice(0,6);
+        const results = [];
+        for (const entry of probes) {
+          const [name, hint] = entry.split(':');
+          const started = Date.now();
+          try {
+            const target = await getAgentByName(env.LIST_DOCUMENT, name, hint ? {locationHint:hint} : undefined);
+            await target.liveSessionStatus();
+            results.push({name, hint: hint || null, ms: Date.now() - started});
+          } catch (error) { results.push({name, hint: hint || null, error: safeError(error).message}); }
+        }
+        return json({edge: colo, probes: results});
+      }
+      // Copies the document into another object, which is how it changes region. The source
+      // is left untouched, so the move is undone by pointing DOCUMENT_NAME back.
+      if (url.pathname === '/api/v2/relocate' && request.method === 'POST') {
+        const body = await readBoundedJson(request,2048);
+        const target = String(body.target || '').trim();
+        const hint = String(body.locationHint || '').trim();
+        if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(target)) return json({error:'Некорректное имя объекта'},400);
+        if (target === (env.DOCUMENT_NAME || 'main')) return json({error:'Целевой объект совпадает с текущим'},400);
+        const payload = await stub.exportEverything();
+        const destination = await getAgentByName(env.LIST_DOCUMENT, target, hint ? {locationHint:hint} : undefined);
+        const written = await destination.importEverything(payload);
+        return json({from:env.DOCUMENT_NAME || 'main', target, locationHint:hint || null, exported:payload.counts, imported:written});
       }
       if (url.pathname === '/api/tasks/tree.json') return json({tasks:await stub.getTaskTree()});
       if (url.pathname === '/api/tasks/frontier.json') return json({frontier:await stub.getTaskFrontier()});

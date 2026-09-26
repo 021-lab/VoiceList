@@ -10,5 +10,13 @@
   "durable_objects": { "bindings": [{ "name": "LIST_DOCUMENT", "class_name": "ListDocumentDO" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ListDocumentDO"] }],
   "observability": { "enabled": true },
-  "vars": { "AGENT_MODEL": "gpt-4.1-mini", "MCP_ALLOWED_HOSTS": "localhost,127.0.0.1,vlist-v02-dev.smileme.ai" }
+  // The document object lives in APAC, next to the person using it. A Durable Object keeps
+  // the region it was created in, so moving means a new object under a new name — the name is
+  // configuration precisely so that pointing it back is the way back.
+  "vars": {
+    "AGENT_MODEL": "gpt-4.1-mini",
+    "MCP_ALLOWED_HOSTS": "localhost,127.0.0.1,vlist-v02-dev.smileme.ai",
+    "DOCUMENT_NAME": "main-apac",
+    "DO_LOCATION_HINT": "apac"
+  }
 }
