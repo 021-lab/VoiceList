@@ -1,6 +1,7 @@
 import { getAgentByName } from 'agents';
 import { LIST_MANAGER_HTML } from '../generated-html.js';
 import { LIVE_LOG_PAGE } from './live-log-page.js';
+import { BENCH_PAGE } from './bench-page.js';
 import { ListDocumentDO } from './document-do.js';
 import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from '../openai-key-setup.js';
 import { isMcpHostAllowed } from './mcp.js';
@@ -23,6 +24,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/health') return new Response('ok\n',{headers:{'Cache-Control':'no-store'}});
     if (url.pathname === '/live-log') return new Response(LIVE_LOG_PAGE,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
+    if (url.pathname === '/bench') return new Response(BENCH_PAGE,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
     if (['/','/index.html','/list-manager.html'].includes(url.pathname)) return new Response(LIST_MANAGER_HTML,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
     if (request.method !== 'GET' && request.method !== 'OPTIONS') {
       const origin = request.headers.get('Origin');
@@ -132,7 +134,7 @@ export default {
             results.push({name, hint: hint || null, ms: Date.now() - started});
           } catch (error) { results.push({name, hint: hint || null, error: safeError(error).message}); }
         }
-        return json({edge: colo, probes: results});
+        return json({edge: colo, object: env.DOCUMENT_NAME || 'main', probes: results});
       }
       // Copies the document into another object, which is how it changes region. The source
       // is left untouched, so the move is undone by pointing DOCUMENT_NAME back.
