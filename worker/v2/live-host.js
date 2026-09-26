@@ -162,6 +162,22 @@ export class LiveHost {
     const text = speech.text.trim();
     if (!text) return;
     this.record({ type: 'vl.speech', role: speech.role, text, start_ms: speech.startMs, end_ms: speech.endMs });
+    // The same turn goes on the bus, where the change it causes will point back at it. The
+    // session log keeps its own copy with the timeline; the bus keeps the words. Turns are
+    // written one after another: an answer can only be linked to the turn before it once
+    // that turn has an id.
+    const write = () => this.writeTurn(speech.role, text);
+    this.turns = (this.turns || Promise.resolve()).then(write, write);
+  }
+
+  async writeTurn(role, text) {
+    try {
+      const entry = await this.services.recordSpeech?.({
+        role, text, source: 'gpt-live', sessionId: this.sessionId,
+        answers: role === 'assistant' ? this.session?.utterance || null : null
+      });
+      if (entry?.requestId && role === 'user' && this.session) this.session.utterance = entry.requestId;
+    } catch (error) { this.record({ type: 'vl.speech.failed', error: safeError(error) }, 'out'); }
   }
 
   /** The literal context the voice layer handed the backend.
@@ -332,6 +348,8 @@ export class LiveHost {
     if (inner?.type !== 'response.output_item.done') return;
     const call = readFunctionCall(inner);
     if (!call) return;
+    // Close the turn before the change is made, so the change has an utterance to point at.
+    this.flushSpeech();
 
     let output;
     try { output = await this.invoke(call); }
@@ -348,7 +366,9 @@ export class LiveHost {
     if (PROMPT_TOOLS.has(call.name)) return this.invokePrompt(call);
 
     const command = toTaskCommand(call.name, call.arguments);
-    const ack = await this.services.applyCommand(command, { clientKey: `gpt-live:${this.sessionId}`, seq: ++this.session.seq });
+    const ack = await this.services.applyCommand(
+      command, { clientKey: `gpt-live:${this.sessionId}`, seq: ++this.session.seq }, this.session?.utterance || null
+    );
     if (ack?.status === 'rejected') return { status: 'rejected', reason: ack.reason || 'Операция отклонена' };
     await this.syncSnapshot();
     return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId };

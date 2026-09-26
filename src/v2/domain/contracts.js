@@ -24,8 +24,18 @@ export const inputSchema = z.object({
     command: id, actId: z.string().max(160).nullable().optional(),
     actType: z.string().max(30).optional(), payload: z.record(z.string(), z.unknown()).optional(),
     source: z.string().max(60).optional(), transcript: z.string().max(16000).optional()
+  }).strict().optional(),
+  // A spoken turn that the system did not have to interpret: the voice model already did,
+  // and what it decided arrives separately as a command. Without this the bus held the change
+  // and not a word of what caused it, and the only place the phrase existed was the session
+  // log — a different table with a different reader.
+  speech: z.object({
+    role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(16000), source: z.string().min(1).max(60)
   }).strict().optional()
-}).strict().refine(v => Number(v.text !== undefined) + Number(v.command !== undefined) === 1, 'Provide text or command, not both');
+}).strict().refine(
+  v => Number(v.text !== undefined) + Number(v.command !== undefined) + Number(v.speech !== undefined) === 1,
+  'Provide exactly one of text, command or speech'
+);
 
 export const graphCommands = new Set(['addItem', 'addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem', 'reorderItems', 'importWorkflowyTree']);
 export const uiCommands = {

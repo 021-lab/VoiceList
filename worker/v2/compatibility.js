@@ -16,14 +16,18 @@ export class CompatibilityPort {
   getTaskSubgraph(id) { return createTaskSubgraph(this.runtime.graph.read().items, id); }
   getTaskTree(query) { return findTaskTree(this.runtime.graph.read().items, query); }
   getTaskTitleTreeText() { return formatTaskTitleTree(this.runtime.graph.read().items); }
-  async applyCommand(command, { message = {} } = {}) {
+  /** `corrects` names the entry this command grew out of — for a voice change, the utterance
+   *  that caused it. It travels as context.actionId, which is how the runtime already links a
+   *  correction to what it corrects. */
+  async applyCommand(command, { message = {}, corrects = null } = {}) {
     const clientKey = message.clientKey === 'mcp' ? 'mcp:' + crypto.randomUUID() : message.clientKey || 'server:' + crypto.randomUUID();
     const seq = message.clientKey === 'mcp' ? 1 : Number(message.seq) || 1;
     const prior = this.runtime.journal.entries.find(e => e.key.clientKey === clientKey && e.key.seq === seq);
     const isAction = ['rollbackAction','commentLogEntry'].includes(command.command);
     const elementId = isAction ? 'action:' + command.actId : this.getTaskById(command.actId) ? 'task:' + command.actId : 'app';
     const result = await this.runtime.executeAndWait({ key: { clientKey, seq }, context: prior?.context || {
-      elementId, view: 'list', revision: this.runtime.graph.revision, ...(isAction ? { actionId: command.actId } : {})
+      elementId, view: 'list', revision: this.runtime.graph.revision,
+      ...(isAction ? { actionId: command.actId } : corrects ? { actionId: corrects } : {})
     }, command });
     return { seq, id: result.actions[0]?.id || result.requestId || null, status: result.error ? 'rejected' : 'applied',
       reason: result.error?.message || null, newTarget: result.target || result.actions.find(a => a.target)?.target || command.actId || null };

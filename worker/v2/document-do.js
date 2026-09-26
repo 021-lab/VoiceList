@@ -111,7 +111,8 @@ export class ListDocumentDO extends Agent {
       services: {
         readItems: async () => this.runtime.graph.read().items,
         readFrontier: async () => this.getTaskFrontier(),
-        applyCommand: async (command, message) => this.port.applyCommand(command, {message})
+        applyCommand: async (command, message, corrects) => this.port.applyCommand(command, {message, corrects}),
+        recordSpeech: (speech) => this.runtime.recordSpeech(speech)
       }
     });
     return this.live;
@@ -124,7 +125,8 @@ export class ListDocumentDO extends Agent {
       services: {
         readItems: async () => this.runtime.graph.read().items,
         readFrontier: async () => this.getTaskFrontier(),
-        applyCommand: async (command, message) => this.port.applyCommand(command, {message})
+        applyCommand: async (command, message, corrects) => this.port.applyCommand(command, {message, corrects}),
+        recordSpeech: (speech) => this.runtime.recordSpeech(speech)
       }
     });
     return this.gemini;
@@ -139,13 +141,16 @@ export class ListDocumentDO extends Agent {
     this.broadcastState();
     return result;
   }
-  stopGeminiSession() { return this.gemini ? this.gemini.stop('client') : false; }
+  async stopGeminiSession() { return this.gemini ? this.gemini.stop('client') : false; }
   geminiSessionStatus() { return {active:Boolean(this.gemini?.active),sessionId:this.gemini?.sessionId || ''}; }
   /** The page relays a tool call and gets back exactly what it must send to Google. */
   /** A read changes nothing, and a repeat was answered from the first result: neither is
    *  worth a snapshot. Only a call that actually applied something redraws the list. */
   async runGeminiTools(frame) {
     const host = this.geminiHost();
+    // The page sends what it has seen in the same request, so the turn that caused the call
+    // is on the bus before the call is executed and the change can be linked to it.
+    if (Array.isArray(frame?.frames)) host.mirror(frame.frames);
     const results = await host.invokeAll(frame);
     if (results.some(item => item.response?.status === 'applied')) this.broadcastState();
     return {results};

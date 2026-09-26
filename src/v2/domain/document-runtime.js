@@ -90,11 +90,13 @@ export class DocumentRuntime {
     if (!parsed.success) fail('INVALID_INPUT', 'Некорректная реплика или команда');
     let input = parsed.data;
     if (input.command?.command === 'commentLogEntry') input = { key: input.key, context: { ...input.context, actionId: input.command.actId }, text: String(input.command.payload?.text || '').trim() };
-    if (!input.text && !input.command) fail('INVALID_INPUT', 'Пустая команда');
+    if (!input.text && !input.command && !input.speech) fail('INVALID_INPUT', 'Пустая команда');
     return this.transaction(({ graph, journal, technical }) => {
       const prior = journal.request(input.key, input);
       if (prior) return this.receipt(prior, journal, technical);
-      if (input.context.revision !== graph.revision) fail('CONFLICT', 'Документ изменился. Повторите команду.');
+      // A spoken turn is a record of what was said, not a request addressed at a state of the
+      // document, so the revision it was heard at cannot make it stale.
+      if (!input.speech && input.context.revision !== graph.revision) fail('CONFLICT', 'Документ изменился. Повторите команду.');
       const elementId = input.context.elementId;
       if (elementId.startsWith('task:') && !graph.read({ id: elementId.slice(5) })) fail('NOT_FOUND', 'Элемент задачи больше не существует');
       if (!elementId.startsWith('task:') && !elementId.startsWith('action:') && !['app', 'toolbar', 'list', ...['list','frontier','log','action','edit','add','settings','dialogues','search'].flatMap(view => ['menu:' + view, 'screen:' + view])].includes(elementId)) fail('NOT_FOUND', 'Неизвестный контекст интерфейса');
@@ -109,8 +111,39 @@ export class DocumentRuntime {
       if (input.command && !graphCommands.has(input.command.command) && !uiCommands[input.command.command] && !['rollbackAction','undo','importWorkflowy'].includes(input.command.command)) fail('UNSUPPORTED_COMMAND', 'Команда не поддерживается');
       const entry = journal.appendInteraction(input, { corrects });
       technical.harness[entry.id] = { status: entry.kind === 'text' ? 'pending' : 'bypassed' };
-      technical.executor[entry.id] = { status: entry.kind === 'text' ? 'waiting' : 'pending', nextIndex: 0, outcomes: [] };
+      // A spoken turn is a record, not a request: nothing interprets it and nothing executes
+      // it, so it is settled the moment it is accepted.
+      technical.executor[entry.id] = { status: entry.kind === 'text' ? 'waiting' : entry.kind === 'speech' ? 'complete' : 'pending', nextIndex: 0, outcomes: [] };
       return this.receipt(entry, journal, technical);
+    });
+  }
+  /** A spoken turn, put on the bus.
+   *
+   *  The key is derived from the journal rather than from a counter in memory: a counter is
+   *  reset by every restart and then collides with entries already written under it. The
+   *  same phrase repeated verbatim right after itself is a re-report of one utterance — the
+   *  page may send its frames twice — and not the person saying it twice. */
+  recordSpeech(speech) {
+    // Turns are recorded one after another: the sequence number of the next one is read from
+    // the journal, so two of them in flight at once would both read the same number and the
+    // second would be refused as a reused request key.
+    const next = () => this.appendSpeech(speech);
+    this.speechTail = (this.speechTail || Promise.resolve()).then(next, next);
+    return this.speechTail;
+  }
+  async appendSpeech({ role = 'user', text, source, sessionId = '', answers = null } = {}) {
+    const spoken = String(text || '').trim();
+    if (!spoken || !source) return null;
+    const clientKey = `${source}:${sessionId || 'session'}:speech`;
+    const said = this.state.entries.filter(entry => entry.key.clientKey === clientKey);
+    const last = said.at(-1);
+    if (last && last.role === role && last.text === spoken) return { requestId: last.id, status: 'completed', repeated: true };
+    return this.submit({
+      key: { clientKey, seq: said.length + 1 },
+      // An answer belongs to the turn it answers: linked, it joins that action's dialogue
+      // instead of standing in the journal as an action of its own that changed nothing.
+      context: { elementId: 'app', view: 'list', revision: this.graph.revision, ...(answers && this.journal.get(answers) ? { actionId: answers } : {}) },
+      speech: { role, text: spoken, source }
     });
   }
   receipt(entry, journal = this.journal, technical = this.state.technical) {

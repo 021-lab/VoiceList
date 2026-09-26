@@ -329,7 +329,12 @@ export class Client {
     const p = component.props; const id = p.actionId || component.id.replace(/^action:/, '');
     this.seenActions.add(id);
     const row = this.node('div', { className: 'action-log-row', 'data-log-id': id, 'data-component-id': component.id, tabIndex: 0 });
-    row.append(this.node('div', { className: 'action-log-label' }, p.transcript || p.text || 'Реплика пользователя'), this.node('div', { className: 'action-log-status' }, p.status || ''), this.node('div', { className: 'action-log-meta' }, p.createdAt || ''));
+    const origin = { 'gemini-live': 'Gemini', 'gpt-live': 'GPT-Live', schedule: 'Расписание' }[p.source] || '';
+    row.append(
+      this.node('div', { className: 'action-log-label' }, p.transcript || p.text || 'Реплика пользователя'),
+      this.node('div', { className: 'action-log-status' }, p.status || ''),
+      this.node('div', { className: 'action-log-meta' }, [origin, p.createdAt || ''].filter(Boolean).join(' · '))
+    );
     row.onclick = () => this.navigate('action', { actionId: id });
     row.onkeydown = (event) => { if (event.key === 'Enter') row.click(); };
     return row;
@@ -410,8 +415,15 @@ export class Client {
           output.append(commands);
         }
         if (output.children.length) block.append(output);
+      } else if (record.kind === 'speech') {
+        // What was actually said. The voice model has already interpreted it, so there is no
+        // model context to reveal here — the interpretation is the next record.
+        block.append(this.node('small', { className: 'v02-record-marker' }, record.role === 'assistant' ? 'Ответ голосом' : 'Сказано голосом'));
+        block.append(this.node('div', { className: 'v02-message', 'data-role': record.role || 'user' }, record.userText || record.answer || ''));
       } else {
-        block.append(this.node('small', { className: 'v02-record-marker' }, record.corrects ? 'Корректировка интерфейса' : 'Команда интерфейса'));
+        const byVoice = record.source && record.source !== 'ui';
+        block.append(this.node('small', { className: 'v02-record-marker' },
+          byVoice ? 'Действие голосового агента' : record.corrects ? 'Корректировка интерфейса' : 'Команда интерфейса'));
         block.append(this.renderCommandCard(record.commandView));
       }
       body.append(block);

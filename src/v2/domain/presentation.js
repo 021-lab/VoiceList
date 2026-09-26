@@ -114,6 +114,11 @@ export class Presentation {
       body = a ? node('action-page', 'action:' + a.id, {
         ...a, title: 'История действия',
         records: journal.chain(a.id).map(entry => {
+          if (entry.kind === 'speech') {
+            return { id: entry.id, kind: 'speech', corrects: entry.corrects || null, role: entry.role || 'user',
+              userText: entry.role === 'assistant' ? '' : entry.text, answer: entry.role === 'assistant' ? entry.text : '',
+              source: entry.source || 'voice' };
+          }
           if (entry.kind === 'text') {
             const recordById = recordTaskIndex(entry, byId);
             return {
@@ -125,7 +130,7 @@ export class Presentation {
           }
           return {
             id: entry.id, kind: 'ui', corrects: entry.corrects || null, command: clone(entry.command),
-            commandView: commandView(entry.command, byId)
+            source: entry.command?.source || 'ui', commandView: commandView(entry.command, byId)
           };
         })
       }) : node('text', 'screen:missing', { text: 'Действие не найдено' });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-9b3e8688c7008fa4">
+<meta name="preview-build-hash" content="v02-3abb7ea65755b3da">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-9b3e8688c7008fa4";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-3abb7ea65755b3da";
 </script>
 <script>
 (() => {
@@ -2001,7 +2001,12 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       const id = p.actionId || component.id.replace(/^action:/, "");
       this.seenActions.add(id);
       const row = this.node("div", { className: "action-log-row", "data-log-id": id, "data-component-id": component.id, tabIndex: 0 });
-      row.append(this.node("div", { className: "action-log-label" }, p.transcript || p.text || "\u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"), this.node("div", { className: "action-log-status" }, p.status || ""), this.node("div", { className: "action-log-meta" }, p.createdAt || ""));
+      const origin = { "gemini-live": "Gemini", "gpt-live": "GPT-Live", schedule: "\u0420\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435" }[p.source] || "";
+      row.append(
+        this.node("div", { className: "action-log-label" }, p.transcript || p.text || "\u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"),
+        this.node("div", { className: "action-log-status" }, p.status || ""),
+        this.node("div", { className: "action-log-meta" }, [origin, p.createdAt || ""].filter(Boolean).join(" \xB7 "))
+      );
       row.onclick = () => this.navigate("action", { actionId: id });
       row.onkeydown = (event) => {
         if (event.key === "Enter") row.click();
@@ -2092,8 +2097,16 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
             output.append(commands);
           }
           if (output.children.length) block.append(output);
+        } else if (record.kind === "speech") {
+          block.append(this.node("small", { className: "v02-record-marker" }, record.role === "assistant" ? "\u041E\u0442\u0432\u0435\u0442 \u0433\u043E\u043B\u043E\u0441\u043E\u043C" : "\u0421\u043A\u0430\u0437\u0430\u043D\u043E \u0433\u043E\u043B\u043E\u0441\u043E\u043C"));
+          block.append(this.node("div", { className: "v02-message", "data-role": record.role || "user" }, record.userText || record.answer || ""));
         } else {
-          block.append(this.node("small", { className: "v02-record-marker" }, record.corrects ? "\u041A\u043E\u0440\u0440\u0435\u043A\u0442\u0438\u0440\u043E\u0432\u043A\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430" : "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430"));
+          const byVoice = record.source && record.source !== "ui";
+          block.append(this.node(
+            "small",
+            { className: "v02-record-marker" },
+            byVoice ? "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0430\u0433\u0435\u043D\u0442\u0430" : record.corrects ? "\u041A\u043E\u0440\u0440\u0435\u043A\u0442\u0438\u0440\u043E\u0432\u043A\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430" : "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430"
+          ));
           block.append(this.renderCommandCard(record.commandView));
         }
         body.append(block);
@@ -3312,10 +3325,14 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         onTranscript({ role: "user", text: input });
       }
       if (output) onTranscript({ role: "assistant", text: output });
-      if (frame.serverContent?.turnComplete) current.heard = "";
+      if (frame.serverContent?.turnComplete) {
+        current.heard = "";
+        remember(current, { vlTurnEnd: true }, "in");
+      }
       if (frame.serverContent?.interrupted) current.streamer.stop();
       if (frame.toolCall) {
-        const { results } = await post("/api/live/gemini/tools", frame);
+        const frames = current.frames.splice(0, MIRROR_LIMIT);
+        const { results } = await post("/api/live/gemini/tools", { ...frame, frames });
         send(current, buildToolResponse(results));
       }
       if (frame.goAway) setStatus("\u0421\u0435\u0441\u0441\u0438\u044F \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442, \u043D\u0430\u0447\u043D\u0438\u0442\u0435 \u0437\u0430\u043D\u043E\u0432\u043E", "warn");
@@ -3427,7 +3444,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-9b3e8688c7008fa4";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-3abb7ea65755b3da";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

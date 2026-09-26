@@ -174,13 +174,23 @@ export function createGeminiVoice({
       onTranscript({ role: 'user', text: input });
     }
     if (output) onTranscript({ role: 'assistant', text: output });
-    if (frame.serverContent?.turnComplete) current.heard = '';
+    if (frame.serverContent?.turnComplete) {
+      current.heard = '';
+      // The end of a turn is the only place the page knows and the server does not: the
+      // transcript frames carry no boundary. Without it a turn stays open in the worker and
+      // is lost if the object restarts before something else closes it.
+      remember(current, { vlTurnEnd: true }, 'in');
+    }
 
     // The model stopped because the user spoke over it; what is already queued is stale.
     if (frame.serverContent?.interrupted) current.streamer.stop();
 
     if (frame.toolCall) {
-      const { results } = await post('/api/live/gemini/tools', frame);
+      // What the page has seen travels with the call, in one request: the server needs the
+      // spoken turn on the bus before it applies the change, so the change can point at it.
+      // A separate report would race the call and usually lose.
+      const frames = current.frames.splice(0, MIRROR_LIMIT);
+      const { results } = await post('/api/live/gemini/tools', { ...frame, frames });
       send(current, buildToolResponse(results));
     }
 

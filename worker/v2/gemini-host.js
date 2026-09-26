@@ -49,10 +49,51 @@ export class GeminiHost {
     this.now = now;
     this.session = null;
     this.recent = new Map();
+    this.speech = null;
+    this.utterance = null;
+    this.turns = null;
   }
 
   get active() { return Boolean(this.session); }
   get sessionId() { return this.session?.id || ''; }
+
+  /** Transcript fragments follow the cadence of speech, so one record per fragment buries the
+   *  journal in syllables. They are assembled into a turn and closed when the other speaker
+   *  starts, when a tool is called, or when the session ends. */
+  hear(role, text) {
+    const spoken = String(text || '').trim();
+    if (!spoken) return;
+    // The turn is held on the host rather than on the session: the object restarts without
+    // the conversation ending, and speech heard after a restart still belongs in the journal.
+    if (this.speech && this.speech.role !== role) this.closeTurn();
+    this.speech ||= { role, text: '' };
+    this.speech.text = `${this.speech.text} ${spoken}`.replace(/\s+/g, ' ').trim();
+  }
+
+  /** Closing a turn from a place that cannot wait for it: it is still written in order, and
+   *  a failure to write it must not take the session down with it. */
+  closeTurn() { this.flushSpeech().catch(error => this.record({ type: 'gm.speech.failed', error: safeError(error) }, 'out')); }
+
+  /** Turns are written one after another. Which turn an answer answers is only known once the
+   *  turn before it has been written, so the queue is what makes the link right. */
+  flushSpeech() {
+    const speech = this.speech;
+    if (!speech) return this.turns || Promise.resolve();
+    this.speech = null;
+    const write = () => this.writeTurn(speech);
+    this.turns = (this.turns || Promise.resolve()).then(write, write);
+    return this.turns;
+  }
+
+  async writeTurn(speech) {
+    const entry = await this.services.recordSpeech?.({
+      role: speech.role, text: speech.text, source: 'gemini-live', sessionId: this.sessionId,
+      answers: speech.role === 'assistant' ? this.utterance : null
+    });
+    // The change a turn causes is linked to the turn, so the journal shows the phrase and
+    // what came of it as one action.
+    if (entry?.requestId && speech.role === 'user') this.utterance = entry.requestId;
+  }
 
   stamp() { return this.now().toISOString(); }
 
@@ -155,7 +196,7 @@ export class GeminiHost {
         // the same call idempotent for free.
         const ack = await this.services.applyCommand(command, {
           clientKey: `gemini:${sessionId || 'session'}:${call.id || crypto.randomUUID()}`, seq: 1
-        });
+        }, this.utterance);
         response = ack?.status === 'rejected'
           ? { status: 'rejected', reason: ack.reason || 'Операция отклонена' }
           : { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId };
@@ -176,6 +217,7 @@ export class GeminiHost {
 
   async invokeAll(frame, sessionId = this.sessionId) {
     const calls = readToolCalls(frame);
+    if (calls.length) await this.flushSpeech();
     const results = [];
     for (const call of calls) results.push(await this.invoke(call, sessionId));
     return results;
@@ -188,18 +230,25 @@ export class GeminiHost {
     let kept = 0;
     for (const entry of batch) {
       const frame = entry?.frame ?? entry;
+      // The page's own marker for "the turn ended here". It is not a frame from Google and
+      // nothing is logged for it; it only closes the turn being assembled.
+      if (frame?.vlTurnEnd) { this.closeTurn(); continue; }
       if (!isLoggableFrame(frame)) continue;
       // The page strips audio before sending; a client that did not is stripped here.
       this.record({ type: 'gm.frame', direction: entry?.direction || 'in', frame: stripAudio(frame) }, entry?.direction === 'out' ? 'out' : 'in', sessionId);
+      this.hear('user', frame?.serverContent?.inputTranscription?.text);
+      this.hear('assistant', frame?.serverContent?.outputTranscription?.text);
       kept += 1;
     }
     return { received: batch.length, kept };
   }
 
-  stop(reason = 'client') {
+  async stop(reason = 'client') {
+    await this.flushSpeech();
     if (!this.session) return false;
     this.record({ type: 'gm.session.stopped', reason }, 'out');
     this.session = null;
+    this.utterance = null;
     return true;
   }
 }

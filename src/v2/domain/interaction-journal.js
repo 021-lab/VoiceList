@@ -2,6 +2,20 @@ import { clone, stable, fail } from './contracts.js';
 
 const commandLabel = command => command?.command || '';
 
+/** Where an entry came from. A command carries it; a spoken turn carries it; anything else is
+ *  the interface itself. */
+export const sourceOf = (entry) =>
+  entry.kind === 'speech' ? (entry.source || 'voice') : entry.kind === 'text' ? 'user' : (entry.command?.source || 'ui');
+
+/** Which entries the journal screen shows as actions of their own.
+ *
+ *  A button press and an MCP call are hidden: the person saw their result on the screen or
+ *  made them from another program. What is shown is what happened without a hand on it —
+ *  spoken to a voice model, typed to the agent, or raised by the schedule. */
+const HIDDEN_SOURCES = new Set(['ui', 'mcp', 'bench']);
+export const isPublicRoot = (entry) =>
+  !entry.corrects && (entry.kind === 'text' || entry.kind === 'speech' || !HIDDEN_SOURCES.has(entry.command?.source || 'ui'));
+
 function normalizeLegacy(entries) {
   if (!entries.some(entry => entry.type !== 'interaction')) return entries.map(clone);
   const modern = entries.filter(entry => entry.type === 'interaction').map(clone);
@@ -46,10 +60,13 @@ export class InteractionJournal {
   static over(entries, technical = {}) { return new InteractionJournal(entries, technical, { own: true }); }
   appendInteraction(input, { corrects } = {}) {
     const cursor = Math.max(0, ...this.entries.map(entry => Number(entry.cursor) || 0)) + 1;
+    const kind = input.text !== undefined ? 'text' : input.speech ? 'speech' : 'ui';
     const entry = {
       id: 'e' + cursor, cursor, at: new Date().toISOString(), type: 'interaction',
-      key: clone(input.key), context: clone(input.context), kind: input.text !== undefined ? 'text' : 'ui',
-      ...(input.text !== undefined ? { text: input.text } : { command: clone(input.command) }),
+      key: clone(input.key), context: clone(input.context), kind,
+      ...(kind === 'text' ? { text: input.text } : {}),
+      ...(kind === 'speech' ? { text: input.speech.text, role: input.speech.role, source: input.speech.source } : {}),
+      ...(kind === 'ui' ? { command: clone(input.command) } : {}),
       ...(corrects ? { corrects } : {})
     };
     this.entries.push(entry);
@@ -96,32 +113,48 @@ export class InteractionJournal {
     for (const entry of this.entries) if (entry.corrects && connected.has(entry.corrects)) connected.add(entry.id);
     return clone(this.entries.filter(entry => connected.has(entry.id)).sort((a, b) => a.cursor - b.cursor));
   }
+  /** Whether anything more is expected from the harness. A spoken turn and a ready command
+   *  need no interpreting here — the voice model or the interface has already decided — so
+   *  only a typed reply waits on the model. */
   processed(entry) {
+    if (entry.kind !== 'text') return true;
     return this.technical.harness?.[entry.id]?.status === 'complete' || Boolean(entry.versions && entry.rawModelResponse !== undefined);
   }
+  /** One action is a root and everything that came of it.
+   *
+   *  Read from the root alone, a spoken phrase looked like an action that changed nothing:
+   *  the change it caused is a separate entry in the same chain, and so are its corrections.
+   *  Status, target and label are therefore taken over the chain, not over the root. */
   action(entry, chains) {
-    const execution = this.technical.executor?.[entry.id] || {};
-    const outcomes = execution.outcomes || [];
-    const target = [...outcomes].reverse().find(item => item.target)?.target || entry.commands?.find(command => command.actId)?.actId || null;
-    const error = execution.error || this.technical.harness?.[entry.id]?.error || null;
-    const rolledBack = Boolean(this.technical.undoneEntries?.[entry.id]);
     const chain = chains ? (chains.get(entry.id) || [entry]) : this.chain(entry.id);
-    const hasChanges = chain.some(item => this.technical.executor?.[item.id]?.outcomes?.some(outcome => outcome.changes?.length));
-    const label = entry.answer || entry.commands?.map(commandLabel).filter(Boolean).join(', ') || entry.text;
+    const ledgers = chain.map(item => this.technical.executor?.[item.id] || {});
+    const outcomes = ledgers.flatMap(ledger => ledger.outcomes || []);
+    const commands = chain.flatMap(item => item.commands || (item.command ? [item.command] : []));
+    const target = [...outcomes].reverse().find(item => item.target)?.target || commands.find(command => command.actId)?.actId || null;
+    const error = ledgers.find(ledger => ledger.error)?.error || this.technical.harness?.[entry.id]?.error || null;
+    const rolledBack = Boolean(this.technical.undoneEntries?.[entry.id]);
+    const hasChanges = outcomes.some(outcome => outcome.changes?.length);
+    const settled = ledgers.every(ledger => !['pending', 'waiting'].includes(ledger.status));
+    const label = entry.answer || entry.text || commands.map(commandLabel).filter(Boolean).join(', ');
     return {
       id: entry.id, actionId: entry.id, rootActionId: entry.id, requestId: entry.id,
-      label, text: label, status: error ? 'failed' : entry.commands?.length ? (execution.status === 'complete' ? 'applied' : 'pending') : 'needs-input',
-      createdAt: entry.at, transcript: entry.text, context: entry.context, command: entry.commands?.[0] || null,
-      target, error, rolledBack, canRollback: hasChanges && !rolledBack, sessionId: entry.key.clientKey, cursor: entry.cursor
+      label, text: label, status: error ? 'failed' : !commands.length ? 'needs-input' : settled ? 'applied' : 'pending',
+      createdAt: entry.at, transcript: entry.text, context: entry.context, command: commands[0] || null,
+      source: sourceOf(entry), target, error, rolledBack, canRollback: hasChanges && !rolledBack,
+      sessionId: entry.key.clientKey, cursor: entry.cursor
     };
   }
   actions(chains) {
-    return this.entries.filter(entry => entry.kind === 'text' && !entry.corrects && this.processed(entry)).map(entry => this.action(entry, chains));
+    return this.entries.filter(entry => isPublicRoot(entry) && this.processed(entry)).map(entry => this.action(entry, chains));
   }
   pending() {
     return clone(this.entries.filter(entry => ['pending', 'waiting'].includes(this.technical.harness?.[entry.id]?.status) || ['pending', 'waiting'].includes(this.technical.executor?.[entry.id]?.status)));
   }
   messagesOf(entry) {
+    if (entry.kind === 'speech') return [{ role: entry.role || 'user', text: entry.text, id: entry.id, kind: 'speech' }];
+    // A change made inside a conversation is not a line of it: the action itself already
+    // says what was done, and repeating the tool name as a user message reads as nonsense.
+    if (entry.kind === 'ui' && entry.corrects) return [];
     if (entry.kind === 'ui') return [{ role: 'user', text: commandLabel(entry.command), id: entry.id, kind: 'ui' }];
     return [
       { role: 'user', text: entry.text, id: entry.id, kind: 'text' },
