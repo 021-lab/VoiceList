@@ -255,6 +255,64 @@ export class ListDocumentDO extends Agent {
   }
   /** One command applied the way every other path applies one; used by the benchmark to undo
    *  what it measured. */
+  /** One addItem taken apart from inside, so the cost lands on a named step instead of on a
+   *  guess. Persistence is timed by wrapping the save the runtime calls, because it happens
+   *  twice per command and neither call is visible from outside. */
+  async profileAddTask() {
+    const storage = this.runtimeStorage;
+    const save = storage.save.bind(storage);
+    const exec = storage.sql.exec.bind(storage.sql);
+    let persistMs = 0, persistCount = 0, writtenBytes = 0, writtenRows = 0;
+    storage.save = async (state) => {
+      const at = Date.now();
+      try { return await save(state); } finally { persistMs += Date.now() - at; persistCount += 1; }
+    };
+    // What the command actually puts on disk, counted where the statements are issued.
+    storage.sql.exec = (query, ...params) => {
+      if (/INSERT|DELETE/i.test(query)) { writtenRows += 1; writtenBytes += params.reduce((sum, value) => sum + String(value).length, 0); }
+      return exec(query, ...params);
+    };
+    try {
+      const line1 = 'profile ' + Date.now().toString(36);
+      const input = { key: {clientKey:'profile:'+crypto.randomUUID(), seq:1},
+        context: {elementId:'app', view:'list', revision: this.runtime.graph.revision},
+        command: {command:'addItem', actId:'list', actType:'list', payload:{line1}} };
+
+      const t0 = Date.now();
+      const receipt = await this.runtime.submit(input);
+      const t1 = Date.now();
+      await this.runtime.processPending();
+      const t2 = Date.now();
+      const settled = this.runtime.receipt(this.runtime.journal.get(receipt.requestId));
+      const t3 = Date.now();
+      const snapshotBytes = JSON.stringify(this.port.getSnapshot()).length;
+      const t4 = Date.now();
+      // Counted before the cleanup delete, which persists twice more of its own.
+      const commandPersistMs = persistMs, commandPersistCount = persistCount;
+      const commandWrittenBytes = writtenBytes, commandWrittenRows = writtenRows;
+
+      const created = settled.target;
+      let cleanupMs = 0;
+      if (created) {
+        const at = Date.now();
+        await this.port.applyCommand({command:'deleteItem', actId:created, actType:'task', payload:{}}, {message:{clientKey:'profile-cleanup:'+crypto.randomUUID(), seq:1}});
+        cleanupMs = Date.now() - at;
+      }
+      return {
+        submit: t1 - t0, execute: t2 - t1, receipt: t3 - t2, snapshot: t4 - t3,
+        total: t4 - t0, persistMs: commandPersistMs, persistCount: commandPersistCount, snapshotBytes, cleanupMs,
+        writtenBytes: commandWrittenBytes, writtenRows: commandWrittenRows,
+        items: this.runtime.graph.read().items.length, entries: this.runtime.journal.entries.length,
+        // What the object holds, against what one command had to write of it.
+        bytes: {
+          technical: JSON.stringify(this.runtime.exportState().technical).length,
+          journal: JSON.stringify(this.runtime.journal.entries).length,
+          items: JSON.stringify(this.runtime.graph.read().items).length
+        }
+      };
+    } finally { storage.save = save; storage.sql.exec = exec; }
+  }
+
   /** What a broadcast has to build before it can send anything. */
   benchSnapshot() {
     const snapshot = this.port.getSnapshot();

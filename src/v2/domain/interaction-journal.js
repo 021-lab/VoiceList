@@ -29,12 +29,21 @@ function normalizeLegacy(entries) {
   return [...modern, ...migrated].sort((a, b) => a.cursor - b.cursor);
 }
 
-/** Append-only interaction bus. Entries may only gain processing fields in place. */
+/** Append-only interaction bus. An entry may only gain processing fields, and it gains them
+ *  as a replacement rather than in place, so a journal can share entries with the state it
+ *  was built from without being able to change it. */
 export class InteractionJournal {
-  constructor(entries = [], technical = {}) {
-    this.entries = normalizeLegacy(clone(entries));
+  constructor(entries = [], technical = {}, { own = false } = {}) {
+    this.entries = own ? entries : normalizeLegacy(clone(entries));
     this.technical = technical;
   }
+
+  /** A journal over entries the caller already owns and has normalised.
+   *
+   *  Copying every entry on construction was the second most expensive thing a command did:
+   *  a journal is built for each transaction and for each read of the document, and each
+   *  build copied the whole journal. */
+  static over(entries, technical = {}) { return new InteractionJournal(entries, technical, { own: true }); }
   appendInteraction(input, { corrects } = {}) {
     const cursor = Math.max(0, ...this.entries.map(entry => Number(entry.cursor) || 0)) + 1;
     const entry = {
@@ -47,13 +56,18 @@ export class InteractionJournal {
     return clone(entry);
   }
   enrich(id, patch) {
-    const entry = this.entries.find(item => item.id === id);
-    if (!entry) fail('NOT_FOUND', 'Запись журнала не найдена');
+    const index = this.entries.findIndex(item => item.id === id);
+    if (index < 0) fail('NOT_FOUND', 'Запись журнала не найдена');
+    const entry = this.entries[index];
+    const enriched = { ...entry };
     for (const [key, value] of Object.entries(clone(patch))) {
       if (entry[key] !== undefined && stable(entry[key]) !== stable(value)) fail('CONFLICT', 'Запись журнала уже обработана иначе');
-      entry[key] = value;
+      enriched[key] = value;
     }
-    return clone(entry);
+    // Replaced, not edited: the entry object may be shared with the state this journal was
+    // built from, and that state must stay as it was until the transaction commits.
+    this.entries[index] = enriched;
+    return clone(enriched);
   }
   read({ after = 0, limit = 100 } = {}) {
     return clone(this.entries.filter(entry => entry.cursor > after).slice(0, Math.min(limit, 500)));
@@ -61,7 +75,9 @@ export class InteractionJournal {
   get(id) { return clone(this.entries.find(entry => entry.id === id) || null); }
   get cursor() { return Math.max(0, ...this.entries.map(entry => Number(entry.cursor) || 0)); }
   request(key, input) {
-    const prior = this.entries.find(entry => stable(entry.key) === stable(key));
+    // The key is a client id and a sequence number, so it is compared as such: serialising
+    // every entry's key to find one made submitting a command cost the whole journal.
+    const prior = this.entries.find(entry => entry.key?.seq === key.seq && entry.key?.clientKey === key.clientKey);
     if (!prior) return null;
     const saved = { key: prior.key, context: prior.context, ...(prior.kind === 'text' ? { text: prior.text } : { command: prior.command }) };
     if (stable(saved) !== stable(input)) fail('REQUEST_KEY_REUSED', 'Идентификатор запроса уже использован для другого ввода');

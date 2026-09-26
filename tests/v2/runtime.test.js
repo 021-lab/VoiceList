@@ -51,6 +51,22 @@ describe('v0.2 authoritative journal and graph projection', () => {
     expect(runtime.graph.read({id:'milk1'}).status).toBe('Done');
     expect(persisted.graph.items.find(x=>x.id==='milk1').status).toBe('Done');
   });
+  it('leaves the ledgers and the journal as they were when a transaction fails', async () => {
+    // A transaction copies the ledgers instead of deep-copying them, and enriches a journal
+    // entry by replacing it. What makes that safe is this: a failed transaction leaves
+    // nothing behind for the next read to see.
+    let reject = false;
+    const runtime = new DocumentRuntime({ persist: async () => { if (reject) throw Error('storage'); } });
+    await runtime.submit(input(1, status('Done')));
+    const before = structuredClone(runtime.exportState());
+    reject = true;
+    await expect(runtime.processPending()).rejects.toThrow('storage');
+    expect(runtime.exportState()).toEqual(before);
+    expect(runtime.journal.entries).toEqual(before.entries);
+    reject = false;
+    await runtime.processPending();
+    expect(runtime.state.technical.executor[before.entries[0].id].outcomes).toHaveLength(1);
+  });
   it('recovers an accepted input after a restart before queueing', async () => {
     const runtime=new DocumentRuntime();
     await runtime.submit(input(1,status('Done')));

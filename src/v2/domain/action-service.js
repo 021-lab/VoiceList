@@ -5,7 +5,10 @@ export class ActionService {
   constructor({ graph, journal, technical }) { Object.assign(this, { graph, journal, technical }); }
   execute(entry, command, index) {
     const key = `${entry.id}:${index}`;
-    const prior = this.technical.commandKeys?.[key];
+    // The entry's own ledger is the record. A second, document-wide copy of every outcome
+    // used to be kept under the same key; it held nothing the ledger does not and made the
+    // ledgers twice the size, which is paid on every transaction.
+    const prior = this.technical.executor?.[entry.id]?.outcomes?.find(item => item.key === key);
     if (prior) return clone(prior);
     let result;
     if (command.command === 'rollbackAction' || command.command === 'undo') {
@@ -25,9 +28,6 @@ export class ActionService {
     } else {
       result = this.graph.apply([command], index === 0 ? entry.context.revision : this.graph.revision);
     }
-    const outcome = { key, command: clone(command), ...clone(result) };
-    this.technical.commandKeys ||= {};
-    this.technical.commandKeys[key] = clone(outcome);
-    return outcome;
+    return { key, command: clone(command), ...clone(result) };
   }
 }

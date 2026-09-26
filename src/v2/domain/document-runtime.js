@@ -8,12 +8,30 @@ import { TaskAgent } from './task-agent.js';
 import { AgentHarness, HARNESS_VERSIONS } from './agent-harness.js';
 import { Presentation } from './presentation.js';
 
-const emptyTechnical = () => ({ harness: {}, executor: {}, commandKeys: {}, undoneEntries: {}, cursor: 0, events: [] });
+const emptyTechnical = () => ({ harness: {}, executor: {}, undoneEntries: {}, cursor: 0, events: [] });
+
+/** A private copy of the ledgers for one transaction.
+ *
+ *  Deep-copying them was the most expensive thing a command did — the ledgers grow with the
+ *  journal, and one command runs two transactions, so adding a task copied hundreds of
+ *  kilobytes four times. Nothing here is edited in place: a changed record replaces its slot,
+ *  so copying the maps is enough for the previous state to survive a failed transaction. */
+const copyTechnical = (technical) => ({
+  harness: { ...technical.harness },
+  executor: { ...technical.executor },
+  undoneEntries: { ...technical.undoneEntries },
+  cursor: technical.cursor,
+  events: technical.events.slice()
+});
 
 function normalizeState(initialState, seed) {
   const rawEntries = clone(initialState?.entries || []);
   const journal = new InteractionJournal(rawEntries);
-  const technical = { ...emptyTechnical(), ...clone(initialState?.technical || {}) };
+  // commandKeys held a second copy of every outcome, keyed the same way the executor ledger
+  // already keys it. It doubled the ledgers and is rebuilt from them on read, so a document
+  // stored with it loses it here.
+  const { commandKeys, ...stored } = clone(initialState?.technical || {});
+  const technical = { ...emptyTechnical(), ...stored };
   for (const entry of journal.entries) {
     const legacyResults = rawEntries.filter(item => item.type === 'result' && item.requestId === entry.id);
     if (!technical.harness[entry.id]) technical.harness[entry.id] = { status: entry.kind === 'text' && !entry.versions ? 'pending' : entry.kind === 'text' ? 'complete' : 'bypassed' };
@@ -24,7 +42,6 @@ function normalizeState(initialState, seed) {
       }));
       const commands = entry.kind === 'ui' ? [entry.command] : entry.commands || [];
       technical.executor[entry.id] = { status: rawEntries.some(item => item.type === 'settled' && item.requestId === entry.id) ? 'complete' : commands.length ? 'pending' : 'complete', nextIndex: outcomes.length, outcomes };
-      for (const outcome of outcomes) technical.commandKeys[outcome.key] = clone(outcome);
       for (const result of legacyResults) for (const id of result.undoneIds || []) technical.undoneEntries[id] = true;
     }
   }
@@ -41,12 +58,21 @@ export class DocumentRuntime {
     this.tail = Promise.resolve(); this.processing = null;
   }
   get graph() { return new TaskGraph(this.state.graph, this.seed); }
-  get journal() { return new InteractionJournal(this.state.entries, this.state.technical); }
+  /** A read-only journal over the current state, built once per state rather than once per
+   *  question: receipts, snapshots and polls each asked for one, and each build copied the
+   *  whole journal. Writing goes through transaction(), which builds its own. */
+  get journal() {
+    if (this.readJournal?.state !== this.state) this.readJournal = { state: this.state, journal: InteractionJournal.over(this.state.entries, this.state.technical) };
+    return this.readJournal.journal;
+  }
   async transaction(fn) {
     const operation = this.tail.then(async () => {
-      const graph = this.graph, technical = clone(this.state.technical), journal = new InteractionJournal(this.state.entries, technical);
+      // The array is copied so an appended entry does not reach the current state; the
+      // entries in it are not, because the journal replaces an entry it enriches.
+      const graph = this.graph, technical = copyTechnical(this.state.technical);
+      const journal = InteractionJournal.over(this.state.entries.slice(), technical);
       const result = fn({ graph, journal, technical });
-      const next = { graph: graph.read(), entries: clone(journal.entries), technical };
+      const next = { graph: graph.read(), entries: journal.entries, technical };
       await this.persist(next);
       this.state = next;
       return result;
@@ -141,7 +167,7 @@ export class DocumentRuntime {
         if (technical.harness[entry.id]?.status !== 'pending') return;
         journal.enrich(entry.id, { rawModelResponse: clone(raw), answer: parsed.answer, commands: parsed.commands });
         technical.harness[entry.id] = { status: 'complete' };
-        technical.executor[entry.id].status = parsed.commands.length ? 'pending' : 'complete';
+        technical.executor[entry.id] = { ...technical.executor[entry.id], status: parsed.commands.length ? 'pending' : 'complete' };
         if (!parsed.commands.length) this.notification(technical, journal.get(entry.id), { publicActionId: journal.get(entry.id).corrects ? null : entry.id });
       });
     } catch (error) {
@@ -169,17 +195,17 @@ export class DocumentRuntime {
         const latest = journal.get(entry.id);
         const service = new ActionService({ graph, journal, technical });
         const outcome = service.execute(latest, command, state.nextIndex);
-        state.outcomes.push(clone(outcome)); state.nextIndex += 1;
+        const next = { ...state, outcomes: [...state.outcomes, clone(outcome)], nextIndex: state.nextIndex + 1 };
+        technical.executor[entry.id] = next;
         if (outcome.undoneEntryIds) for (const id of outcome.undoneEntryIds) technical.undoneEntries[id] = true;
-        if (state.nextIndex >= commands.length) {
-          state.status = 'complete';
+        if (next.nextIndex >= commands.length) {
+          next.status = 'complete';
           this.notification(technical, latest, { publicActionId: latest.kind === 'text' && !latest.corrects ? latest.id : null, uiEffect: outcome.uiEffect });
         }
       });
     } catch (error) {
       await this.transaction(({ journal, technical }) => {
-        const state = technical.executor[entry.id];
-        state.status = 'failed'; state.error = safeError(error);
+        technical.executor[entry.id] = { ...technical.executor[entry.id], status: 'failed', error: safeError(error) };
         this.notification(technical, journal.get(entry.id), { publicActionId: journal.get(entry.id).kind === 'text' && !journal.get(entry.id).corrects ? entry.id : null });
       });
     }

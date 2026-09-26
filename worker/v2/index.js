@@ -103,6 +103,12 @@ export default {
         if (url.pathname === '/api/live/log/sessions') return json(await stub.listLiveSessions(Number(url.searchParams.get('limit')||50)));
         if (url.pathname === '/api/live/log') return json(await stub.readLiveLog({sessionId:url.searchParams.get('session')||'',afterSeq:Number(url.searchParams.get('after')||0),limit:Number(url.searchParams.get('limit')||200)}));
       }
+      // One addItem taken apart from inside the object.
+      if (url.pathname === '/api/v2/profile') {
+        const runs = [];
+        for (let index = 0; index < 3; index++) runs.push(await stub.profileAddTask());
+        return json({edge: request.cf?.colo || 'unknown', runs});
+      }
       // The same measurements, taken inside the worker. Run from the client they include the
       // client's own network; run here they are edge-to-object and back, which is the part
       // moving the object was meant to change. Cleans up the tasks it creates.

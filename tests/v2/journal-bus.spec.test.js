@@ -30,7 +30,9 @@ describe('v0.2 InteractionJournal bus comprehensive contract', () => {
     expect(runtime.graph.read({ id: 'milk1' }).status).toBe('Focus');
     expect(runtime.journal.entries).toHaveLength(1);
     expect(runtime.journal.entries.some(entry => ['result', 'settled', 'command'].includes(entry.type))).toBe(false);
-    expect(runtime.state.technical.commandKeys[`${rootId}:0`]).toBeTruthy();
+    // The outcome is kept once, in the entry's own executor ledger, under its command key.
+    expect(runtime.state.technical.executor[rootId].outcomes.map(outcome => outcome.key)).toEqual([`${rootId}:0`]);
+    expect(runtime.state.technical.commandKeys).toBeUndefined();
 
     const uiReceipt = await runtime.executeAndWait(request(runtime, 2, { command: { command: 'setDeadline', actId: 'milk1', payload: { deadline: '2026-10-20' } } }));
     expect(uiReceipt.actions).toEqual([]);
