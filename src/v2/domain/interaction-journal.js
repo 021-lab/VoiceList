@@ -83,13 +83,14 @@ export class InteractionJournal {
   processed(entry) {
     return this.technical.harness?.[entry.id]?.status === 'complete' || Boolean(entry.versions && entry.rawModelResponse !== undefined);
   }
-  action(entry) {
+  action(entry, chains) {
     const execution = this.technical.executor?.[entry.id] || {};
     const outcomes = execution.outcomes || [];
     const target = [...outcomes].reverse().find(item => item.target)?.target || entry.commands?.find(command => command.actId)?.actId || null;
     const error = execution.error || this.technical.harness?.[entry.id]?.error || null;
     const rolledBack = Boolean(this.technical.undoneEntries?.[entry.id]);
-    const hasChanges = this.chain(entry.id).some(item => this.technical.executor?.[item.id]?.outcomes?.some(outcome => outcome.changes?.length));
+    const chain = chains ? (chains.get(entry.id) || [entry]) : this.chain(entry.id);
+    const hasChanges = chain.some(item => this.technical.executor?.[item.id]?.outcomes?.some(outcome => outcome.changes?.length));
     const label = entry.answer || entry.commands?.map(commandLabel).filter(Boolean).join(', ') || entry.text;
     return {
       id: entry.id, actionId: entry.id, rootActionId: entry.id, requestId: entry.id,
@@ -98,19 +99,61 @@ export class InteractionJournal {
       target, error, rolledBack, canRollback: hasChanges && !rolledBack, sessionId: entry.key.clientKey, cursor: entry.cursor
     };
   }
-  actions() {
-    return this.entries.filter(entry => entry.kind === 'text' && !entry.corrects && this.processed(entry)).map(entry => this.action(entry));
+  actions(chains) {
+    return this.entries.filter(entry => entry.kind === 'text' && !entry.corrects && this.processed(entry)).map(entry => this.action(entry, chains));
   }
   pending() {
     return clone(this.entries.filter(entry => ['pending', 'waiting'].includes(this.technical.harness?.[entry.id]?.status) || ['pending', 'waiting'].includes(this.technical.executor?.[entry.id]?.status)));
   }
+  messagesOf(entry) {
+    if (entry.kind === 'ui') return [{ role: 'user', text: commandLabel(entry.command), id: entry.id, kind: 'ui' }];
+    return [
+      { role: 'user', text: entry.text, id: entry.id, kind: 'text' },
+      ...(this.processed(entry) ? [{ role: 'assistant', text: entry.answer || entry.commands?.map(commandLabel).join(', ') || '', id: entry.id + ':answer' }] : [])
+    ];
+  }
+
+  /** Every correction chain in one pass, keyed by the root it belongs to.
+   *
+   *  Asking per action — chain() inside action(), then dialogue() again — re-walked and
+   *  re-cloned the whole journal each time. A snapshot of a few hundred entries cost around
+   *  190 ms, and a broadcast spent almost all of its time here, on every tool call. */
+  chains() {
+    const byId = new Map(this.entries.map(entry => [entry.id, entry]));
+    const rootOf = new Map();
+    const resolve = (entry) => {
+      const path = [];
+      let current = entry;
+      const seen = new Set();
+      while (current && !rootOf.has(current.id) && current.corrects && !seen.has(current.id)) {
+        seen.add(current.id);
+        path.push(current);
+        current = byId.get(current.corrects) || null;
+      }
+      const root = current ? (rootOf.get(current.id) || current) : entry;
+      for (const item of path) rootOf.set(item.id, root);
+      if (current) rootOf.set(current.id, root);
+      return root;
+    };
+    const groups = new Map();
+    for (const entry of this.entries) {
+      const root = resolve(entry);
+      const list = groups.get(root.id);
+      if (list) list.push(entry); else groups.set(root.id, [entry]);
+    }
+    for (const list of groups.values()) list.sort((a, b) => a.cursor - b.cursor);
+    return groups;
+  }
+
+  dialogues(chains = this.chains()) {
+    const result = new Map();
+    for (const [rootId, entries] of chains) result.set(rootId, entries.flatMap(entry => this.messagesOf(entry)));
+    return result;
+  }
+
   dialogue(actionId) {
     return this.chain(actionId).flatMap(entry => {
-      if (entry.kind === 'ui') return [{ role: 'user', text: commandLabel(entry.command), id: entry.id, kind: 'ui' }];
-      return [
-        { role: 'user', text: entry.text, id: entry.id, kind: 'text' },
-        ...(this.processed(entry) ? [{ role: 'assistant', text: entry.answer || entry.commands?.map(commandLabel).join(', ') || '', id: entry.id + ':answer' }] : [])
-      ];
+      return this.messagesOf(entry);
     });
   }
 }

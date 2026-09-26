@@ -89,9 +89,15 @@ export class ListDocumentDO extends Agent {
       this.broadcastState();
     } catch (error) { connection.send(JSON.stringify({type:'ack',ack:{status:'rejected',reason:safeError(error).message}})); }
   }
+  /** Building the snapshot is the most expensive thing the object does, so it is not built
+   *  for nobody: with no page listening and no voice session to keep in step there is
+   *  nothing to send. */
   broadcastState() {
+    const connections = [...this.getConnections()];
+    const live = Boolean(this.live?.active);
+    if (!connections.length && !live) return;
     const payload = JSON.stringify({type:'state',state:this.port.getSnapshot()});
-    for (const connection of this.getConnections()) { try { connection.send(payload); } catch {} }
+    for (const connection of connections) { try { connection.send(payload); } catch {} }
     // An edit made by hand has to reach the voice layer too, not only its own tool calls.
     if (this.live?.active) this.live.syncSnapshot().catch(() => {});
   }
@@ -136,10 +142,12 @@ export class ListDocumentDO extends Agent {
   stopGeminiSession() { return this.gemini ? this.gemini.stop('client') : false; }
   geminiSessionStatus() { return {active:Boolean(this.gemini?.active),sessionId:this.gemini?.sessionId || ''}; }
   /** The page relays a tool call and gets back exactly what it must send to Google. */
+  /** A read changes nothing, and a repeat was answered from the first result: neither is
+   *  worth a snapshot. Only a call that actually applied something redraws the list. */
   async runGeminiTools(frame) {
     const host = this.geminiHost();
     const results = await host.invokeAll(frame);
-    this.broadcastState();
+    if (results.some(item => item.response?.status === 'applied')) this.broadcastState();
     return {results};
   }
   mirrorGeminiFrames(frames) { return this.geminiHost().mirror(frames); }
@@ -247,6 +255,8 @@ export class ListDocumentDO extends Agent {
   }
   /** One command applied the way every other path applies one; used by the benchmark to undo
    *  what it measured. */
+  /** What a broadcast has to build before it can send anything. */
+  benchSnapshot() { return JSON.stringify(this.port.getSnapshot()).length; }
   async applyTaskCommand(command) {
     const ack = await this.port.applyCommand(command, {message:{clientKey:'bench:'+crypto.randomUUID(), seq:1}});
     this.broadcastState();

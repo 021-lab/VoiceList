@@ -2,8 +2,15 @@ import { createActiveTaskTree, createTaskSubgraph, findTaskTree, formatTaskTitle
 
 export class CompatibilityPort {
   constructor(runtime) { this.runtime = runtime; }
-  getSnapshot() { return { rev: this.runtime.graph.revision, content: { snapshot: { items: this.runtime.graph.read().items },
-    actionLog: this.runtime.journal.actions().map(a => ({ ...a, syncStatus: a.status === 'applied' ? 'synced' : 'failed', comments: this.runtime.journal.dialogue(a.id).filter(m => m.role === 'user').slice(1) })) } }; }
+  /** Chains are walked once and reused by both the action list and the comments. */
+  getSnapshot() {
+    const journal = this.runtime.journal;
+    const chains = journal.chains();
+    const dialogues = journal.dialogues(chains);
+    return { rev: this.runtime.graph.revision, content: { snapshot: { items: this.runtime.graph.read().items },
+      actionLog: journal.actions(chains).map(a => ({ ...a, syncStatus: a.status === 'applied' ? 'synced' : 'failed',
+        comments: (dialogues.get(a.id) || []).filter(m => m.role === 'user').slice(1) })) } };
+  }
   getTaskById(id) { return this.runtime.graph.read({ id }); }
   getActiveTaskTree() { return createActiveTaskTree(this.runtime.graph.read().items); }
   getTaskSubgraph(id) { return createTaskSubgraph(this.runtime.graph.read().items, id); }
