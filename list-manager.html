@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-3abb7ea65755b3da">
+<meta name="preview-build-hash" content="v02-a040a14c7a6462de">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-3abb7ea65755b3da";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-a040a14c7a6462de";
 </script>
 <script>
 (() => {
@@ -3267,6 +3267,12 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     transcriptNode = null;
   }
   var audioPartsOf = (frame) => (frame?.serverContent?.modelTurn?.parts || []).map((part) => part?.inlineData?.data).filter(Boolean);
+  var SPEAKER_TAIL_MS = 500;
+  function modelSpeaking(streamer, tailMs = SPEAKER_TAIL_MS) {
+    const context = streamer?.context;
+    if (!context) return false;
+    return streamer.scheduledTime > context.currentTime - tailMs / 1e3;
+  }
   function createGeminiVoice({
     button,
     status,
@@ -3352,7 +3358,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     }
     async function start() {
       if (session) return;
-      const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: "" };
+      const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: "", speaking: false };
       session = current;
       try {
         setStatus("\u0413\u043E\u0442\u043E\u0432\u043B\u044E \u0437\u0432\u0443\u043A\u2026");
@@ -3364,9 +3370,15 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         const stream = await within(requestMicrophone(), 3e4, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u0437\u0430\u043F\u0440\u043E\u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
         current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
         current.recorder.onVolume = (volume) => {
-          if (volume > 0.02) showListening();
+          if (volume > 0.02 && !modelSpeaking(current.streamer)) showListening();
         };
         current.recorder.onData = (data) => {
+          const speaking = modelSpeaking(current.streamer);
+          if (speaking !== current.speaking) {
+            current.speaking = speaking;
+            setStatus(speaking ? "\u041E\u0442\u0432\u0435\u0447\u0430\u0435\u0442" : "\u0421\u043B\u0443\u0448\u0430\u044E", "active");
+          }
+          if (speaking) return;
           send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
         };
         setStatus("\u0417\u0430\u043F\u0443\u0441\u043A\u0430\u044E \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0443\u2026");
@@ -3444,7 +3456,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-3abb7ea65755b3da";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-a040a14c7a6462de";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

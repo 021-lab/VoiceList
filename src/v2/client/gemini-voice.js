@@ -113,6 +113,30 @@ const audioPartsOf = (frame) =>
     .map(part => part?.inlineData?.data)
     .filter(Boolean);
 
+/** How long after the model stops sounding the microphone stays closed. Covers the last of
+ *  the speaker's output reaching the microphone and the room's own echo of it. */
+const SPEAKER_TAIL_MS = 500;
+
+/** Whether the model's voice is still in the air.
+ *
+ *  The page plays the model through Web Audio, and the browser's echo canceller does not
+ *  cover that path: on a speakerphone the model's own voice goes back into the microphone,
+ *  Google transcribes it as the user, and the model answers itself. It is visible in the log
+ *  — «Добавила задачи…» comes back as «добавить», the answer to that comes back as «Что», and
+ *  from there the conversation talks to itself.
+ *
+ *  So the microphone is closed while the model speaks, the way a speakerphone does it. The
+ *  streamer schedules its audio ahead on the output clock, and the end of the last scheduled
+ *  buffer is when the voice actually stops.
+ *
+ *  The cost is that speaking over the model no longer interrupts it. Its turns are a few
+ *  seconds long, and a conversation that answers itself is the worse trade. */
+export function modelSpeaking(streamer, tailMs = SPEAKER_TAIL_MS) {
+  const context = streamer?.context;
+  if (!context) return false;
+  return streamer.scheduledTime > context.currentTime - tailMs / 1000;
+}
+
 export function createGeminiVoice({
   button, status, fetchImpl = (...args) => fetch(...args), WebSocketCtor = WebSocket, onTranscript = () => {}
 } = {}) {
@@ -216,7 +240,7 @@ export function createGeminiVoice({
 
   async function start() {
     if (session) return;
-    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: '' };
+    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: '', speaking: false };
     session = current;
 
     try {
@@ -240,8 +264,15 @@ export function createGeminiVoice({
       const stream = await within(requestMicrophone(), 30_000, 'Браузер не ответил на запрос микрофона.');
       current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
       // The meter fires every 25 ms; it is the only signal available before the model speaks.
-      current.recorder.onVolume = (volume) => { if (volume > 0.02) showListening(); };
+      current.recorder.onVolume = (volume) => { if (volume > 0.02 && !modelSpeaking(current.streamer)) showListening(); };
       current.recorder.onData = (data) => {
+        // While the model is speaking the microphone hears the model, so nothing goes out.
+        const speaking = modelSpeaking(current.streamer);
+        if (speaking !== current.speaking) {
+          current.speaking = speaking;
+          setStatus(speaking ? 'Отвечает' : 'Слушаю', 'active');
+        }
+        if (speaking) return;
         // Audio frames are the bulk of the traffic and say nothing a transcript does not.
         // Before the socket is open they are dropped: a second of lost silence costs nothing.
         send(current, { realtimeInput: { audio: { data, mimeType: `audio/pcm;rate=${GEMINI_INPUT_SAMPLE_RATE}` } } }, { log: false });
