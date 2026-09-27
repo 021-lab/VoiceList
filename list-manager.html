@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-a040a14c7a6462de">
+<meta name="preview-build-hash" content="v02-4ddbbcf96ca3d5d8">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1089,7 +1089,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-a040a14c7a6462de";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-4ddbbcf96ca3d5d8";
 </script>
 <script>
 (() => {
@@ -2003,7 +2003,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       const row = this.node("div", { className: "action-log-row", "data-log-id": id, "data-component-id": component.id, tabIndex: 0 });
       const origin = { "gemini-live": "Gemini", "gpt-live": "GPT-Live", schedule: "\u0420\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435" }[p.source] || "";
       row.append(
-        this.node("div", { className: "action-log-label" }, p.transcript || p.text || "\u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"),
+        this.node("div", { className: "action-log-label" }, p.heard || p.transcript || p.text || "\u0420\u0435\u043F\u043B\u0438\u043A\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"),
         this.node("div", { className: "action-log-status" }, p.status || ""),
         this.node("div", { className: "action-log-meta" }, [origin, p.createdAt || ""].filter(Boolean).join(" \xB7 "))
       );
@@ -2107,6 +2107,10 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
             { className: "v02-record-marker" },
             byVoice ? "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0430\u0433\u0435\u043D\u0442\u0430" : record.corrects ? "\u041A\u043E\u0440\u0440\u0435\u043A\u0442\u0438\u0440\u043E\u0432\u043A\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430" : "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430"
           ));
+          if (record.heard) {
+            block.append(this.node("div", { className: "v02-section-label" }, "\u041C\u043E\u0434\u0435\u043B\u044C \u0443\u0441\u043B\u044B\u0448\u0430\u043B\u0430"));
+            block.append(this.node("div", { className: "v02-message", "data-role": "user" }, record.heard));
+          }
           block.append(this.renderCommandCard(record.commandView));
         }
         body.append(block);
@@ -3268,10 +3272,11 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   }
   var audioPartsOf = (frame) => (frame?.serverContent?.modelTurn?.parts || []).map((part) => part?.inlineData?.data).filter(Boolean);
   var SPEAKER_TAIL_MS = 500;
-  function modelSpeaking(streamer, tailMs = SPEAKER_TAIL_MS) {
+  var TURN_GAP_MS = 2e3;
+  function modelSpeaking(streamer, turn = {}, now = Date.now()) {
     const context = streamer?.context;
-    if (!context) return false;
-    return streamer.scheduledTime > context.currentTime - tailMs / 1e3;
+    if (context && streamer.scheduledTime > context.currentTime - SPEAKER_TAIL_MS / 1e3) return true;
+    return Boolean(turn.active) && now - (turn.lastAudioAt || 0) < TURN_GAP_MS;
   }
   function createGeminiVoice({
     button,
@@ -3322,6 +3327,10 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         return;
       }
       const audio = audioPartsOf(frame);
+      if (audio.length) {
+        current.turn.active = true;
+        current.turn.lastAudioAt = Date.now();
+      }
       for (const chunk of audio) current.streamer.addPCM16(new Uint8Array(base64ToArrayBuffer(chunk)));
       const input = frame.serverContent?.inputTranscription?.text;
       const output = frame.serverContent?.outputTranscription?.text;
@@ -3332,10 +3341,14 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
       }
       if (output) onTranscript({ role: "assistant", text: output });
       if (frame.serverContent?.turnComplete) {
+        current.turn.active = false;
         current.heard = "";
         remember(current, { vlTurnEnd: true }, "in");
       }
-      if (frame.serverContent?.interrupted) current.streamer.stop();
+      if (frame.serverContent?.interrupted) {
+        current.turn.active = false;
+        current.streamer.stop();
+      }
       if (frame.toolCall) {
         const frames = current.frames.splice(0, MIRROR_LIMIT);
         const { results } = await post("/api/live/gemini/tools", { ...frame, frames });
@@ -3358,7 +3371,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     }
     async function start() {
       if (session) return;
-      const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: "", speaking: false };
+      const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: "", speaking: false, turn: { active: false, lastAudioAt: 0 } };
       session = current;
       try {
         setStatus("\u0413\u043E\u0442\u043E\u0432\u043B\u044E \u0437\u0432\u0443\u043A\u2026");
@@ -3370,10 +3383,10 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
         const stream = await within(requestMicrophone(), 3e4, "\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u0437\u0430\u043F\u0440\u043E\u0441 \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0430.");
         current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
         current.recorder.onVolume = (volume) => {
-          if (volume > 0.02 && !modelSpeaking(current.streamer)) showListening();
+          if (volume > 0.02 && !modelSpeaking(current.streamer, current.turn)) showListening();
         };
         current.recorder.onData = (data) => {
-          const speaking = modelSpeaking(current.streamer);
+          const speaking = modelSpeaking(current.streamer, current.turn);
           if (speaking !== current.speaking) {
             current.speaking = speaking;
             setStatus(speaking ? "\u041E\u0442\u0432\u0435\u0447\u0430\u0435\u0442" : "\u0421\u043B\u0443\u0448\u0430\u044E", "active");
@@ -3456,7 +3469,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-a040a14c7a6462de";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-4ddbbcf96ca3d5d8";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

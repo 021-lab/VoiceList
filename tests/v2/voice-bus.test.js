@@ -96,6 +96,30 @@ describe('a change made by voice', () => {
   });
 });
 
+describe('when the transcription fails but the model heard right', () => {
+  /** Live: the person asked for a deadline and focus, the model did exactly that, and the
+   *  transcription of the same audio came back as «la nuit». The journal recorded «la nuit»
+   *  as the command. */
+  it('shows what the model heard, and keeps the transcription beside it', async () => {
+    const { runtime, host, heard } = session();
+    host.mirror([heard('user', 'la nuit'), turnEnd]);
+    await host.invokeAll(call('c1', 'addItem', { line1: 'Забронировать отель', heard: 'поставь отель в фокус на завтра' }));
+    await host.stop('client');
+
+    const [action] = runtime.journal.actions();
+    expect(action.label).toBe('поставь отель в фокус на завтра');
+    expect(action.transcript).toBe('la nuit');
+    expect(action.status).toBe('applied');
+  });
+
+  it('does not let the wording defeat the guard against a repeated change', async () => {
+    const { runtime, host } = session();
+    await host.invokeAll(call('a', 'addItem', { line1: 'Хлеб', heard: 'добавь хлеб' }));
+    await host.invokeAll(call('b', 'addItem', { line1: 'Хлеб', heard: 'ну добавь хлеб же' }));
+    expect(runtime.graph.read().items.filter(item => item.line1 === 'Хлеб')).toHaveLength(1);
+  });
+});
+
 describe('what the journal screen shows', () => {
   it('hides a button press and keeps what was said to an agent', async () => {
     const { runtime, port, host, heard } = session();

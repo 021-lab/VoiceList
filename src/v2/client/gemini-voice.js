@@ -117,6 +117,11 @@ const audioPartsOf = (frame) =>
  *  the speaker's output reaching the microphone and the room's own echo of it. */
 const SPEAKER_TAIL_MS = 500;
 
+/** How long a turn with no new audio is still treated as the model speaking. The model sends
+ *  its voice in bursts with gaps between them, and a gap is not the end of the turn; it is
+ *  also the limit on how long a turn that never reports its end can hold the microphone. */
+const TURN_GAP_MS = 2_000;
+
 /** Whether the model's voice is still in the air.
  *
  *  The page plays the model through Web Audio, and the browser's echo canceller does not
@@ -131,10 +136,13 @@ const SPEAKER_TAIL_MS = 500;
  *
  *  The cost is that speaking over the model no longer interrupts it. Its turns are a few
  *  seconds long, and a conversation that answers itself is the worse trade. */
-export function modelSpeaking(streamer, tailMs = SPEAKER_TAIL_MS) {
+export function modelSpeaking(streamer, turn = {}, now = Date.now()) {
   const context = streamer?.context;
-  if (!context) return false;
-  return streamer.scheduledTime > context.currentTime - tailMs / 1000;
+  if (context && streamer.scheduledTime > context.currentTime - SPEAKER_TAIL_MS / 1000) return true;
+  // Between two bursts of one turn the queue is empty and the speaker is silent for a moment.
+  // Opening the microphone there is how «Забронировать» came back as «Abono» and the model
+  // started its sentence over.
+  return Boolean(turn.active) && now - (turn.lastAudioAt || 0) < TURN_GAP_MS;
 }
 
 export function createGeminiVoice({
@@ -187,6 +195,7 @@ export function createGeminiVoice({
     }
 
     const audio = audioPartsOf(frame);
+    if (audio.length) { current.turn.active = true; current.turn.lastAudioAt = Date.now(); }
     for (const chunk of audio) current.streamer.addPCM16(new Uint8Array(base64ToArrayBuffer(chunk)));
 
     const input = frame.serverContent?.inputTranscription?.text;
@@ -199,6 +208,7 @@ export function createGeminiVoice({
     }
     if (output) onTranscript({ role: 'assistant', text: output });
     if (frame.serverContent?.turnComplete) {
+      current.turn.active = false;
       current.heard = '';
       // The end of a turn is the only place the page knows and the server does not: the
       // transcript frames carry no boundary. Without it a turn stays open in the worker and
@@ -207,7 +217,7 @@ export function createGeminiVoice({
     }
 
     // The model stopped because the user spoke over it; what is already queued is stale.
-    if (frame.serverContent?.interrupted) current.streamer.stop();
+    if (frame.serverContent?.interrupted) { current.turn.active = false; current.streamer.stop(); }
 
     if (frame.toolCall) {
       // What the page has seen travels with the call, in one request: the server needs the
@@ -240,7 +250,7 @@ export function createGeminiVoice({
 
   async function start() {
     if (session) return;
-    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: '', speaking: false };
+    const current = { socket: null, recorder: null, streamer: null, frames: [], timer: null, watchdog: null, ready: false, heard: '', speaking: false, turn: { active: false, lastAudioAt: 0 } };
     session = current;
 
     try {
@@ -264,10 +274,10 @@ export function createGeminiVoice({
       const stream = await within(requestMicrophone(), 30_000, 'Браузер не ответил на запрос микрофона.');
       current.recorder = new AudioRecorder(GEMINI_INPUT_SAMPLE_RATE);
       // The meter fires every 25 ms; it is the only signal available before the model speaks.
-      current.recorder.onVolume = (volume) => { if (volume > 0.02 && !modelSpeaking(current.streamer)) showListening(); };
+      current.recorder.onVolume = (volume) => { if (volume > 0.02 && !modelSpeaking(current.streamer, current.turn)) showListening(); };
       current.recorder.onData = (data) => {
         // While the model is speaking the microphone hears the model, so nothing goes out.
-        const speaking = modelSpeaking(current.streamer);
+        const speaking = modelSpeaking(current.streamer, current.turn);
         if (speaking !== current.speaking) {
           current.speaking = speaking;
           setStatus(speaking ? 'Отвечает' : 'Слушаю', 'active');

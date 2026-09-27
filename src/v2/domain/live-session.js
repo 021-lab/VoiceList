@@ -319,8 +319,19 @@ const requireText = (value, field) => {
 };
 
 /** Task tools map onto the ordinary document commands, so a voice change travels the same
- *  path as one made by hand and lands in the same interaction journal. */
+ *  path as one made by hand and lands in the same interaction journal.
+ *
+ *  `heard` rides along when the voice model supplies it: what the person asked, in the words
+ *  of the model that heard it. The separate transcription pass is not reliable — a request
+ *  the model acted on correctly («в фокус и дедлайн на завтра») came back from it as
+ *  «la nuit», and the journal then showed that as the command. */
 export function toTaskCommand(name, args = {}, source = 'gpt-live') {
+  const command = buildTaskCommand(name, args, source);
+  const heard = String(args.heard ?? '').trim().slice(0, 300);
+  return heard ? { ...command, transcript: heard } : command;
+}
+
+function buildTaskCommand(name, args, source) {
   switch (name) {
     case 'addItem':
       return { actId: 'list', actType: 'list', command: 'addItem', payload: { line1: requireText(args.line1, 'line1') }, source };

@@ -331,7 +331,7 @@ export class Client {
     const row = this.node('div', { className: 'action-log-row', 'data-log-id': id, 'data-component-id': component.id, tabIndex: 0 });
     const origin = { 'gemini-live': 'Gemini', 'gpt-live': 'GPT-Live', schedule: 'Расписание' }[p.source] || '';
     row.append(
-      this.node('div', { className: 'action-log-label' }, p.transcript || p.text || 'Реплика пользователя'),
+      this.node('div', { className: 'action-log-label' }, p.heard || p.transcript || p.text || 'Реплика пользователя'),
       this.node('div', { className: 'action-log-status' }, p.status || ''),
       this.node('div', { className: 'action-log-meta' }, [origin, p.createdAt || ''].filter(Boolean).join(' · '))
     );
@@ -424,6 +424,11 @@ export class Client {
         const byVoice = record.source && record.source !== 'ui';
         block.append(this.node('small', { className: 'v02-record-marker' },
           byVoice ? 'Действие голосового агента' : record.corrects ? 'Корректировка интерфейса' : 'Команда интерфейса'));
+        // What the model says it heard, next to what it did with it.
+        if (record.heard) {
+          block.append(this.node('div', { className: 'v02-section-label' }, 'Модель услышала'));
+          block.append(this.node('div', { className: 'v02-message', 'data-role': 'user' }, record.heard));
+        }
         block.append(this.renderCommandCard(record.commandView));
       }
       body.append(block);

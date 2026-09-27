@@ -135,11 +135,15 @@ export class InteractionJournal {
     const rolledBack = Boolean(this.technical.undoneEntries?.[entry.id]);
     const hasChanges = outcomes.some(outcome => outcome.changes?.length);
     const settled = ledgers.every(ledger => !['pending', 'waiting'].includes(ledger.status));
-    const label = entry.answer || entry.text || commands.map(commandLabel).filter(Boolean).join(', ');
+    // What the voice model says it heard outranks the transcription of the same audio: the
+    // transcription is a separate, worse listener, and when it fails the journal was left
+    // showing «la nuit» as the command that set a deadline. Both are kept.
+    const heard = chain.map(item => item.command?.transcript).find(Boolean) || '';
+    const label = heard || entry.answer || entry.text || commands.map(commandLabel).filter(Boolean).join(', ');
     return {
       id: entry.id, actionId: entry.id, rootActionId: entry.id, requestId: entry.id,
       label, text: label, status: error ? 'failed' : !commands.length ? 'needs-input' : settled ? 'applied' : 'pending',
-      createdAt: entry.at, transcript: entry.text, context: entry.context, command: commands[0] || null,
+      createdAt: entry.at, transcript: entry.text, heard, context: entry.context, command: commands[0] || null,
       source: sourceOf(entry), target, error, rolledBack, canRollback: hasChanges && !rolledBack,
       sessionId: entry.key.clientKey, cursor: entry.cursor
     };

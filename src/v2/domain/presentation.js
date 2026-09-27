@@ -130,7 +130,8 @@ export class Presentation {
           }
           return {
             id: entry.id, kind: 'ui', corrects: entry.corrects || null, command: clone(entry.command),
-            source: entry.command?.source || 'ui', commandView: commandView(entry.command, byId)
+            source: entry.command?.source || 'ui', heard: entry.command?.transcript || '',
+            commandView: commandView(entry.command, byId)
           };
         })
       }) : node('text', 'screen:missing', { text: 'Действие не найдено' });

@@ -30,7 +30,9 @@ const REPEAT_WINDOW_MS = 30_000;
 /** Case and spacing differ between a call and its retry — «Йены» then «йены» — so they are
  *  normalised away before comparing. */
 function changeKey(name, args) {
-  const normalised = Object.keys(args || {}).sort().map(key => {
+  // What the model says it heard does not change what the call does, and a retry may word it
+  // differently, so it is left out of the comparison.
+  const normalised = Object.keys(args || {}).filter(key => key !== 'heard').sort().map(key => {
     const value = args[key];
     return `${key}=${typeof value === 'string' ? value.trim().toLowerCase() : JSON.stringify(value)}`;
   });

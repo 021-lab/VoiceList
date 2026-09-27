@@ -63,6 +63,10 @@ export const DEFAULT_GEMINI_PROMPT = `
 
 Идентификаторы вслух не произноси, они нужны инструменту, а не человеку. Говори названиями.
 
+В каждом вызове, который меняет список, заполняй heard — просьбу пользователя своими словами,
+одной короткой фразой. Это единственная запись о том, зачем изменение сделано: расшифровка
+речи бывает неразборчивой, а ты слышишь сам.
+
 Простое изменение выполняй сразу, без объяснений, что собираешься делать: короткая фраза,
 вызов инструмента, и дальше только результат.
 
@@ -111,15 +115,32 @@ function toGeminiSchema(schema) {
   return converted;
 }
 
+/** What the person asked, as the model that heard it would put it.
+ *
+ *  The transcription pass is a separate, worse listener: a request the model executed exactly
+ *  right came back from it as «la nuit», and that is what the journal recorded as the
+ *  command. The model heard the audio, so the model says what it heard, and it travels with
+ *  the change it caused. */
+const HEARD_ARGUMENT = {
+  type: 'string',
+  description: 'Просьба пользователя своими словами, одной короткой фразой по-русски. Заполняй всегда.'
+};
+
 export function geminiFunctionDeclarations(tools = LIVE_TOOLS) {
   return tools
     .filter(tool => GEMINI_TOOL_NAMES.includes(tool.name))
-    .map(tool => ({
-      name: tool.name,
-      description: tool.description,
-      behavior: BLOCKING_TOOLS.has(tool.name) ? 'BLOCKING' : 'NON_BLOCKING',
-      parameters: toGeminiSchema(tool.parameters)
-    }));
+    .map(tool => {
+      const parameters = toGeminiSchema(tool.parameters);
+      // Only on the tools that change something: a read leaves nothing in the journal to
+      // explain. Not required, because a call without it is still a call worth making.
+      if (BLOCKING_TOOLS.has(tool.name)) parameters.properties = { ...parameters.properties, heard: HEARD_ARGUMENT };
+      return {
+        name: tool.name,
+        description: tool.description,
+        behavior: BLOCKING_TOOLS.has(tool.name) ? 'BLOCKING' : 'NON_BLOCKING',
+        parameters
+      };
+    });
 }
 
 /** Prompt, then the table. Deliberately not the <capabilities> block the GPT-Live layer
