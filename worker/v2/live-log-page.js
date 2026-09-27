@@ -119,7 +119,13 @@ function gist(entry) {
     case 'gm.session.stopped': return ['Gemini: остановлено', p.reason || ''];
     case 'gm.token.failed': return ['Gemini отклонил запрос токена', short(p.detail || ('HTTP ' + p.status), 140)];
     case 'gm.token.unreachable': return ['Gemini: не дозвонились', p.error?.message || ''];
-    case 'gm.tool.call': return ['вызов ' + p.name, short(JSON.stringify(p.arguments || {}), 140)];
+    case 'gm.tool.call': {
+      // What the model says it heard is the readable half of a call, and the transcription
+      // pass regularly disagrees with it, so it is shown as text rather than buried in JSON.
+      const { heard, ...args } = p.arguments || {};
+      const rest = short(JSON.stringify(args), 120);
+      return ['вызов ' + p.name, heard ? 'услышано: «' + heard + '» · ' + rest : rest];
+    }
     case 'gm.tool.result': return ['результат ' + p.name, short(JSON.stringify(p.response || {}), 140)];
     case 'gm.tool.repeat': return ['повтор ' + p.name + ' — не применён', short(JSON.stringify(p.response || {}), 120)];
     case 'gm.frame': {

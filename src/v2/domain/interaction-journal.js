@@ -2,6 +2,14 @@ import { clone, stable, fail } from './contracts.js';
 
 const commandLabel = command => command?.command || '';
 
+/** What the model said back. For a turn that changed nothing it is the only evidence of what
+ *  the model heard: the transcription of the same audio is a separate, weaker listener and
+ *  regularly comes back as another language entirely. */
+function answerOf(chain, root) {
+  if (root.answer) return root.answer;
+  return chain.find(item => item.kind === 'speech' && item.role === 'assistant')?.text || '';
+}
+
 /** Where an entry came from. A command carries it; a spoken turn carries it; anything else is
  *  the interface itself. */
 export const sourceOf = (entry) =>
@@ -143,7 +151,8 @@ export class InteractionJournal {
     return {
       id: entry.id, actionId: entry.id, rootActionId: entry.id, requestId: entry.id,
       label, text: label, status: error ? 'failed' : !commands.length ? 'needs-input' : settled ? 'applied' : 'pending',
-      createdAt: entry.at, transcript: entry.text, heard, context: entry.context, command: commands[0] || null,
+      createdAt: entry.at, transcript: entry.text, heard, answer: answerOf(chain, entry),
+      context: entry.context, command: commands[0] || null,
       source: sourceOf(entry), target, error, rolledBack, canRollback: hasChanges && !rolledBack,
       sessionId: entry.key.clientKey, cursor: entry.cursor
     };

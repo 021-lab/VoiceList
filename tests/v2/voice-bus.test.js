@@ -112,6 +112,18 @@ describe('when the transcription fails but the model heard right', () => {
     expect(action.status).toBe('applied');
   });
 
+  it('shows what the model answered, when nothing was changed and the words are nonsense', async () => {
+    // Live: «¿Qué tal? ¿Hotel?» — and the model asked, in Russian, which of the three hotel
+    // tasks was meant. Its answer is the only readable record of what it heard.
+    const { runtime, host, heard } = session();
+    host.mirror([heard('user', '¿Qué tal? ¿Hotel?'), heard('assistant', 'Какую именно задачу про отель?')]);
+    await host.stop('client');
+
+    const [action] = runtime.journal.actions();
+    expect(action.transcript).toBe('¿Qué tal? ¿Hotel?');
+    expect(action.answer).toBe('Какую именно задачу про отель?');
+  });
+
   it('does not let the wording defeat the guard against a repeated change', async () => {
     const { runtime, host } = session();
     await host.invokeAll(call('a', 'addItem', { line1: 'Хлеб', heard: 'добавь хлеб' }));

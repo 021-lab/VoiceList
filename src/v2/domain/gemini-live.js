@@ -169,8 +169,11 @@ export function buildGeminiSetup({ items = [], prompt, model = GEMINI_MODEL, voi
       parts: [{ text: composeGeminiInstructions(prompt || DEFAULT_GEMINI_PROMPT, formatTaskSnapshot(items)) }]
     },
     tools: [{ functionDeclarations: geminiFunctionDeclarations() }],
-    // Recognition is pinned to one language. Left open it drifts: whole turns came back as
-    // Spanish. The field takes a list, and a list of one is the block on everything else.
+    // The language of recognition, asked for and not granted. The field is real — the API
+    // rejects any other name inside this message — but it validates nothing: «не-язык» is
+    // accepted as a language code, and short Russian phrases still come back as Spanish or
+    // Dutch while the model itself answers them correctly in Russian. It stays because it is
+    // the only lever there is; the record of what was said comes from the model, not here.
     inputAudioTranscription: { languageCodes: [GEMINI_LANGUAGE] },
     outputAudioTranscription: {},
     // The model decides where an utterance starts and ends. Left at its defaults it clips
@@ -180,7 +183,9 @@ export function buildGeminiSetup({ items = [], prompt, model = GEMINI_MODEL, voi
       automaticActivityDetection: {
         startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
         endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
-        prefixPaddingMs: 400,
+  // Raised from 400: a phrase that starts softly has its first syllables cut by the detector,
+      // and a clipped start is what the transcription pass turns into another language.
+      prefixPaddingMs: 600,
         silenceDurationMs: 900
       }
     }

@@ -868,6 +868,14 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 11px;
 }
 
+/** What the model answered, under the phrase it was answering. */
+.action-log-answer {
+  margin-top: 4px;
+  color: #6b6b70;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .action-log-status {
   font-size: 10px;
   font-weight: 700;

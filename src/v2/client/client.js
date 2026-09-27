@@ -335,6 +335,9 @@ export class Client {
       this.node('div', { className: 'action-log-status' }, p.status || ''),
       this.node('div', { className: 'action-log-meta' }, [origin, p.createdAt || ''].filter(Boolean).join(' · '))
     );
+    // The recognised phrase can be nonsense while the model understood perfectly. Its own
+    // words are shown under the row, which is what makes such a line readable at all.
+    if (p.answer && p.answer !== p.label) row.append(this.node('div', { className: 'action-log-answer' }, p.answer));
     row.onclick = () => this.navigate('action', { actionId: id });
     row.onkeydown = (event) => { if (event.key === 'Enter') row.click(); };
     return row;

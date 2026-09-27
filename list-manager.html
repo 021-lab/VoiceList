@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-4ddbbcf96ca3d5d8">
+<meta name="preview-build-hash" content="v02-eabdbde845ab33d6">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -876,6 +876,14 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
   font-size: 11px;
 }
 
+/** What the model answered, under the phrase it was answering. */
+.action-log-answer {
+  margin-top: 4px;
+  color: #6b6b70;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .action-log-status {
   font-size: 10px;
   font-weight: 700;
@@ -1089,7 +1097,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-4ddbbcf96ca3d5d8";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-eabdbde845ab33d6";
 </script>
 <script>
 (() => {
@@ -2007,6 +2015,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         this.node("div", { className: "action-log-status" }, p.status || ""),
         this.node("div", { className: "action-log-meta" }, [origin, p.createdAt || ""].filter(Boolean).join(" \xB7 "))
       );
+      if (p.answer && p.answer !== p.label) row.append(this.node("div", { className: "action-log-answer" }, p.answer));
       row.onclick = () => this.navigate("action", { actionId: id });
       row.onkeydown = (event) => {
         if (event.key === "Enter") row.click();
@@ -3469,7 +3478,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-4ddbbcf96ca3d5d8";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-eabdbde845ab33d6";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
