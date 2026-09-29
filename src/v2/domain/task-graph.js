@@ -65,13 +65,26 @@ export class TaskGraph {
       const { command, actId, payload = {} } = input;
       if (!graphCommands.has(command)) fail('UNSUPPORTED_COMMAND', 'Команда не поддерживается графом');
       const target = next.find(x => x.id === actId);
-      if (!['addItem', 'importWorkflowyTree', 'reorderItems'].includes(command) && !target) fail('NOT_FOUND', 'Задача не найдена');
+      if (!['addItem', 'importWorkflowyTree', 'reorderItems', 'replaceItems'].includes(command) && !target) fail('NOT_FOUND', 'Задача не найдена');
       if (actId === 'inbox' && ['editItem', 'deleteItem', 'setParent'].includes(command)) fail('PROTECTED', 'Входящие нельзя изменить этой командой');
       if ((['addItem', 'addChild'].includes(command) || (command === 'editItem' && 'line1' in payload)) && (typeof payload.line1 !== 'string' || !payload.line1.trim())) fail('INVALID_INPUT', 'Введите название');
       if (command === 'setStatus' && !statuses.includes(payload.status)) fail('INVALID_INPUT', 'Неизвестный статус');
       if (command === 'reorderItems') {
         if (!Array.isArray(payload.arranged) || payload.arranged.some(x => !next.some(n => n.id === x.id) || Object.keys(x).some(k => !['id','order','parentId'].includes(k)) || !Number.isFinite(x.order))) fail('INVALID_INPUT', 'Некорректное перемещение');
         if (payload.arranged.some(x => x.id === 'inbox' && x.parentId != null)) fail('PROTECTED', 'Входящие остаются в корне');
+      }
+      // A whole list at once, for carrying a document over from elsewhere. It does not go
+      // through the interpreter: the interpreter's vocabulary is edits to a list that is
+      // already here, and this one hands over the list itself. Ids come with it, so what
+      // referred to a task before the move still refers to it. The difference is journalled
+      // like any other change, so the move can be rolled back.
+      if (command === 'replaceItems') {
+        if (!Array.isArray(payload.items) || !payload.items.length) fail('INVALID_INPUT', 'Нужен список задач');
+        next = clone(payload.items);
+        if (!next.some(x => x.id === 'inbox')) next.unshift(clone(inbox));
+        validateItems(next);
+        label = `Заменён список задач: ${next.length}`;
+        continue;
       }
       const interpreter = createInterpreter({ createItemId: existingIds => allocator.allocate(existingIds), createLogId: () => 'draft' });
       const result = interpreter.execute({ snapshot: { items: next }, actionLog: [] }, input);

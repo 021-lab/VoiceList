@@ -12,6 +12,7 @@ const commandLabels = {
   setDeadline: 'Изменить срок', toggleCollapse: 'Свернуть или развернуть задачу',
   deleteItem: 'Удалить задачу', reorderItems: 'Изменить порядок задач',
   importWorkflowyTree: 'Импортировать дерево задач',
+  replaceItems: 'Заменить список задач',
   rollbackAction: 'Откатить действие и все его корректировки', undo: 'Откатить действие и все его корректировки',
   showList: 'Открыть список', showFrontier: 'Открыть фронтир', showActionLog: 'Открыть журнал действий',
   showSearch: 'Открыть поиск', showAddModal: 'Открыть создание задачи', showEditModal: 'Открыть редактирование задачи',
