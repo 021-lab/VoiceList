@@ -10,7 +10,9 @@ const command = (runtime, items, seq = 1) => ({
   command: { command: 'replaceItems', actId: 'list', actType: 'list', source: 'import', payload: { items } }
 });
 
-/** Carrying a document over from another installation: the list arrives whole, with the ids
+/** TEMPORARY (перенос v1 → v2): удаляется вместе с командой replaceItems.
+ *
+ *  Carrying a document over from another installation: the list arrives whole, with the ids
  *  it already had, and replaces what is here. */
 describe('replacing the whole list', () => {
   it('keeps ids, fields and nesting, and drops what was there', async () => {

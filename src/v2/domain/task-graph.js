@@ -73,6 +73,10 @@ export class TaskGraph {
         if (!Array.isArray(payload.arranged) || payload.arranged.some(x => !next.some(n => n.id === x.id) || Object.keys(x).some(k => !['id','order','parentId'].includes(k)) || !Number.isFinite(x.order))) fail('INVALID_INPUT', 'Некорректное перемещение');
         if (payload.arranged.some(x => x.id === 'inbox' && x.parentId != null)) fail('PROTECTED', 'Входящие остаются в корне');
       }
+      // TEMPORARY (перенос v1 → v2). Существует ради одного переезда документа со старого
+      // прода и после него не нужна: удалить эту ветку, имя команды из graphCommands, ярлык
+      // в presentation.js и tests/v2/replace-items.test.js. Ничто другое её не вызывает.
+      //
       // A whole list at once, for carrying a document over from elsewhere. It does not go
       // through the interpreter: the interpreter's vocabulary is edits to a list that is
       // already here, and this one hands over the list itself. Ids come with it, so what
