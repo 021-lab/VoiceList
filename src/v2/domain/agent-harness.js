@@ -1,4 +1,4 @@
-export const HARNESS_VERSIONS = Object.freeze({ contextBuilder: 'context-v0.2.2', prompt: 'prompt-v0.2.2', parser: 'parser-v0.2.2' });
+export const HARNESS_VERSIONS = Object.freeze({ contextBuilder: 'context-v0.2.3', prompt: 'prompt-v0.2.3', parser: 'parser-v0.2.3' });
 
 export class AgentHarness {
   constructor({ agent, scheduler }) { this.agent = agent; this.scheduler = scheduler; }

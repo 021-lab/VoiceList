@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LiveSettings, promptVersion } from '../../src/v2/domain/live-settings.js';
+import { DEFAULT_CORRECTION_MODEL, LiveSettings, promptVersion } from '../../src/v2/domain/live-settings.js';
 import { DEFAULT_BACKEND_MODEL, DEFAULT_VOICE_PROMPT } from '../../src/v2/domain/live-session.js';
 import { buildLogEntry } from '../../src/v2/domain/live-log-entry.js';
 
@@ -16,8 +16,9 @@ describe('live settings', () => {
     expect(read.backendModel).toBe(DEFAULT_BACKEND_MODEL);
     expect(read.defaults).toEqual({
       voicePrompt: true, backendPrompt: true, geminiPrompt: true,
-      backendModel: true, geminiModel: true, reasoningEffort: true
+      backendModel: true, geminiModel: true, correctionModel: true, reasoningEffort: true
     });
+    expect(read.correctionModel).toBe(DEFAULT_CORRECTION_MODEL);
   });
 
   it('appends a rule without losing the text it had', async () => {

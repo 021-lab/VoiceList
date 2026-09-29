@@ -1,4 +1,7 @@
 import { DEFAULT_BACKEND_MODEL, DEFAULT_BACKEND_PROMPT, DEFAULT_VOICE_PROMPT } from './live-session.js';
+
+/** Correcting is a reading task, so it goes to the stronger model by default. */
+export const DEFAULT_CORRECTION_MODEL = DEFAULT_BACKEND_MODEL;
 import { DEFAULT_GEMINI_PROMPT, GEMINI_MODEL } from './gemini-live.js';
 import { fail } from './contracts.js';
 
@@ -7,6 +10,7 @@ export const BACKEND_PROMPT_KEY = 'voicelist.live.backend-prompt.v1';
 export const BACKEND_MODEL_KEY = 'voicelist.live.backend-model.v1';
 export const GEMINI_PROMPT_KEY = 'voicelist.live.gemini-prompt.v1';
 export const GEMINI_MODEL_KEY = 'voicelist.live.gemini-model.v1';
+export const CORRECTION_MODEL_KEY = 'voicelist.live.correction-model.v1';
 export const REASONING_KEY = 'voicelist.live.reasoning-effort.v1';
 export const REASONING_EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh', 'max'];
 export const PROMPT_HISTORY_KEY = 'voicelist.live.prompt-history.v1';
@@ -36,6 +40,10 @@ export class LiveSettings {
   async backendModel() { return (await this.storage.get(BACKEND_MODEL_KEY)) || ''; }
 
   async geminiModel() { return (await this.storage.get(GEMINI_MODEL_KEY)) || ''; }
+  /** The model that fixes another model's action. It reads the first model's instructions,
+   *  its context, its answer and the person's objection, so it is asked to be better at
+   *  reading than at speed — which is why it is a setting of its own and not the agent's. */
+  async correctionModel() { return (await this.storage.get(CORRECTION_MODEL_KEY)) || ''; }
 
   /** Picking a tool by a name the voice layer already resolved needs no deep thinking, and
    *  reasoning effort is what that costs in latency. Left unset, nothing is sent and the
@@ -50,9 +58,9 @@ export class LiveSettings {
   }
 
   async read() {
-    const [voice, backend, gemini, model, geminiModel, reasoning, history] = await Promise.all([
+    const [voice, backend, gemini, model, geminiModel, correctionModel, reasoning, history] = await Promise.all([
       this.stored('voice'), this.stored('backend'), this.stored('gemini'),
-      this.backendModel(), this.geminiModel(), this.reasoningEffort(), this.history()
+      this.backendModel(), this.geminiModel(), this.correctionModel(), this.reasoningEffort(), this.history()
     ]);
     return {
       voicePrompt: voice || DEFAULT_VOICE_PROMPT,
@@ -60,10 +68,11 @@ export class LiveSettings {
       geminiPrompt: gemini || DEFAULT_GEMINI_PROMPT,
       backendModel: model || DEFAULT_BACKEND_MODEL,
       geminiModel: geminiModel || GEMINI_MODEL,
+      correctionModel: correctionModel || DEFAULT_CORRECTION_MODEL,
       reasoningEffort: reasoning,
       defaults: {
         voicePrompt: !voice, backendPrompt: !backend, geminiPrompt: !gemini,
-        backendModel: !model, geminiModel: !geminiModel, reasoningEffort: !reasoning
+        backendModel: !model, geminiModel: !geminiModel, correctionModel: !correctionModel, reasoningEffort: !reasoning
       },
       history: history.map(({ before, after, ...rest }) => ({ ...rest, beforeChars: before.length, afterChars: after.length }))
     };
@@ -116,6 +125,13 @@ export class LiveSettings {
     if (value && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) fail('INVALID_INPUT', 'Недопустимое имя модели');
     await this.storage.put(BACKEND_MODEL_KEY, value);
     return { backendModel: value || DEFAULT_BACKEND_MODEL, usingDefault: !value };
+  }
+
+  async setCorrectionModel(model) {
+    const value = String(model ?? '').trim();
+    if (value && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)) fail('INVALID_INPUT', 'Недопустимое имя модели');
+    await this.storage.put(CORRECTION_MODEL_KEY, value);
+    return { correctionModel: value || DEFAULT_CORRECTION_MODEL, usingDefault: !value };
   }
 
   async setGeminiModel(model) {

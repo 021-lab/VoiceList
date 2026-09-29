@@ -10,7 +10,7 @@ import { LiveHost } from './live-host.js';
 import { GeminiHost } from './gemini-host.js';
 import {
   LiveSettings, VOICE_PROMPT_KEY, BACKEND_PROMPT_KEY, BACKEND_MODEL_KEY, REASONING_KEY,
-  GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, PROMPT_HISTORY_KEY
+  GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, CORRECTION_MODEL_KEY, PROMPT_HISTORY_KEY, DEFAULT_CORRECTION_MODEL
 } from '../../src/v2/domain/live-settings.js';
 import { taskTreeFromItems } from '../task-tree.js';
 import { taskFrontierFromItems } from '../task-frontier.js';
@@ -21,7 +21,7 @@ const GEMINI_KEY = 'voicelist.gemini-api-key.v1';
 const LIVE_SETTINGS_KEYS = [
   API_KEY, GEMINI_KEY, 'voicelist.openai-setup-used.v1',
   VOICE_PROMPT_KEY, BACKEND_PROMPT_KEY, BACKEND_MODEL_KEY, REASONING_KEY,
-  GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, PROMPT_HISTORY_KEY
+  GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, CORRECTION_MODEL_KEY, PROMPT_HISTORY_KEY
 ];
 export class ListDocumentDO extends Agent {
   static options = { sendIdentityOnConnect: false };
@@ -37,7 +37,11 @@ export class ListDocumentDO extends Agent {
     const resolveModel = this.env.V02_TEST_MODEL === 'local-parser' ? undefined : async context => resolveOpenAI({
       ...context,
       apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(),
-      model: this.env.AGENT_MODEL || 'gpt-4.1-mini'
+      model: this.env.AGENT_MODEL || 'gpt-4.1-mini',
+      // Correcting an action is a reading task and goes to its own model; the setting is read
+      // per request, so changing it takes effect on the next correction rather than the next
+      // restart of the object.
+      correctionModel: await this.liveSettings.correctionModel() || DEFAULT_CORRECTION_MODEL
     });
     this.runtime = new DocumentRuntime({
       initialState, persist: state => this.runtimeStorage.save(state), scheduler: this,
@@ -342,6 +346,7 @@ export class ListDocumentDO extends Agent {
   setLiveBackendModel(model) { return this.liveSettings.setBackendModel(model); }
   setLiveReasoningEffort(effort) { return this.liveSettings.setReasoningEffort(effort); }
   setGeminiModel(model) { return this.liveSettings.setGeminiModel(model); }
+  setCorrectionModel(model) { return this.liveSettings.setCorrectionModel(model); }
   async onRequest(request) {
     if (new URL(request.url).pathname === '/mcp') {
       const response = await handleMcpRequest(request, this.port); this.broadcastState(); return response;

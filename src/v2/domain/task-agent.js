@@ -3,6 +3,50 @@ import { findCandidates } from '../../resolver.js';
 import { adaptSnapshot } from '../../snapshot-adapter.js';
 import { clone, fail } from './contracts.js';
 
+/** Everything needed to correct another model's work, gathered from the journal.
+ *
+ *  A correction is not a new request. What it needs is the case file: the instructions the
+ *  first model worked under, the context it was handed, the answer it gave, what the system
+ *  did with that answer, and the person's objection. All of it is already in the journal —
+ *  the entry being corrected carries its own model context and raw response — and none of it
+ *  was reaching the model asked to fix it, which is why «так неправильно» produced a question
+ *  instead of a fix.
+ *
+ *  A voice action has no context of ours to show: the model that made it heard the audio and
+ *  its reasoning never passed through here. Then the case file is the command it issued and
+ *  the words it reported hearing, which is what there is. */
+function correctionOf({ entry, journal }) {
+  if (!entry.corrects) return null;
+  const corrected = journal.get(entry.corrects);
+  if (!corrected) return null;
+  // The outcome of the entry being corrected, read from its own ledger. Taken over the whole
+  // chain it would include this very correction, which has not run yet, and the case file
+  // would say «pending» about an action that finished long ago.
+  const ledger = journal.technical?.executor?.[corrected.id] || {};
+  const outcomes = ledger.outcomes || [];
+  const status = ledger.error ? 'failed' : ledger.status === 'complete' ? 'applied' : (ledger.status || 'unknown');
+  const error = ledger.error || null;
+  const target = [...outcomes].reverse().find(item => item.target)?.target || null;
+  const changed = outcomes.flatMap(item => item.changes || []).map(change => ({
+    id: change.id, fields: change.fields || (change.before ? 'удалена' : 'создана')
+  }));
+  return {
+    userText: entry.text,
+    original: {
+      id: corrected.id,
+      kind: corrected.kind,
+      text: corrected.text || null,
+      heard: corrected.command?.transcript || null,
+      source: corrected.command?.source || (corrected.kind === 'text' ? 'agent' : 'ui'),
+      modelContext: clone(corrected.modelContext || null),
+      rawModelResponse: corrected.rawModelResponse ?? null,
+      answer: corrected.answer || '',
+      commands: clone(corrected.commands || (corrected.command ? [corrected.command] : []))
+    },
+    outcome: { status, error, target, changed }
+  };
+}
+
 export class TaskAgent {
   constructor({ resolveModel = null } = {}) { this.resolveModel = resolveModel; }
   buildContext({ entry, graph, journal }) {
@@ -27,6 +71,7 @@ export class TaskAgent {
         id: root.id, text: root.text, answer: root.answer || '', commands: clone(root.commands || []),
         ...(() => { const { status, error, target: acted } = journal.action(root); return { status, error, target: acted }; })()
       } : null,
+      correction: correctionOf({ entry, journal }),
       history, tasks: clone(graph.items), graphRevision: graph.revision, today: new Date().toISOString().slice(0, 10)
     };
   }
