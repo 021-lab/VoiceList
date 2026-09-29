@@ -35,7 +35,7 @@ export function buildCorrectionMessages(modelContext) {
     { role: 'system', content: CORRECTION_SYSTEM },
     { role: 'user', content: [
       block('инструкция_исходной_модели', original.modelContext ? AGENT_SYSTEM_TEXT : unknown),
-      block('контекст_исходной_модели', original.modelContext ? JSON.stringify(original.modelContext) : unknown),
+      block('контекст_исходной_модели', original.modelContext ? JSON.stringify(withoutTasks(original.modelContext)) : unknown),
       block('ответ_исходной_модели', original.rawModelResponse
         ? String(original.rawModelResponse)
         : JSON.stringify({ answer: original.answer, commands: original.commands, heard: original.heard })),
@@ -45,6 +45,16 @@ export function buildCorrectionMessages(modelContext) {
       'Скорректируй действие исходной модели так, чтобы пользователь получил то, что просил. Отвечай тем же JSON {reply, commands} и теми же инструментами.'
     ].join('\n\n') }
   ];
+}
+
+/** The task list as it was at the time is the bulk of a recorded context and almost exactly
+ *  the list below it: sending both doubled the brief to forty thousand characters and made
+ *  the model read the same hundred tasks twice, the first copy already stale. What the
+ *  correction needs from that moment is the request, the target and the history; what the
+ *  list looked like then is recoverable from what changed. */
+function withoutTasks(context) {
+  const { tasks, ...rest } = context;
+  return { ...rest, tasks: `<опущено: ${Array.isArray(tasks) ? tasks.length : 0} задач на тот момент; актуальный список ниже>` };
 }
 
 const CORRECTION_SYSTEM = [

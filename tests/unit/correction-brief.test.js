@@ -9,7 +9,7 @@ const context = (over = {}) => ({
     userText: 'Так неправильно, надо было в той же ветке',
     original: {
       id: 'e36', kind: 'text', text: 'Разнеси на две задачи', heard: null, source: 'agent',
-      modelContext: { text: 'Разнеси на две задачи', target: 'sm' },
+      modelContext: { text: 'Разнеси на две задачи', target: 'sm', tasks: [{ id: 'sm', line1: 'Данные сторон' }] },
       rawModelResponse: '{"reply":"","commands":[{"command":"addItem","payload":{"line1":"Продавец"}}]}',
       answer: '', commands: [{ command: 'addItem', payload: { line1: 'Продавец' } }]
     },
@@ -32,6 +32,8 @@ describe('бриф для модели коррекции', () => {
     expect(user.content).toContain('Так неправильно, надо было в той же ветке');
     // Состояние документа едет без самого дела о коррекции, иначе оно было бы дважды.
     expect(user.content).not.toContain('"correction"');
+    // И список задач едет один раз: в контексте того момента он заменён пометкой.
+    expect(user.content).toContain('<опущено: 1 задач на тот момент');
   });
 
   it('у голосового действия честно говорит, что рассуждения модели нет', () => {

@@ -1,7 +1,7 @@
 import { DEFAULT_BACKEND_MODEL, DEFAULT_BACKEND_PROMPT, DEFAULT_VOICE_PROMPT } from './live-session.js';
 
 /** Correcting is a reading task, so it goes to the stronger model by default. */
-export const DEFAULT_CORRECTION_MODEL = DEFAULT_BACKEND_MODEL;
+export const DEFAULT_CORRECTION_MODEL = 'gpt-5.6-sol';
 import { DEFAULT_GEMINI_PROMPT, GEMINI_MODEL } from './gemini-live.js';
 import { fail } from './contracts.js';
 
