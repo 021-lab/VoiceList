@@ -13,8 +13,14 @@ export class TaskAgent {
     })) : [];
     const target = [...history].reverse().flatMap(item => item.commands || []).find(command => command.actId)?.actId
       || (entry.context.elementId.startsWith('task:') ? entry.context.elementId.slice(5) : null);
+    // The branch the conversation is in. A new task born in the context of another one
+    // belongs beside it, not at the root: a request to split a task into two came in while
+    // that task was held, and the model answered with addItem twice — two tasks in the root,
+    // far from the project they belong to. The target's own parent is what makes «beside it»
+    // expressible, so it is handed over rather than searched for among a hundred tasks.
+    const targetParent = target ? (graph.items.find(item => item.id === target)?.parentId ?? null) : null;
     return {
-      text: entry.text, target, context: clone(entry.context), corrects: entry.corrects || null,
+      text: entry.text, target, targetParent, context: clone(entry.context), corrects: entry.corrects || null,
       action: root ? { id: root.id, text: root.text, answer: root.answer || '', commands: clone(root.commands || []) } : null,
       history, tasks: clone(graph.items), graphRevision: graph.revision, today: new Date().toISOString().slice(0, 10)
     };
@@ -56,6 +62,16 @@ export class TaskAgent {
     const targetCommands = new Set(['addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem']);
     const parsedCommands = clone(commands).map(command => {
       if (targetCommands.has(command.command) && !taskIds.has(command.actId) && taskIds.has(modelContext.target)) command.actId = modelContext.target;
+      // A task created while another one is in hand stays in that branch. The prompt asks for
+      // this, and this is what holds when the model answers with addItem anyway: the request
+      // was about a task, so the root is the one place the answer cannot belong.
+      if (command.command === 'addItem' && taskIds.has(modelContext.target)) {
+        command.command = 'addChild';
+        command.actType = 'task';
+        command.actId = modelContext.targetParent && taskIds.has(modelContext.targetParent)
+          ? modelContext.targetParent
+          : modelContext.target;
+      }
       if (command.command === 'setStatus' && typeof command.payload === 'string') command.payload = { status: command.payload };
       return command;
     });
