@@ -21,7 +21,12 @@ export class TaskAgent {
     const targetParent = target ? (graph.items.find(item => item.id === target)?.parentId ?? null) : null;
     return {
       text: entry.text, target, targetParent, context: clone(entry.context), corrects: entry.corrects || null,
-      action: root ? { id: root.id, text: root.text, answer: root.answer || '', commands: clone(root.commands || []) } : null,
+      // Not just what was asked for, but how it ended: a correction is usually a reaction to
+      // the outcome, and the model was being handed the request without the result of it.
+      action: root ? {
+        id: root.id, text: root.text, answer: root.answer || '', commands: clone(root.commands || []),
+        ...(() => { const { status, error, target: acted } = journal.action(root); return { status, error, target: acted }; })()
+      } : null,
       history, tasks: clone(graph.items), graphRevision: graph.revision, today: new Date().toISOString().slice(0, 10)
     };
   }

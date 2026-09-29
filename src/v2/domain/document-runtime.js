@@ -100,7 +100,11 @@ export class DocumentRuntime {
       const elementId = input.context.elementId;
       if (elementId.startsWith('task:') && !graph.read({ id: elementId.slice(5) })) fail('NOT_FOUND', 'Элемент задачи больше не существует');
       if (!elementId.startsWith('task:') && !elementId.startsWith('action:') && !['app', 'toolbar', 'list', ...['list','frontier','log','action','edit','add','settings','dialogues','search'].flatMap(view => ['menu:' + view, 'screen:' + view])].includes(elementId)) fail('NOT_FOUND', 'Неизвестный контекст интерфейса');
-      let corrects = input.context.actionId;
+      // Speaking at an action is correcting it. The journal screen hands the element as
+      // `action:<id>` and carries no actionId of its own, so a remark addressed at a row
+      // there arrived as a bare phrase: the model was asked to fix «здесь» with no action in
+      // its context, and could only ask what was meant.
+      let corrects = input.context.actionId || (elementId.startsWith('action:') ? elementId.slice(7) : null);
       if (input.text !== undefined && corrects && journal.get(corrects)) corrects = journal.chain(corrects).at(-1)?.id || corrects;
       if (input.command?.command === 'rollbackAction') corrects ||= input.command.actId;
       if (input.command?.command === 'undo') corrects ||= [...journal.entries].reverse().find(item =>
