@@ -15,7 +15,20 @@ import { clone, fail } from './contracts.js';
  *  A voice action has no context of ours to show: the model that made it heard the audio and
  *  its reasoning never passed through here. Then the case file is the command it issued and
  *  the words it reported hearing, which is what there is. */
-function correctionOf({ entry, journal }) {
+/** The element the correction was spoken at, resolved into the thing itself. */
+function elementOf(elementId, graph, journal) {
+  if (elementId.startsWith('task:')) {
+    const task = graph.items.find(item => item.id === elementId.slice(5));
+    return task ? { вид: 'задача', id: task.id, line1: task.line1, status: task.status, parentId: task.parentId } : { вид: 'задача', id: elementId.slice(5), примечание: 'задачи уже нет' };
+  }
+  if (elementId.startsWith('action:')) {
+    const action = journal.get(elementId.slice(7));
+    return { вид: 'действие', id: elementId.slice(7), ...(action ? { просьба: action.text || null } : { примечание: 'записи не найдено' }) };
+  }
+  return { вид: 'экран', id: elementId };
+}
+
+function correctionOf({ entry, graph, journal }) {
   if (!entry.corrects) return null;
   const corrected = journal.get(entry.corrects);
   if (!corrected) return null;
@@ -27,11 +40,23 @@ function correctionOf({ entry, journal }) {
   const status = ledger.error ? 'failed' : ledger.status === 'complete' ? 'applied' : (ledger.status || 'unknown');
   const error = ledger.error || null;
   const target = [...outcomes].reverse().find(item => item.target)?.target || null;
-  const changed = outcomes.flatMap(item => item.changes || []).map(change => ({
-    id: change.id, fields: change.fields || (change.before ? 'удалена' : 'создана')
-  }));
+  // The rows as they changed, not a list of field names: a correction is judged against what
+  // the list looks like now, and «изменены line1, line2» says nothing about what it became.
+  const shown = (task) => task && Object.fromEntries(
+    ['line1', 'line2', 'status', 'parentId', 'deadline', 'tags'].filter(field => task[field] !== undefined && task[field] !== '')
+      .map(field => [field, task[field]])
+  );
+  const changed = outcomes.flatMap(item => item.changes || []).map(change => change.fields
+    ? { id: change.id, поля: change.fields, было: shown(change.before), стало: shown(change.after) }
+    : { id: change.id, операция: change.before ? 'удалена' : 'создана', задача: shown(change.after || change.before) });
+  const root = journal.rootFor(corrected.id) || corrected;
   return {
     userText: entry.text,
+    // What the person was touching when they objected: a task or an action. «Здесь» and «это»
+    // mean that element and nothing else.
+    element: elementOf(entry.context.elementId, graph, journal),
+    // The id rollbackAction needs, which is the root of the chain rather than the entry.
+    actionId: root.id,
     original: {
       id: corrected.id,
       kind: corrected.kind,
@@ -71,7 +96,7 @@ export class TaskAgent {
         id: root.id, text: root.text, answer: root.answer || '', commands: clone(root.commands || []),
         ...(() => { const { status, error, target: acted } = journal.action(root); return { status, error, target: acted }; })()
       } : null,
-      correction: correctionOf({ entry, journal }),
+      correction: correctionOf({ entry, graph, journal }),
       history, tasks: clone(graph.items), graphRevision: graph.revision, today: new Date().toISOString().slice(0, 10)
     };
   }
