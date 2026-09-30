@@ -12,19 +12,15 @@ const walk = (node, fn) => { if (!node) return; fn(node); for (const child of no
 
 /** Browser boundary. Owns view/input state, never a mutable task projection. */
 export class Client {
-  constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15000, watchPollMs = 120000, WebSocketCtor, asrFactory } = {}) {
+  constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15000, WebSocketCtor, asrFactory } = {}) {
     this.dom = dom;
     this.win = dom.defaultView;
     this.fetch = fetcher;
     this.storage = storage;
     this.pollMs = pollMs;
-    // Опрос — единственный канал обновлений, и каждый запрос будит объект. На частоте
-    // разговора открытая вкладка обращается к объекту три тысячи раз в час и делает это
-    // сутки напролёт, хотя смотреть там нечего. Поэтому после череды пустых ответов шаг
-    // растёт до idlePollMs, а скрытая вкладка не опрашивает вовсе; и то и другое
+    // Шаг опроса на время без сокета: после череды пустых ответов он растёт до idlePollMs и
     // сбрасывается, как только пользователь что-то сделал или вкладка снова видна.
     this.idlePollMs = idlePollMs;
-    this.watchPollMs = watchPollMs;
     this.quietPolls = 0;
     this.WebSocketCtor = WebSocketCtor || this.win?.WebSocket;
     this.socket = null;
@@ -87,9 +83,12 @@ export class Client {
    *
    *  Опрос спрашивал объект каждую секунду, чтобы почти всегда услышать «ничего нового»:
    *  открытая вкладка обходилась в тысячи обращений в час и выбирала дневной лимит объекта.
-   *  Сокет молчит, пока ничего не произошло, и стоит одного подключения. Опрос остаётся
-   *  редким подстраховочным ударом — на случай, если сообщение потерялось, — и возвращается
-   *  к прежней частоте, если сокет не открылся вовсе. */
+   *  Сокет молчит, пока ничего не произошло, и стоит одного подключения, поэтому при живом
+   *  сокете опроса нет совсем. Две дыры, которые он раньше затыкал, закрыты по существу:
+   *  сигнал, пришедший во время похода за обновлением, запоминается и повторяется, а
+   *  подключившийся сокет первым делом догоняет пропущенное. Остаётся то, чего опрос всё
+   *  равно не ловил быстро: молча умерший сокет — его находит close, повторное подключение
+   *  и любая команда пользователя. */
   openSocket() {
     if (!this.WebSocketCtor || this.socket || !this.connected) return;
     clearTimeout(this.socketRetryTimer);
@@ -107,7 +106,8 @@ export class Client {
       if (this.dom.visibilityState === 'hidden') { this.missedPush = true; return; }
       this.resume().then(() => this.schedulePoll());
     });
-    socket.addEventListener('open', () => { this.socketAttempts = 0; this.schedulePoll(); });
+    // Пока сокета не было, документ мог уйти вперёд: первый шаг после подключения — догнать.
+    socket.addEventListener('open', () => { this.socketAttempts = 0; this.resume().then(() => this.schedulePoll()); });
     const dropped = () => { if (this.socket === socket) { this.socket = null; this.schedulePoll(); this.retrySocket(); } };
     socket.addEventListener('close', dropped);
     socket.addEventListener('error', dropped);
@@ -132,8 +132,13 @@ export class Client {
     this.dragController?.cancel();
     this.realtime?.stop();
   }
+  /** Один поход за обновлением в каждый момент времени.
+   *
+   *  Сигнал, пришедший пока предыдущий поход не вернулся, раньше просто терялся: его нечем
+   *  было заметить, и страница ждала следующего. Теперь он запоминается и походом
+   *  повторяется — на этом держится отказ от периодического опроса. */
   async resume(cursor = this.cursor) {
-    if (this.polling) return;
+    if (this.polling) { this.signalWhileBusy = true; return; }
     this.polling = true;
     try {
       await this.flush();
@@ -155,18 +160,18 @@ export class Client {
       this.connection('');
     } catch { this.connection('Нет соединения. Команды будут отправлены при восстановлении связи.'); }
     finally { this.polling = false; }
+    if (this.signalWhileBusy) { this.signalWhileBusy = false; await this.resume(); }
   }
-  /** Пока сокет открыт, опрос — только подстраховка от потерянного сообщения. Без сокета он
-   *  единственный канал: первые ответы приходят часто, чтобы выполнение команды выглядело
-   *  мгновенным, а череда пустых замедляет его. */
   socketOpen() { return this.socket?.readyState === 1; }
-  pollDelay() {
-    if (this.socketOpen()) return Math.max(this.pollMs, this.watchPollMs);
-    return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs;
-  }
+  /** Опрос — не канал обновлений, а запасной путь на время без сокета: первые ответы
+   *  приходят часто, чтобы выполнение команды выглядело мгновенным, череда пустых замедляет
+   *  шаг. Пока сокет открыт, страница не спрашивает объект вовсе. */
+  pollDelay() { return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs; }
   schedulePoll() {
     clearTimeout(this.pollTimer);
+    this.pollTimer = null;
     if (!this.connected || !this.pollMs) return;
+    if (this.socketOpen()) return;
     if (this.dom.visibilityState === 'hidden') return;
     this.pollTimer = setTimeout(async () => { await this.resume(); this.schedulePoll(); }, this.pollDelay());
   }

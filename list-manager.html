@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-cef0387f901b232e">
+<meta name="preview-build-hash" content="v02-cef2612eb7968593">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1091,7 +1091,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-cef0387f901b232e";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-cef2612eb7968593";
 </script>
 <script>
 (() => {
@@ -1561,14 +1561,13 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
     for (const child of node.children || []) walk(child, fn);
   };
   var Client = class {
-    constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15e3, watchPollMs = 12e4, WebSocketCtor, asrFactory } = {}) {
+    constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15e3, WebSocketCtor, asrFactory } = {}) {
       this.dom = dom;
       this.win = dom.defaultView;
       this.fetch = fetcher;
       this.storage = storage;
       this.pollMs = pollMs;
       this.idlePollMs = idlePollMs;
-      this.watchPollMs = watchPollMs;
       this.quietPolls = 0;
       this.WebSocketCtor = WebSocketCtor || this.win?.WebSocket;
       this.socket = null;
@@ -1659,9 +1658,12 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
      *
      *  Опрос спрашивал объект каждую секунду, чтобы почти всегда услышать «ничего нового»:
      *  открытая вкладка обходилась в тысячи обращений в час и выбирала дневной лимит объекта.
-     *  Сокет молчит, пока ничего не произошло, и стоит одного подключения. Опрос остаётся
-     *  редким подстраховочным ударом — на случай, если сообщение потерялось, — и возвращается
-     *  к прежней частоте, если сокет не открылся вовсе. */
+     *  Сокет молчит, пока ничего не произошло, и стоит одного подключения, поэтому при живом
+     *  сокете опроса нет совсем. Две дыры, которые он раньше затыкал, закрыты по существу:
+     *  сигнал, пришедший во время похода за обновлением, запоминается и повторяется, а
+     *  подключившийся сокет первым делом догоняет пропущенное. Остаётся то, чего опрос всё
+     *  равно не ловил быстро: молча умерший сокет — его находит close, повторное подключение
+     *  и любая команда пользователя. */
     openSocket() {
       if (!this.WebSocketCtor || this.socket || !this.connected) return;
       clearTimeout(this.socketRetryTimer);
@@ -1692,7 +1694,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       });
       socket.addEventListener("open", () => {
         this.socketAttempts = 0;
-        this.schedulePoll();
+        this.resume().then(() => this.schedulePoll());
       });
       const dropped = () => {
         if (this.socket === socket) {
@@ -1731,8 +1733,16 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       this.dragController?.cancel();
       this.realtime?.stop();
     }
+    /** Один поход за обновлением в каждый момент времени.
+     *
+     *  Сигнал, пришедший пока предыдущий поход не вернулся, раньше просто терялся: его нечем
+     *  было заметить, и страница ждала следующего. Теперь он запоминается и походом
+     *  повторяется — на этом держится отказ от периодического опроса. */
     async resume(cursor = this.cursor) {
-      if (this.polling) return;
+      if (this.polling) {
+        this.signalWhileBusy = true;
+        return;
+      }
       this.polling = true;
       try {
         await this.flush();
@@ -1763,20 +1773,25 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       } finally {
         this.polling = false;
       }
+      if (this.signalWhileBusy) {
+        this.signalWhileBusy = false;
+        await this.resume();
+      }
     }
-    /** Пока сокет открыт, опрос — только подстраховка от потерянного сообщения. Без сокета он
-     *  единственный канал: первые ответы приходят часто, чтобы выполнение команды выглядело
-     *  мгновенным, а череда пустых замедляет его. */
     socketOpen() {
       return this.socket?.readyState === 1;
     }
+    /** Опрос — не канал обновлений, а запасной путь на время без сокета: первые ответы
+     *  приходят часто, чтобы выполнение команды выглядело мгновенным, череда пустых замедляет
+     *  шаг. Пока сокет открыт, страница не спрашивает объект вовсе. */
     pollDelay() {
-      if (this.socketOpen()) return Math.max(this.pollMs, this.watchPollMs);
       return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs;
     }
     schedulePoll() {
       clearTimeout(this.pollTimer);
+      this.pollTimer = null;
       if (!this.connected || !this.pollMs) return;
+      if (this.socketOpen()) return;
       if (this.dom.visibilityState === "hidden") return;
       this.pollTimer = setTimeout(async () => {
         await this.resume();
@@ -3566,7 +3581,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-cef0387f901b232e";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-cef2612eb7968593";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

@@ -61,7 +61,7 @@ describe('частота опроса', () => {
     create();
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     client.schedulePoll();
-    expect(client.pollTimer).toBeUndefined();
+    expect(client.pollTimer).toBeFalsy();
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
     client.schedulePoll();
     expect(client.pollTimer).toBeDefined();
@@ -88,12 +88,36 @@ describe('сервер сам будит страницу', () => {
     expect(client.fetch.mock.calls.length).toBeGreaterThan(before);
   });
 
-  it('пока сокет открыт, опрос становится редкой подстраховкой', () => {
+  it('пока сокет открыт, страница не опрашивает объект вовсе', () => {
     create({ WebSocketCtor: FakeSocket });
     client.openSocket();
-    expect(client.pollDelay()).toBe(1200);
+    client.schedulePoll();
+    expect(client.pollTimer).toBeDefined();
     FakeSocket.last.open();
-    expect(client.pollDelay()).toBe(120000);
+    client.schedulePoll();
+    expect(client.pollTimer).toBeFalsy();
+  });
+
+  it('сигнал, пришедший во время похода за обновлением, не теряется', async () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.polling = true;
+    await client.resume();
+    expect(client.signalWhileBusy).toBe(true);
+    client.polling = false;
+    const before = client.fetch.mock.calls.length;
+    await client.resume();
+    expect(client.signalWhileBusy).toBe(false);
+    // Поход и его повтор: пропущенный сигнал забран, а не отброшен.
+    expect(client.fetch.mock.calls.length).toBeGreaterThan(before + 1);
+  });
+
+  it('подключившийся сокет первым делом догоняет пропущенное', async () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.openSocket();
+    const before = client.fetch.mock.calls.length;
+    FakeSocket.last.open();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.fetch.mock.calls.length).toBeGreaterThan(before);
   });
 
   it('упавший сокет возвращает обычный опрос и переподключается с отсрочкой', () => {
