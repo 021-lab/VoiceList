@@ -408,15 +408,16 @@ export class ListDocumentDO extends Agent {
     this.initializeRuntime(this.runtimeStorage.load());
     this.broadcastState();
     const state = this.runtime.exportState();
-    const disk = JSON.stringify([
-      this.ctx.storage.sql.exec('SELECT value FROM vl_projection').toArray(),
-      this.ctx.storage.sql.exec('SELECT value FROM vl_journal').toArray(),
-      this.ctx.storage.sql.exec('SELECT value FROM vl_technical').toArray()
-    ]);
+    const rows = [];
+    for (const table of ['vl_projection', 'vl_journal', 'vl_technical']) {
+      for (const row of this.ctx.storage.sql.exec(`SELECT value FROM ${table}`).toArray()) {
+        if (/line1|line2/.test(row.value)) rows.push(table + ': ' + row.value.slice(0, 400));
+      }
+    }
     return {
       items: state.graph.items.length, entries: state.entries.length, revision: state.graph.revision,
       changed: before !== after,
-      remaining: { memory: /"line[12]"/.test(JSON.stringify(state)), disk: /line[12]/.test(disk) }
+      remaining: { memory: /line1|line2/.test(JSON.stringify(state)), rows: rows.length, sample: rows.slice(0, 3) }
     };
   }
   async reset() {
