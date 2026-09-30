@@ -161,6 +161,8 @@ export default {
         const written = await destination.importEverything(payload);
         return json({from:env.DOCUMENT_NAME || 'main', target, locationHint:hint || null, exported:payload.counts, imported:written});
       }
+      // TEMPORARY (одноразовая чистка line1/line2). Удалить вместе с dropLegacyFields.
+      if (url.pathname === '/api/v2/drop-legacy-fields' && request.method === 'POST') return json(await stub.dropLegacyFields());
       if (url.pathname === '/api/tasks/tree.json') return json({tasks:await stub.getTaskTree()});
       if (url.pathname === '/api/tasks/frontier.json') return json({frontier:await stub.getTaskFrontier()});
       if (url.pathname === '/api/tasks/tree.txt') return new Response(await stub.getTaskTitleTreeText(),{headers:{'Content-Type':'text/plain;charset=utf-8','Cache-Control':'no-store'}});

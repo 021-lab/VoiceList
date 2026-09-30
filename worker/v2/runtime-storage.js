@@ -162,6 +162,16 @@ export class RuntimeStorage {
     await this.storage.sync();
   }
 
+  /** TEMPORARY (одноразовая чистка полей line1/line2). Заставляет следующий save записать
+   *  каждую строку заново: значения «что уже лежит в базе» забываются, ключи остаются на
+   *  месте, чтобы исчезнувшие строки всё так же удалялись. Удалить вместе с
+   *  dropLegacyFields в document-do.js. */
+  forgetWritten() {
+    for (const map of [this.written.items, this.written.entries, this.written.technical]) for (const id of map.keys()) map.set(id, null);
+    this.written.revision = null; this.written.nextId = null;
+    this.text = { items: new RowText(), entries: new RowText(), technical: new RowText() };
+  }
+
   clear() {
     this.storage.transactionSync(() => {
       this.sql.exec('DELETE FROM vl_projection'); this.sql.exec('DELETE FROM vl_journal'); this.sql.exec('DELETE FROM vl_meta'); this.sql.exec('DELETE FROM vl_technical');
