@@ -24,6 +24,17 @@ function nextOrder(items, parentId) {
   return Math.max(...siblings.map((item) => item.order || 0)) + 10;
 }
 
+/** Место для только что созданной задачи — над соседями.
+ *
+ *  Задача, сказанная вслух, должна быть видна сразу, а не в конце списка, который к этому
+ *  моменту уже не помещается на экран. Порядок — просто число, поэтому «выше всех» это шаг
+ *  вниз от наименьшего; отрицательные значения допустимы и нормализуются при перетаскивании. */
+function topOrder(items, parentId) {
+  const siblings = items.filter((item) => item.parentId === parentId);
+  if (!siblings.length) return 10;
+  return Math.min(...siblings.map((item) => item.order || 0)) - 10;
+}
+
 function noChange() {
   return { patch: [], logEntryDraft: null };
 }
@@ -170,7 +181,7 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
         nextItems.push({
           id: createItemId(existingIds, input),
           parentId: null,
-          order: nextOrder(nextItems, null),
+          order: topOrder(nextItems, null),
           status: 'Open',
           title: payload.title,
           collapsed: false,
@@ -180,7 +191,7 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
         nextItems.push({
           id: createItemId(existingIds, input),
           parentId: input.actId,
-          order: nextOrder(nextItems, input.actId),
+          order: topOrder(nextItems, input.actId),
           status: STATUS_VALUES.has(payload.status) ? payload.status : 'Open',
           title: payload.title,
           collapsed: false,
