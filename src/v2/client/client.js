@@ -12,12 +12,19 @@ const walk = (node, fn) => { if (!node) return; fn(node); for (const child of no
 
 /** Browser boundary. Owns view/input state, never a mutable task projection. */
 export class Client {
-  constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, asrFactory } = {}) {
+  constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15000, asrFactory } = {}) {
     this.dom = dom;
     this.win = dom.defaultView;
     this.fetch = fetcher;
     this.storage = storage;
     this.pollMs = pollMs;
+    // Опрос — единственный канал обновлений, и каждый запрос будит объект. На частоте
+    // разговора открытая вкладка обращается к объекту три тысячи раз в час и делает это
+    // сутки напролёт, хотя смотреть там нечего. Поэтому после череды пустых ответов шаг
+    // растёт до idlePollMs, а скрытая вкладка не опрашивает вовсе; и то и другое
+    // сбрасывается, как только пользователь что-то сделал или вкладка снова видна.
+    this.idlePollMs = idlePollMs;
+    this.quietPolls = 0;
     this.asrFactory = asrFactory || (() => this.win.__voiceTest ? new MockASR(this.win.__voiceTest) : new BrowserASR());
     this.clientKey = this.readStorage('voicelist.v02.client') || this.win.crypto.randomUUID();
     this.writeStorage('voicelist.v02.client', this.clientKey);
@@ -95,15 +102,23 @@ export class Client {
       this.deferredRefresh ||= changed || update.reset || !this.document;
       if (this.deferredRefresh && this.gesture.state === 'idle' && !this.dragController?.active && !this.editorDirty && !this.transcriptEditor) { await this.loadDocument(); this.deferredRefresh = false; }
       this.cursor = update.nextCursor ?? this.cursor;
+      const quiet = !changed && !update.reset && !(update.events || []).length && !(update.actions || []).length && !(update.uiEffects || []).length;
+      this.quietPolls = quiet ? this.quietPolls + 1 : 0;
       this.connection('');
     } catch { this.connection('Нет соединения. Команды будут отправлены при восстановлении связи.'); }
     finally { this.polling = false; }
   }
+  /** Ничего не происходит — значит и спрашивать реже. Первые ответы приходят с прежней
+   *  частотой, чтобы выполнение команды выглядело мгновенным. */
+  pollDelay() { return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs; }
   schedulePoll() {
     clearTimeout(this.pollTimer);
     if (!this.connected || !this.pollMs) return;
-    this.pollTimer = setTimeout(async () => { await this.resume(); this.schedulePoll(); }, this.pollMs);
+    if (this.dom.visibilityState === 'hidden') return;
+    this.pollTimer = setTimeout(async () => { await this.resume(); this.schedulePoll(); }, this.pollDelay());
   }
+  /** Пользователь что-то сделал: следующий ответ ждут сейчас, а не через паузу. */
+  pollNow() { this.quietPolls = 0; this.schedulePoll(); }
   async waitForCompletion(requestId, timeoutMs = 30000) {
     const until = Date.now() + timeoutMs;
     while (Date.now() < until) {
@@ -143,6 +158,7 @@ export class Client {
     this.writeStorage('voicelist.v02.seq', String(this.seq));
     this.pending.set(body.key.seq, body);
     this.savePending();
+    this.pollNow();
     return this.deliver(body);
   }
   savePending() { this.writeStorage('voicelist.v02.pending', JSON.stringify([...this.pending.values()])); }
@@ -234,7 +250,12 @@ export class Client {
       if (this.gesture.state === 'dragging') this.gesture.cancel();
       else this.dragController.cancel();
     });
-    this.dom.addEventListener('visibilitychange', () => { if (this.dom.visibilityState === 'hidden') { this.gesture.cancel(); this.dragController.cancel(); } });
+    this.dom.addEventListener('visibilitychange', () => {
+      if (this.dom.visibilityState === 'hidden') { this.gesture.cancel(); this.dragController.cancel(); clearTimeout(this.pollTimer); return; }
+      // Вкладку вернули: сначала догоняем пропущенное, потом снова в обычном ритме.
+      this.quietPolls = 0;
+      if (this.connected) this.resume().then(() => this.schedulePoll());
+    });
     this.win.addEventListener('online', () => void this.resume());
   }
   render(document) {

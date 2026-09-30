@@ -44,6 +44,11 @@ export const uiCommands = {
   showAddModal: 'edit', showEditModal: 'edit', showNestModal: 'edit', viewItem: 'edit',
   showSettings: 'settings', showDialogues: 'dialogues'
 };
+/** Наружу уходит код и безопасный текст; в журнал воркера — настоящая причина.
+ *
+ *  Ошибка без кода — это поломка, а не отказ: её текст пользователю не показывают, и без
+ *  записи в лог она исчезает вместе с запросом, оставляя «попробуйте ещё раз» и ничего больше. */
 export function safeError(error) {
+  if (!error?.code) console.error('PROCESSING_FAILED', error?.stack || String(error));
   return { code: error.code || 'PROCESSING_FAILED', message: error.code ? error.message : 'Не удалось выполнить действие. Попробуйте ещё раз.' };
 }
