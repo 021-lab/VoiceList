@@ -16,8 +16,7 @@ const sampleState = {
         parentId: null,
         order: 10,
         status: 'Open',
-        line1: 'Task',
-        line2: '',
+        title: 'Task',
         collapsed: false,
         tags: []
       }

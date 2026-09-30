@@ -22,7 +22,7 @@ function check(name, ok, extra) {
 }
 
 // ===== Граф «Ремонт» ==================================================
-const T = (id, line1, parentId = null, status = 'Open') => ({ id, line1, parentId, status, order: 1 });
+const T = (id, title, parentId = null, status = 'Open') => ({ id, title, parentId, status, order: 1 });
 const TASKS = [
   T('inbox', 'Входящие'),
   T('1', 'Ремонт'),
@@ -68,7 +68,7 @@ const isCmd = (r, command, extra = {}) => {
   const c = cmdOf(r);
   if (!c || c.command !== command) return false;
   return Object.entries(extra).every(([k, v]) =>
-    k === 'status' || k === 'line1' || k === 'query' || k === 'parentId'
+    k === 'status' || k === 'title' || k === 'query' || k === 'parentId'
       ? c.payload[k] === v : c[k] === v);
 };
 
@@ -208,7 +208,7 @@ const one = (text, ctx = null) => { const p = P(text, ctx); return p.kind === 'o
 {
   const rows = A.adaptSnapshot(TASKS);
   const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
-  check('адаптер: line1 -> title', byId['3'].title === 'Установить смеситель');
+  check('адаптер: title -> title', byId['3'].title === 'Установить смеситель');
   check('адаптер: Done -> closed', byId['11'].status === 'closed');
   check('адаптер: Archive -> superseded', byId['10'].status === 'superseded');
   check('адаптер: Pause остаётся рабочим', byId['6'].status === 'open');
@@ -241,7 +241,7 @@ const one = (text, ctx = null) => { const p = P(text, ctx); return p.kind === 'o
 // ===== 6. Отпускание в зонах =========================================
 {
   const r = runGesture({ phrase: 'добавь купить молоко', dy: 0 });
-  check('зона: без смещения — команда под пальцем', isCmd(r, 'addChild', { line1: 'купить молоко' }), cmdOf(r));
+  check('зона: без смещения — команда под пальцем', isCmd(r, 'addChild', { title: 'купить молоко' }), cmdOf(r));
   check('зона: без контекста родитель — inbox', cmdOf(r).actId === 'inbox');
 }
 {

@@ -9,7 +9,7 @@ describe('коррекция действия', () => {
     const seen = [];
     const answers = [
       JSON.stringify({ answer: 'Создаю две задачи', commands: [
-        { command: 'addChild', actId: 'inbox', actType: 'task', payload: { line1: 'Продавец' } }
+        { command: 'addChild', actId: 'inbox', actType: 'task', payload: { title: 'Продавец' } }
       ] }),
       JSON.stringify({ answer: 'Перенёс в нужную ветку', commands: [
         { command: 'setParent', actId: 'PLACEHOLDER', actType: 'task', payload: { parentId: 'milk1' } }
@@ -47,6 +47,6 @@ describe('коррекция действия', () => {
 
     // Исправление применено к тому, что было сделано, а не создано заново.
     expect(runtime.graph.read({ id: created }).parentId).toBe('milk1');
-    expect(runtime.graph.read().items.filter(item => item.line1 === 'Продавец')).toHaveLength(1);
+    expect(runtime.graph.read().items.filter(item => item.title === 'Продавец')).toHaveLength(1);
   });
 });

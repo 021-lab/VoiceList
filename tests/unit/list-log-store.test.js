@@ -17,7 +17,7 @@ describe('list log store', () => {
       id: 'log-a',
       createdAt: '2026-08-02T10:00:00.000Z',
       transcript: 'добавь молоко',
-      command: { command: 'addItem', payload: { line1: 'молоко' } },
+      command: { command: 'addItem', payload: { title: 'молоко' } },
       patch: [{ op: 'replace', path: '/snapshot/items', value: [] }],
       syncStatus: 'pending',
       comments: []
@@ -48,7 +48,7 @@ describe('list log store', () => {
         id: 'legacy-1',
         createdAt: '2026-08-01T10:00:00.000Z',
         transcript: null,
-        command: { command: 'addItem', payload: { line1: 'из прошлого' } },
+        command: { command: 'addItem', payload: { title: 'из прошлого' } },
         patch: [],
         syncStatus: 'synced',
         comments: []
@@ -59,7 +59,7 @@ describe('list log store', () => {
         id: 'legacy-2',
         createdAt: '2026-08-01T10:01:00.000Z',
         transcript: null,
-        command: { command: 'addItem', payload: { line1: 'не должен импортироваться второй раз' } },
+        command: { command: 'addItem', payload: { title: 'не должен импортироваться второй раз' } },
         patch: [],
         syncStatus: 'synced',
         comments: []

@@ -96,11 +96,11 @@ const IdInputSchema = z.object({
   id: z.string().trim().min(1).describe('Exact VoiceList task id.')
 }).strict();
 const LineInputSchema = z.object({
-  line1: z.string().trim().min(1).describe('Task title.')
+  title: z.string().trim().min(1).describe('Task title.')
 }).strict();
 const ChildInputSchema = z.object({
   parentId: z.string().trim().min(1).describe('Exact parent task id.'),
-  line1: z.string().trim().min(1).describe('Task title.')
+  title: z.string().trim().min(1).describe('Task title.')
 }).strict();
 const StatusInputSchema = z.object({
   id: z.string().trim().min(1).describe('Exact VoiceList task id.'),
@@ -112,7 +112,7 @@ const MoveInputSchema = z.object({
 }).strict();
 const RenameInputSchema = z.object({
   id: z.string().trim().min(1).describe('Exact VoiceList task id.'),
-  line1: z.string().trim().min(1).describe('New task title.')
+  title: z.string().trim().min(1).describe('New task title.')
 }).strict();
 
 function jsonSchema(schema) {
@@ -254,7 +254,7 @@ async function executeMcpTool(core, name, args) {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: input.line1, line2: '' },
+      payload: { title: input.title },
       source: 'mcp'
     });
     return result.task;
@@ -267,8 +267,7 @@ async function executeMcpTool(core, name, args) {
       actType: 'task',
       command: 'addChild',
       payload: {
-        line1: input.line1,
-        line2: '',
+        title: input.title,
         ...(name === 'voicelist_add_task_note' ? { status: 'Info' } : {})
       },
       source: 'mcp'
@@ -294,7 +293,7 @@ async function executeMcpTool(core, name, args) {
       actId: input.id,
       actType: 'task',
       command: 'editItem',
-      payload: { line1: input.line1, line2: task.line2 || '' },
+      payload: { title: input.title },
       source: 'mcp'
     });
     return result.task;

@@ -33,9 +33,9 @@
 
 ```javascript
 let items = [
-  { id: 2,  line1: 'Хлеб ржаной' },
-  { id: 26, line1: 'Бородинский', line2: '400 г', level: 1 },
-  { id: 27, line1: 'Столичный',   line2: '500 г', level: 1 },
+  { id: 2,  title: 'Хлеб ржаной' },
+  { id: 26, title: 'Бородинский', level: 1 },
+  { id: 27, title: 'Столичный',   level: 1 },
 ];
 let nextId = 32; // монотонно растущий, ID не переиспользуются
 ```
@@ -45,8 +45,7 @@ let nextId = 32; // монотонно растущий, ID не переисп�
 | Поле | Тип | Описание |
 |------|-----|---------|
 | `id` | `number` | Уникальный идентификатор элемента |
-| `line1` | `string` | Заголовок (обязательно) |
-| `line2` | `string?` | Подпись / дополнительный текст |
+| `title` | `string` | Заголовок (обязательно) |
 | `level` | `number?` | Глубина вложенности: 0 = корень (по умолчанию), 1 = дочерний и т.д. |
 | `collapsed` | `boolean?` | Подсписок свёрнут. Управляется через `toggleCollapse()` |
 | `tags` | `string[]?` | Список тегов, назначенных элементу через левую панель |
@@ -91,7 +90,7 @@ function toggleCollapse(itemId) {
 |----------|-----------------|
 | **Добавить** | `items.push({ id: nextId++, ... })` |
 | **Добавить вложенный** | `items.splice(insertIdx, 0, { ..., level: parent.level + 1 })` |
-| **Редактировать** | `item.line1 = ...; item.line2 = ...` |
+| **Редактировать** | `item.title = ...` |
 | **Удалить** | `items = items.filter(i => i.id !== itemId)` |
 | **Перетащить** | После drop DOM-порядок вrapперов читается обратно:<br>`items = [...wrappers].map(w => items.find(it => it.id === +w.dataset.id))` |
 | **Тег** | `item.tags.push(tag)` или `item.tags.splice(idx, 1)` |

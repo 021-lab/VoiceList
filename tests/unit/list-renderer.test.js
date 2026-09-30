@@ -17,8 +17,8 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'root1', parentId: null, order: 10, status: 'Open', line1: 'Root', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'root1', order: 10, status: 'Focus', line1: 'Child', line2: '', tags: [], collapsed: false }
+          { id: 'root1', parentId: null, order: 10, status: 'Open', title: 'Root', tags: [], collapsed: false },
+          { id: 'child', parentId: 'root1', order: 10, status: 'Focus', title: 'Child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -42,9 +42,9 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'visible', parentId: null, order: 10, status: 'Open', line1: 'Visible task', line2: '', tags: [], collapsed: false },
-          { id: 'archived', parentId: null, order: 20, status: 'Archive', line1: 'Archived task', line2: '', tags: [], collapsed: false },
-          { id: 'archived-child', parentId: 'archived', order: 10, status: 'Open', line1: 'Archived child', line2: '', tags: [], collapsed: false }
+          { id: 'visible', parentId: null, order: 10, status: 'Open', title: 'Visible task', tags: [], collapsed: false },
+          { id: 'archived', parentId: null, order: 20, status: 'Archive', title: 'Archived task', tags: [], collapsed: false },
+          { id: 'archived-child', parentId: 'archived', order: 10, status: 'Open', title: 'Archived child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -76,9 +76,9 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'parent', parentId: null, order: 10, status: 'Open', line1: 'Parent', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'parent', order: 10, status: 'Open', line1: 'Child', line2: '', tags: [], collapsed: false },
-          { id: 'paused', parentId: null, order: 20, status: 'Pause', line1: 'Paused', line2: '', tags: [], collapsed: false }
+          { id: 'parent', parentId: null, order: 10, status: 'Open', title: 'Parent', tags: [], collapsed: false },
+          { id: 'child', parentId: 'parent', order: 10, status: 'Open', title: 'Child', tags: [], collapsed: false },
+          { id: 'paused', parentId: null, order: 20, status: 'Pause', title: 'Paused', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -107,8 +107,8 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'focus', parentId: null, order: 10, status: 'Focus', line1: 'Focused task', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'focus', order: 10, status: 'Open', line1: 'Action child', line2: '', tags: [], collapsed: false }
+          { id: 'focus', parentId: null, order: 10, status: 'Focus', title: 'Focused task', tags: [], collapsed: false },
+          { id: 'child', parentId: 'focus', order: 10, status: 'Open', title: 'Action child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -134,9 +134,9 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'later', parentId: null, order: 10, status: 'Open', line1: 'Later', deadline: deadlineFromToday(7), collapsed: false, tags: [] },
-          { id: 'soon', parentId: null, order: 20, status: 'Open', line1: 'Soon', deadline: deadlineFromToday(1), collapsed: false, tags: [] },
-          { id: 'unscheduled', parentId: null, order: 30, status: 'Open', line1: 'Unscheduled', collapsed: false, tags: [] }
+          { id: 'later', parentId: null, order: 10, status: 'Open', title: 'Later', deadline: deadlineFromToday(7), collapsed: false, tags: [] },
+          { id: 'soon', parentId: null, order: 20, status: 'Open', title: 'Soon', deadline: deadlineFromToday(1), collapsed: false, tags: [] },
+          { id: 'unscheduled', parentId: null, order: 30, status: 'Open', title: 'Unscheduled', collapsed: false, tags: [] }
         ]
       },
       actionLog: []
@@ -158,8 +158,8 @@ describe('list renderer', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'parent', parentId: null, order: 10, status: 'Open', line1: 'Parent task', line2: '', tags: [], collapsed: false },
-          { id: 'child', parentId: 'parent', order: 10, status: 'Open', line1: 'Frontier child', line2: '', tags: [], collapsed: false }
+          { id: 'parent', parentId: null, order: 10, status: 'Open', title: 'Parent task', tags: [], collapsed: false },
+          { id: 'child', parentId: 'parent', order: 10, status: 'Open', title: 'Frontier child', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -204,7 +204,7 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'root-task', parentId: null, order: 10, status: 'Open', line1: 'Root frontier task', line2: '', tags: [], collapsed: false }
+          { id: 'root-task', parentId: null, order: 10, status: 'Open', title: 'Root frontier task', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -232,9 +232,9 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'archived', parentId: null, order: 10, status: 'Archive', line1: 'Archived task', line2: '', tags: [], collapsed: false },
-          { id: 'archived-focus', parentId: 'archived', order: 10, status: 'Focus', line1: 'Archived focus', line2: '', tags: [], collapsed: false },
-          { id: 'visible', parentId: null, order: 20, status: 'Open', line1: 'Visible frontier', line2: '', tags: [], collapsed: false }
+          { id: 'archived', parentId: null, order: 10, status: 'Archive', title: 'Archived task', tags: [], collapsed: false },
+          { id: 'archived-focus', parentId: 'archived', order: 10, status: 'Focus', title: 'Archived focus', tags: [], collapsed: false },
+          { id: 'visible', parentId: null, order: 20, status: 'Open', title: 'Visible frontier', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -265,9 +265,9 @@ describe('list renderer', () => {
     renderer.render({
       snapshot: {
         items: [
-          { id: 'match', parentId: null, order: 10, status: 'Open', line1: 'Купить молоко', line2: '', tags: [], collapsed: false },
-          { id: 'other', parentId: null, order: 20, status: 'Open', line1: 'Купить хлеб', line2: '', tags: [], collapsed: false },
-          { id: 'archived', parentId: null, order: 30, status: 'Archive', line1: 'Старое молоко', line2: '', tags: [], collapsed: false }
+          { id: 'match', parentId: null, order: 10, status: 'Open', title: 'Купить молоко', tags: [], collapsed: false },
+          { id: 'other', parentId: null, order: 20, status: 'Open', title: 'Купить хлеб', tags: [], collapsed: false },
+          { id: 'archived', parentId: null, order: 30, status: 'Archive', title: 'Старое молоко', tags: [], collapsed: false }
         ]
       },
       actionLog: []
@@ -302,7 +302,7 @@ describe('list renderer', () => {
         createdAt: '2026-08-02T10:00:00.000Z',
         label: 'Создана задача: молоко',
         transcript: 'добавь молоко',
-        command: { command: 'addItem', payload: { line1: 'молоко' } },
+        command: { command: 'addItem', payload: { title: 'молоко' } },
         patch: [],
         syncStatus: 'pending',
         comments: [{ id: 'c1', createdAt: '2026-08-02T10:01:00.000Z', text: 'купить сегодня' }]

@@ -13,7 +13,7 @@ test.beforeEach(async ({ page, request }) => {
 
 async function confirmModal(page) {
   await expect(page.locator('#modal-overlay')).toHaveClass(/open/);
-  await page.locator('#input-line1').press('Enter');
+  await page.locator('#input-title').press('Enter');
   await expect(page.locator('#modal-overlay')).not.toHaveClass(/open/);
 }
 
@@ -162,7 +162,7 @@ test('preview app can create task, create subtask, and change status', async ({ 
   await expect(page.locator('#list-container')).toContainText('Молоко 3.2%');
 
   await page.getByRole('button', { name: 'Добавить задачу' }).click();
-  await page.locator('#input-line1').fill(taskTitle);
+  await page.locator('#input-title').fill(taskTitle);
   await confirmModal(page);
 
   const taskRow = page.locator('.list-item-wrapper', { hasText: taskTitle });
@@ -220,7 +220,7 @@ test('task edit page preserves edits on Save, links parent and orders visible su
   await page.reload();
 
   await page.getByRole('button', { name: 'Добавить задачу' }).click();
-  await page.locator('#input-line1').fill(parentTitle);
+  await page.locator('#input-title').fill(parentTitle);
   await confirmModal(page);
   const parentRow = page.locator('.list-item-wrapper', { hasText: parentTitle });
 
@@ -228,13 +228,12 @@ test('task edit page preserves edits on Save, links parent and orders visible su
     (await page.locator('#task-page').getAttribute('aria-hidden')) === 'false'
   ));
   await expect(page.locator('#task-page-save')).toHaveText('Сохранить');
-  await expect(page.locator('#task-page-line2')).toHaveCount(0);
   await page.locator('#task-page-child-input').fill(pausedChildTitle);
   await page.locator('#task-page-add-child').click();
   await page.locator('#task-page-child-input').fill(focusChildTitle);
   await page.locator('#task-page-add-child').click();
 
-  await page.locator('#task-page-line1').fill(`${parentTitle} unsaved`);
+  await page.locator('#task-page-title').fill(`${parentTitle} unsaved`);
   await page.locator('#task-page-close').click();
   await expect(parentRow).toContainText(parentTitle);
 
@@ -266,7 +265,7 @@ test('task edit page preserves edits on Save, links parent and orders visible su
   await expect(visibleSubtasks.nth(0)).toContainText(focusChildTitle);
   await expect(visibleSubtasks.nth(1)).toContainText(pausedChildTitle);
 
-  await page.locator('#task-page-line1').fill(renamedParentTitle);
+  await page.locator('#task-page-title').fill(renamedParentTitle);
   await page.locator('#task-page-status').selectOption('Info');
   await page.locator('#task-page-save').click();
   await expect(page.locator('#task-page')).toHaveClass(/open/);
@@ -451,7 +450,7 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
           type: 'function_call',
           call_id: 'call-1',
           name: 'addItem',
-          arguments: JSON.stringify({ line1: 'Позвонить маме' })
+          arguments: JSON.stringify({ title: 'Позвонить маме' })
         }
       })
     });
@@ -753,10 +752,10 @@ test('preview app wraps long task titles to no more than two lines', async ({ pa
 
   const longTitle = 'Длинная задача должна переноситься ровно на две строки';
   await page.getByRole('button', { name: 'Добавить задачу' }).click();
-  await page.locator('#input-line1').fill(longTitle);
+  await page.locator('#input-title').fill(longTitle);
   await confirmModal(page);
 
-  const line = page.locator('.list-item-wrapper', { hasText: longTitle }).locator('.item-line1');
+  const line = page.locator('.list-item-wrapper', { hasText: longTitle }).locator('.item-title');
   await expect(line).toBeVisible();
   const metrics = await line.evaluate((node) => {
     const style = getComputedStyle(node);
@@ -962,7 +961,7 @@ test('preview app positions voice overlay near the pointer and selects a candida
   await expect(overlay).not.toHaveClass(/open/);
   await expect.poll(() => overlay.evaluate((element) => element.style.top)).toMatch(/px$/);
   await expect(page.locator('#modal-overlay')).toHaveClass(/open/);
-  await expect(page.locator('#view-line1')).toHaveText('Молоко 3.2%');
+  await expect(page.locator('#view-title')).toHaveText('Молоко 3.2%');
 });
 
 test('preview app adds a voice comment to a log entry on press speak release', async ({ page }) => {
@@ -972,7 +971,7 @@ test('preview app adds a voice comment to a log entry on press speak release', a
   await page.reload();
 
   await page.getByRole('button', { name: 'Добавить задачу' }).click();
-  await page.locator('#input-line1').fill(taskTitle);
+  await page.locator('#input-title').fill(taskTitle);
   await confirmModal(page);
 
   await page.evaluate(() => {

@@ -93,8 +93,7 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
     row.innerHTML = `
       <div class="item-head">
         <div class="item-copy">
-          <div class="item-line1">${chevron}${escHtml(item.line1)}</div>
-          ${item.line2 ? `<div class="item-line2">${escHtml(item.line2)}</div>` : ''}
+          <div class="item-title">${chevron}${escHtml(item.title)}</div>
           ${item.tags?.length ? `<div class="item-tags">${item.tags.map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="item-side">
@@ -126,8 +125,7 @@ export function createRenderer({ container, actionLogPanel, actionLogList, rootP
     row.innerHTML = `
       <div class="item-head">
         <div class="item-copy">
-          <div class="item-line1">${escHtml(parent.line1)}</div>
-          ${parent.line2 ? `<div class="item-line2">${escHtml(parent.line2)}</div>` : ''}
+          <div class="item-title">${escHtml(parent.title)}</div>
           ${parent.tags?.length ? `<div class="item-tags">${parent.tags.map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="item-side">
@@ -166,7 +164,7 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
       focusStrip.className = 'frontier-focus-strip';
       focusStrip.innerHTML = `
         <span class="frontier-focus-label">Фокус</span>
-        ${result.focusHighlights.map((item) => `<span class="frontier-focus-chip">${escHtml(item.line1 || item.id)}</span>`).join('')}
+        ${result.focusHighlights.map((item) => `<span class="frontier-focus-chip">${escHtml(item.title || item.id)}</span>`).join('')}
       `;
       fragment.appendChild(focusStrip);
     }
@@ -175,8 +173,7 @@ const focusIds = new Set(result.focusHighlights.map((item) => item.id));
       const parent = item.parentId ? itemById.get(item.parentId) : {
         id: '__root__',
         status: 'Open',
-        line1: 'Мой список',
-        line2: '',
+        title: 'Мой список',
         tags: []
       };
       const parentExpanded = expandedFrontierParents.has(item.id);

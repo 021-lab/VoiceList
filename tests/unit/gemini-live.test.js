@@ -4,7 +4,7 @@ import {
   buildToolResponse, geminiFunctionDeclarations, isLoggableFrame, readToolCalls, stripAudio
 } from '../../src/v2/domain/gemini-live.js';
 
-const task = (id, parentId, status, line1) => ({ id, parentId, order: 10, status, line1, line2: '', collapsed: false, tags: [] });
+const task = (id, parentId, status, title) => ({ id, parentId, order: 10, status, title, collapsed: false, tags: [] });
 const sample = [task('rs', null, 'Open', 'Яблоки'), task('rt', 'rs', 'Open', 'Голден')];
 
 describe('gemini tool declarations', () => {

@@ -33,11 +33,11 @@ describe('v0.2 authoritative journal and graph projection', () => {
   });
   it('deduplicates both pending and completed requests; rejects key reuse', async () => {
     const runtime=new DocumentRuntime();
-    const request=input(1,{command:'addItem',actId:'list',payload:{line1:'One'}});
+    const request=input(1,{command:'addItem',actId:'list',payload:{title:'One'}});
     await Promise.all([runtime.submit(request),runtime.submit(request)]);
     await runtime.processPending();
     expect((await runtime.executeAndWait(request)).status).toBe('completed');
-    expect(runtime.graph.read().items.filter(x=>x.line1==='One')).toHaveLength(1);
+    expect(runtime.graph.read().items.filter(x=>x.title==='One')).toHaveLength(1);
     await expect(runtime.submit({...request,command:status('Done')})).rejects.toMatchObject({code:'REQUEST_KEY_REUSED'});
   });
   it('does not publish a changed graph on storage failure and can retry', async () => {
@@ -87,9 +87,8 @@ describe('v0.2 authoritative journal and graph projection', () => {
   it('preserves details, deadline, tags and arbitrary task attributes on edits', async () => {
     const runtime=new DocumentRuntime();
     await execute(runtime,input(1,{command:'setDeadline',actId:'milk1',payload:{deadline:'2026-10-20'}}));
-    await execute(runtime,input(2,{command:'editItem',actId:'milk1',payload:{line1:'New title'}}));
+    await execute(runtime,input(2,{command:'editItem',actId:'milk1',payload:{title:'New title'}}));
     const task=runtime.graph.read({id:'milk1'});
-    expect(task.line2).toBe('2 пакета, магазин у дома');
     expect(task.deadline).toBe('2026-10-20');
   });
   it('rolls back an action and its corrections without deleting independent field edits', async () => {
@@ -97,10 +96,10 @@ describe('v0.2 authoritative journal and graph projection', () => {
     const first=await execute(runtime,input(1,status('Focus')));
     const id=first.requestId;
     await execute(runtime,input(2,status('Done'),{actionId:id,elementId:'action:'+id}));
-    await execute(runtime,input(3,{command:'editItem',actId:'milk1',payload:{line1:'Independent'}}));
+    await execute(runtime,input(3,{command:'editItem',actId:'milk1',payload:{title:'Independent'}}));
     const rollback=await execute(runtime,input(4,{command:'rollbackAction',actId:id,payload:{}},{elementId:'action:'+id,actionId:id}));
     expect(rollback.error).toBe(null);
-    expect(runtime.graph.read({id:'milk1'})).toMatchObject({status:'Open',line1:'Independent'});
+    expect(runtime.graph.read({id:'milk1'})).toMatchObject({status:'Open',title:'Independent'});
     expect(runtime.state.technical.undoneEntries[id]).toBe(true);
   });
   it('fails targeted rollback if another action changed the same field', async () => {

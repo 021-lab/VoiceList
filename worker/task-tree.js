@@ -5,7 +5,7 @@ export function taskTreeFromItems(items = []) {
     if (!id) continue;
     nodes.set(id, {
       id,
-      title: String(item?.line1 || ''),
+      title: String(item?.title || ''),
       status: String(item?.status || 'Open'),
       children: []
     });

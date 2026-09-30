@@ -17,7 +17,7 @@ const STATUS_MAP = {
 function adaptItem(item) {
   return {
     id: item.id,
-    title: item.line1 ?? '',
+    title: item.title ?? '',
     status: STATUS_MAP[item.status] ?? 'open',
   };
 }

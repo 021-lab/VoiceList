@@ -3,7 +3,7 @@ import { GeminiHost } from '../../worker/v2/gemini-host.js';
 import { LiveSettings } from '../../src/v2/domain/live-settings.js';
 
 const memory = () => { const map = new Map(); return { map, async get(k) { return map.get(k); }, async put(k, v) { map.set(k, v); } }; };
-const task = (id, parentId, status, line1) => ({ id, parentId, order: 10, status, line1, line2: '', collapsed: false, tags: [] });
+const task = (id, parentId, status, title) => ({ id, parentId, order: 10, status, title, collapsed: false, tags: [] });
 
 function harness({ tokenOk = true, ack = { status: 'applied', newTarget: 'rt' } } = {}) {
   const rows = [];
@@ -83,7 +83,7 @@ describe('running a tool call', () => {
   it('passes a rejection back instead of throwing at the page', async () => {
     const { host } = harness({ ack: { status: 'rejected', reason: 'Задача не найдена' } });
     await host.mintToken();
-    const [result] = await host.invokeAll({ toolCall: { functionCalls: [{ id: 'c2', name: 'editItem', args: { taskId: 'zz', line1: 'Нет' } }] } });
+    const [result] = await host.invokeAll({ toolCall: { functionCalls: [{ id: 'c2', name: 'editItem', args: { taskId: 'zz', title: 'Нет' } }] } });
     expect(result.response).toEqual({ status: 'rejected', reason: 'Задача не найдена' });
   });
 
@@ -106,7 +106,7 @@ describe('running a tool call', () => {
     const { host, applied } = harness();
     await host.mintToken();
     await host.invokeAll({ toolCall: { functionCalls: [
-      { id: 'a', name: 'editItem', args: { taskId: 'rt', line1: 'Голден новый' } },
+      { id: 'a', name: 'editItem', args: { taskId: 'rt', title: 'Голден новый' } },
       { id: 'b', name: 'setStatus', args: { taskId: 'rt', status: 'Pause' } }
     ] } });
     const keys = applied.map(entry => entry.message.clientKey);
@@ -183,8 +183,8 @@ describe('a repeated change', () => {
   it('is answered from the first result instead of applied twice', async () => {
     const { host, applied, rows } = harness();
     await host.mintToken();
-    const call = { toolCall: { functionCalls: [{ id: 'first', name: 'addChild', args: { parentId: 'rs', line1: 'Йены' } }] } };
-    const retry = { toolCall: { functionCalls: [{ id: 'second', name: 'addChild', args: { parentId: 'rs', line1: 'йены' } }] } };
+    const call = { toolCall: { functionCalls: [{ id: 'first', name: 'addChild', args: { parentId: 'rs', title: 'Йены' } }] } };
+    const retry = { toolCall: { functionCalls: [{ id: 'second', name: 'addChild', args: { parentId: 'rs', title: 'йены' } }] } };
 
     const [one] = await host.invokeAll(call);
     const [two] = await host.invokeAll(retry);
@@ -200,7 +200,7 @@ describe('a repeated change', () => {
     const { host, applied } = harness();
     host.now = () => new Date(clock);
     await host.mintToken();
-    const call = { toolCall: { functionCalls: [{ id: 'a', name: 'addItem', args: { line1: 'Хлеб' } }] } };
+    const call = { toolCall: { functionCalls: [{ id: 'a', name: 'addItem', args: { title: 'Хлеб' } }] } };
 
     await host.invokeAll(call);
     clock += 31_000;
@@ -222,7 +222,7 @@ describe('a repeated change', () => {
   it('does not remember a rejection, so a corrected call still runs', async () => {
     const { host, applied } = harness({ ack: { status: 'rejected', reason: 'нет задачи' } });
     await host.mintToken();
-    const call = { toolCall: { functionCalls: [{ id: 'r', name: 'addItem', args: { line1: 'Хлеб' } }] } };
+    const call = { toolCall: { functionCalls: [{ id: 'r', name: 'addItem', args: { title: 'Хлеб' } }] } };
     await host.invokeAll(call);
     await host.invokeAll(call);
     expect(applied).toHaveLength(2);

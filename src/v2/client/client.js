@@ -213,7 +213,7 @@ export class Client {
     bind('task-page-save', () => this.saveTask());
     bind('task-page-add-child', async () => {
       const input = this.$('task-page-child-input'); if (!input.value.trim()) return;
-      await this.command('addChild', this.editorNode?.props.taskId, { line1: input.value.trim(), line2: '' }); input.value = '';
+      await this.command('addChild', this.editorNode?.props.taskId, { title: input.value.trim() }); input.value = '';
     });
     bind('undo-btn', () => this.command('undo'));
     bind('workflowy-import-btn', async () => {
@@ -221,13 +221,8 @@ export class Client {
       const result = await this.command('importWorkflowy', null, { url: this.$('workflowy-url-input').value.trim() });
       status.textContent = result ? 'Импорт завершён' : 'Не удалось импортировать';
     });
-    for (const id of ['input-line1', 'input-line2']) if (this.$(id)) this.$(id).onkeydown = (event) => { if (event.key === 'Enter') void this.saveAdd(); };
-    for (const id of ['task-page-line1', 'task-page-status']) if (this.$(id)) this.$(id).oninput = () => { this.editorDirty = true; };
-    if (this.$('task-page-line1')) {
-      const details = this.node('textarea', { id: 'task-page-line2', className: 'v02-task-details', placeholder: 'Подробности', 'aria-label': 'Подробности задачи' });
-      details.oninput = () => { this.editorDirty = true; };
-      this.$('task-page-line1').parentElement.append(details);
-    }
+    for (const id of ['input-title']) if (this.$(id)) this.$(id).onkeydown = (event) => { if (event.key === 'Enter') void this.saveAdd(); };
+    for (const id of ['task-page-title', 'task-page-status']) if (this.$(id)) this.$(id).oninput = () => { this.editorDirty = true; };
     const menus = { 'frontier-tab-btn': 'frontier', 'settings-btn': 'settings', 'view-toggle-btn': 'log', 'add-btn': 'add', 'dialogues-tab-btn': 'dialogues' };
     for (const [id, menu] of Object.entries(menus)) if (this.$(id)) this.$(id).dataset.componentId = `menu:${menu}`;
     this.bindGestures(root);
@@ -281,7 +276,7 @@ export class Client {
       case 'application': for (const child of component.children || []) this.renderComponent(child, parent); break;
       case 'task-list':
         if (p.query) parent.append(this.node('div', { className: 'search-summary' }, `Поиск: ${p.query}`));
-        if (p.focusHighlights?.length) parent.append(this.node('div', { className: 'frontier-focus-strip' }, `Фокус: ${p.focusHighlights.map(x => x.line1).join(' · ')}`));
+        if (p.focusHighlights?.length) parent.append(this.node('div', { className: 'frontier-focus-strip' }, `Фокус: ${p.focusHighlights.map(x => x.title).join(' · ')}`));
         for (const child of component.children || []) this.renderComponent(child, parent); break;
       case 'toolbar': this.$('undo-btn').disabled = p.canUndo === false; if (p.title) this.dom.querySelector('header h1').textContent = p.title; break;
       case 'task': parent.append(this.renderTask(component)); break;
@@ -301,11 +296,10 @@ export class Client {
     const row = this.node('div', { className: 'list-item', 'data-act-id': p.taskId, 'data-act-type': 'task', tabIndex: 0 });
     const head = this.node('div', { className: 'item-head' });
     const copy = this.node('div', { className: 'item-copy' });
-    const title = this.node('div', { className: 'item-line1' });
+    const title = this.node('div', { className: 'item-title' });
     if (p.hasChildren) title.append(this.node('span', { className: 'chevron' }, (this.collapsed.get(p.taskId) ?? p.collapsed) ? '▶' : '▼'));
-    title.append(this.dom.createTextNode(p.line1 || ''));
+    title.append(this.dom.createTextNode(p.title || ''));
     copy.append(title);
-    if (p.line2) copy.append(this.node('div', { className: 'item-line2' }, p.line2));
     if (p.tags?.length) { const tags = this.node('div', { className: 'item-tags' }); for (const tag of p.tags) tags.append(this.node('span', { className: 'item-tag' }, tag)); copy.append(tags); }
     const side = this.node('div', { className: 'item-side' });
     const badge = this.node('span', { className: 'status-badge' }, p.status || 'Open'); badge.style.setProperty('--badge-color', colors[p.status] || colors.Open);
@@ -447,38 +441,36 @@ export class Client {
   renderEditor(component) {
     this.editorNode = component; const p = component.props;
     this.$('task-page').dataset.componentId = component.id;
-    this.$('task-page-line1').value = p.line1 || '';
-    this.$('task-page-line2').value = p.line2 || '';
+    this.$('task-page-title').value = p.title || '';
     this.$('task-page-status').value = p.status || 'Open';
-    const link = this.$('task-page-parent'); link.hidden = !p.parent; link.textContent = p.parent?.line1 || '';
+    const link = this.$('task-page-parent'); link.hidden = !p.parent; link.textContent = p.parent?.title || '';
     link.onclick = (event) => { event.preventDefault(); void this.navigate('edit', { taskId: p.parent.id || p.parent.taskId }); };
     const children = this.$('task-page-subtasks'); children.replaceChildren();
     for (const child of p.subtasks || []) {
       const row = this.node('div', { className: 'task-page-subtask', 'data-id': child.id || child.taskId, 'data-component-id': `task:${child.id || child.taskId}` });
-      row.append(this.node('span', {}, child.line1), this.node('small', {}, child.status));
+      row.append(this.node('span', {}, child.title), this.node('small', {}, child.status));
       row.onclick = () => this.navigate('edit', { taskId: child.id || child.taskId }); children.append(row);
     }
   }
   async saveTask() {
     const p = this.editorNode?.props; if (!p) return;
-    const line1 = this.$('task-page-line1').value.trim(); if (!line1) return;
-    const line2 = this.$('task-page-line2').value;
+    const title = this.$('task-page-title').value.trim(); if (!title) return;
     const status = this.$('task-page-status').value;
-    if (p.mode === 'add' || !p.taskId) { await this.command(p.parentId ? 'addChild' : 'addItem', p.parentId, { line1, line2, status }); return this.close(); }
+    if (p.mode === 'add' || !p.taskId) { await this.command(p.parentId ? 'addChild' : 'addItem', p.parentId, { title, status }); return this.close(); }
     // Capture every draft before the first reply renders the page again.
-    if (line1 !== p.line1 || line2 !== (p.line2 || '')) await this.command('editItem', p.taskId, { line1, line2 });
+    if (title !== p.title) await this.command('editItem', p.taskId, { title });
     if (status !== p.status) await this.command('setStatus', p.taskId, { status });
     this.showToast('Сохранено');
   }
   openAdd(parentId = null) {
     this.addParentId = parentId;
-    this.$('input-line1').value = ''; this.$('input-line2').value = '';
+    this.$('input-title').value = '';
     this.$('modal-title').textContent = parentId ? 'Новая подзадача' : 'Новый элемент';
-    this.$('modal-overlay').classList.add('open'); this.$('input-line1').focus();
+    this.$('modal-overlay').classList.add('open'); this.$('input-title').focus();
   }
   async saveAdd() {
-    const line1 = this.$('input-line1').value.trim(); if (!line1) return;
-    const result = await this.command(this.addParentId ? 'addChild' : 'addItem', this.addParentId, { line1, line2: this.$('input-line2').value.trim() });
+    const title = this.$('input-title').value.trim(); if (!title) return;
+    const result = await this.command(this.addParentId ? 'addChild' : 'addItem', this.addParentId, { title });
     if (result) this.$('modal-overlay').classList.remove('open');
   }
   showToast(message, actionId) {
@@ -541,7 +533,7 @@ export class Client {
       if (existing?.classList.contains('frontier-parent-wrapper')) { existing.remove(); target.element.style.marginLeft = '0px'; return; }
       const parent = target.node.props.parent;
       const contextRow = this.node('div', { className: 'list-item-wrapper frontier-parent-wrapper', 'data-id': `parent:${parent.id}` });
-      const row = this.node('div', { className: 'list-item frontier-parent-item' }); row.append(this.node('div', { className: 'item-line1' }, parent.line1)); contextRow.append(row);
+      const row = this.node('div', { className: 'list-item frontier-parent-item' }); row.append(this.node('div', { className: 'item-title' }, parent.title)); contextRow.append(row);
       contextRow.onclick = () => { if (parent.id !== '__root__') void this.navigate('edit', { taskId: parent.id }); };
       target.element.before(contextRow); target.element.style.marginLeft = '24px'; return;
     }

@@ -19,13 +19,17 @@ import { clone, fail } from './contracts.js';
 function elementOf(elementId, graph, journal) {
   if (elementId.startsWith('task:')) {
     const task = graph.items.find(item => item.id === elementId.slice(5));
-    return task ? { вид: 'задача', id: task.id, line1: task.line1, status: task.status, parentId: task.parentId } : { вид: 'задача', id: elementId.slice(5), примечание: 'задачи уже нет' };
+    return task
+      ? { kind: 'task', taskId: task.id, title: task.title, status: task.status, parentId: task.parentId }
+      : { kind: 'task', taskId: elementId.slice(5), missing: true };
   }
   if (elementId.startsWith('action:')) {
     const action = journal.get(elementId.slice(7));
-    return { вид: 'действие', id: elementId.slice(7), ...(action ? { просьба: action.text || null } : { примечание: 'записи не найдено' }) };
+    return action
+      ? { kind: 'action', actionId: elementId.slice(7), request: action.text || null }
+      : { kind: 'action', actionId: elementId.slice(7), missing: true };
   }
-  return { вид: 'экран', id: elementId };
+  return { kind: 'screen', screenId: elementId };
 }
 
 function correctionOf({ entry, graph, journal }) {
@@ -41,14 +45,14 @@ function correctionOf({ entry, graph, journal }) {
   const error = ledger.error || null;
   const target = [...outcomes].reverse().find(item => item.target)?.target || null;
   // The rows as they changed, not a list of field names: a correction is judged against what
-  // the list looks like now, and «изменены line1, line2» says nothing about what it became.
+  // the list looks like now, and «изменены title, status» says nothing about what it became.
   const shown = (task) => task && Object.fromEntries(
-    ['line1', 'line2', 'status', 'parentId', 'deadline', 'tags'].filter(field => task[field] !== undefined && task[field] !== '')
+    ['title', 'status', 'parentId', 'deadline', 'tags'].filter(field => task[field] !== undefined && task[field] !== '')
       .map(field => [field, task[field]])
   );
   const changed = outcomes.flatMap(item => item.changes || []).map(change => change.fields
-    ? { id: change.id, поля: change.fields, было: shown(change.before), стало: shown(change.after) }
-    : { id: change.id, операция: change.before ? 'удалена' : 'создана', задача: shown(change.after || change.before) });
+    ? { taskId: change.id, changedFields: change.fields, valuesBefore: shown(change.before), valuesAfter: shown(change.after) }
+    : { taskId: change.id, operation: change.before ? 'removed' : 'created', task: shown(change.after || change.before) });
   const root = journal.rootFor(corrected.id) || corrected;
   return {
     userText: entry.text,

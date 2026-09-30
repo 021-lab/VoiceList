@@ -146,7 +146,7 @@ Allowed operations:
      "actId": "list",
      "actType": "list",
      "command": "addItem",
-     "payload": { "line1": "<new task title>" },
+     "payload": { "title": "<new task title>" },
      "source": "openai-chatbot",
      "transcript": "<original user request>"
    }
@@ -158,7 +158,7 @@ Allowed operations:
      "actId": "<parent task id>",
      "actType": "task",
      "command": "addChild",
-     "payload": { "line1": "<new child task title>" },
+     "payload": { "title": "<new child task title>" },
      "source": "openai-chatbot",
      "transcript": "<original user request>"
    }
@@ -172,7 +172,7 @@ Allowed operations:
      "actId": "<parent task id>",
      "actType": "task",
      "command": "addChild",
-     "payload": { "line1": "<information text>", "status": "Info" },
+     "payload": { "title": "<information text>", "status": "Info" },
      "source": "openai-chatbot",
      "transcript": "<original user request>"
    }
@@ -196,7 +196,7 @@ Allowed operations:
      "actId": "<task id>",
      "actType": "task",
      "command": "editItem",
-     "payload": { "line1": "<new task title>" },
+     "payload": { "title": "<new task title>" },
      "source": "openai-chatbot",
      "transcript": "<original user request>"
    }

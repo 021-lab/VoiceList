@@ -168,9 +168,9 @@ function toCommand(h, context) {
   const r = h.rule;
   switch (r.command) {
     case 'addChild':
-      return { command: 'addChild', actId: context ?? 'inbox', payload: { line1: h.tail } };
+      return { command: 'addChild', actId: context ?? 'inbox', payload: { title: h.tail } };
     case 'editItem':
-      return { command: 'editItem', actId: context, payload: { line1: h.tail } };
+      return { command: 'editItem', actId: context, payload: { title: h.tail } };
     case 'setParent':
       return { command: 'setParent', actId: context, payload: { parentId: null } };
     case 'showSearch':

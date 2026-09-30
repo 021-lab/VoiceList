@@ -4,7 +4,7 @@ import {
   buildLiveSessionConfig, formatSnapshotDeltas, formatTaskSnapshot, isLoggableEvent, readFunctionCall
 } from '../../src/v2/domain/live-session.js';
 
-const task = (id, parentId, status, line1, extra = {}) => ({ id, parentId, order: 10, status, line1, line2: '', collapsed: false, tags: [], ...extra });
+const task = (id, parentId, status, title, extra = {}) => ({ id, parentId, order: 10, status, title, collapsed: false, tags: [], ...extra });
 
 const sample = [
   task('rs', null, 'Open', 'Яблоки'),
@@ -54,7 +54,7 @@ describe('snapshot deltas', () => {
 
   it('reports rename, status and move separately', () => {
     expect(formatSnapshotDeltas([
-      { id: 'ru', before, after: { ...before, line1: 'Фуджи красные' }, fields: ['line1'] },
+      { id: 'ru', before, after: { ...before, title: 'Фуджи красные' }, fields: ['title'] },
       { id: 'ru', before, after: { ...before, status: 'Focus' }, fields: ['status'] },
       { id: 'ru', before, after: { ...before, parentId: 'rw' }, fields: ['parentId'] }
     ])).toEqual(['~ ru Фуджи красные', '* ru F', '> ru rw']);

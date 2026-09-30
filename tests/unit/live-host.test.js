@@ -15,7 +15,7 @@ class FakeSocket {
 
 const memory = () => { const map = new Map(); return { map, async get(k) { return map.get(k); }, async put(k, v) { map.set(k, v); } }; };
 
-const task = (id, parentId, status, line1) => ({ id, parentId, order: 10, status, line1, line2: '', collapsed: false, tags: [] });
+const task = (id, parentId, status, title) => ({ id, parentId, order: 10, status, title, collapsed: false, tags: [] });
 
 function harness({ createOk = true, attachOk = true, applyAck = { status: 'applied', newTarget: 'rs' } } = {}) {
   const socket = new FakeSocket();
@@ -191,7 +191,7 @@ describe('tool calls', () => {
   it('reports a rejected command back to the model instead of claiming success', async () => {
     const context = harness({ applyAck: { status: 'rejected', reason: 'Задача не найдена' } });
     await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(functionCall('editItem', { taskId: 'нет', line1: 'Новое' }));
+    context.socket.deliver(functionCall('editItem', { taskId: 'нет', title: 'Новое' }));
     await settle();
 
     const result = context.socket.sent.find(message => message.type === 'response.item.create');

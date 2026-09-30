@@ -5,7 +5,7 @@ import { GestureController } from '../../src/v2/client/gesture-controller.js';
 import { MockASR } from '../../src/asr-mock.js';
 
 const node = (type, id, props = {}, children = []) => ({ type, id, props, children });
-const task = (id, props = {}) => node('task', `task:${id}`, { taskId: id, line1: id, status: 'Open', parentId: null, level: 0, ...props });
+const task = (id, props = {}) => node('task', `task:${id}`, { taskId: id, title: id, status: 'Open', parentId: null, level: 0, ...props });
 const documentTree = (children = [task('one')], view = 'list', cursor = 0) => ({ schemaVersion: 1, revision: 3, cursor, view, root: node('application', 'app', {}, [node('toolbar', 'toolbar'), node('task-list', 'screen:list', {}, children)]) });
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 let client;
@@ -23,10 +23,10 @@ function create(fetcher) {
 
 describe('server component Client', () => {
   it('renders escaped task data using stable component and task IDs', () => {
-    create().render(documentTree([task('one', { line1: '<img src=x onerror=alert(1)>' })]));
+    create().render(documentTree([task('one', { title: '<img src=x onerror=alert(1)>' })]));
     expect(document.querySelector('[data-component-id="task:one"]')).toBeTruthy();
-    expect(document.querySelector('.item-line1').textContent).toContain('<img');
-    expect(document.querySelector('.item-line1 img')).toBeNull();
+    expect(document.querySelector('.item-title').textContent).toContain('<img');
+    expect(document.querySelector('.item-title img')).toBeNull();
   });
   it('collapses and expands server-collapsed branches locally without sending a mutation', () => {
     const fetcher = vi.fn(); create(fetcher);

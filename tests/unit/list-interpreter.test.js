@@ -10,14 +10,14 @@ describe('list interpreter', () => {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: 'Task from test', line2: 'detail' },
+      payload: { title: 'Task from test' },
       transcript: 'добавь task from test',
       source: 'unit-test'
     });
 
     expect(result.patch.length).toBeGreaterThan(0);
     expect(result.logEntryDraft.command.command).toBe('addItem');
-    expect(result.logEntryDraft.command.payload.line1).toBe('Task from test');
+    expect(result.logEntryDraft.command.payload.title).toBe('Task from test');
     expect(result.logEntryDraft.transcript).toBe('добавь task from test');
     expect(result.logEntryDraft.comments).toEqual([]);
   });
@@ -42,9 +42,9 @@ describe('list interpreter', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'a', parentId: null, order: 10, status: 'Open', line1: 'A' },
-          { id: 'b', parentId: 'a', order: 10, status: 'Open', line1: 'B' },
-          { id: 'c', parentId: null, order: 20, status: 'Open', line1: 'C' }
+          { id: 'a', parentId: null, order: 10, status: 'Open', title: 'A' },
+          { id: 'b', parentId: 'a', order: 10, status: 'Open', title: 'B' },
+          { id: 'c', parentId: null, order: 20, status: 'Open', title: 'C' }
         ]
       },
       actionLog: []
@@ -75,9 +75,9 @@ describe('list interpreter', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'inbox', parentId: null, order: 0, status: 'Open', line1: 'Входящие' },
-          { id: 'milk', parentId: 'inbox', order: 10, status: 'Open', line1: 'Купить молоко' },
-          { id: 'old', parentId: null, order: 20, status: 'Archive', line1: 'Старое молоко' }
+          { id: 'inbox', parentId: null, order: 0, status: 'Open', title: 'Входящие' },
+          { id: 'milk', parentId: 'inbox', order: 10, status: 'Open', title: 'Купить молоко' },
+          { id: 'old', parentId: null, order: 20, status: 'Archive', title: 'Старое молоко' }
         ]
       },
       actionLog: []
@@ -87,7 +87,7 @@ describe('list interpreter', () => {
       actId: 'inbox',
       actType: 'task',
       command: 'editItem',
-      payload: { line1: 'Other' },
+      payload: { title: 'Other' },
       source: 'unit-test'
     })).toEqual({ patch: [], logEntryDraft: null });
 
@@ -108,7 +108,7 @@ describe('list interpreter', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'bread', parentId: null, order: 10, status: 'Open', line1: 'Хлеб', collapsed: false, tags: [] }
+          { id: 'bread', parentId: null, order: 10, status: 'Open', title: 'Хлеб', collapsed: false, tags: [] }
         ]
       },
       actionLog: []
@@ -131,7 +131,7 @@ describe('list interpreter', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'note', parentId: null, order: 10, status: 'Open', line1: 'Reference', collapsed: false, tags: [] }
+          { id: 'note', parentId: null, order: 10, status: 'Open', title: 'Reference', collapsed: false, tags: [] }
         ]
       },
       actionLog: []
@@ -157,7 +157,7 @@ describe('list interpreter', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'apple', parentId: null, order: 10, status: 'Open', line1: 'Яблоки', line2: 'old details', collapsed: false, tags: [] }
+          { id: 'apple', parentId: null, order: 10, status: 'Open', title: 'Яблоки', collapsed: false, tags: [] }
         ]
       },
       actionLog: []
@@ -167,14 +167,14 @@ describe('list interpreter', () => {
       actId: 'apple',
       actType: 'task',
       command: 'addChild',
-      payload: { line1: 'Сезонные дешевле в сентябре', status: 'Info' },
+      payload: { title: 'Сезонные дешевле в сентябре', status: 'Info' },
       source: 'unit-test'
     });
     const infoChild = added.patch[0].value.find((item) => item.id === 'info-1');
     expect(infoChild).toMatchObject({
       parentId: 'apple',
       status: 'Info',
-      line1: 'Сезонные дешевле в сентябре'
+      title: 'Сезонные дешевле в сентябре'
     });
     expect(added.logEntryDraft.label).toBe('Добавлена информация: Сезонные дешевле в сентябре');
 
@@ -182,12 +182,11 @@ describe('list interpreter', () => {
       actId: 'apple',
       actType: 'task',
       command: 'editItem',
-      payload: { line1: 'Яблоки сезонные' },
+      payload: { title: 'Яблоки сезонные' },
       source: 'unit-test'
     });
     expect(edited.patch[0].value.find((item) => item.id === 'apple')).toMatchObject({
-      line1: 'Яблоки сезонные',
-      line2: 'old details'
+      title: 'Яблоки сезонные'
     });
   });
 
@@ -209,7 +208,7 @@ describe('list interpreter', () => {
     const state = {
       snapshot: {
         items: [
-          { id: 'milk1', parentId: null, order: 10, status: 'Open', line1: 'Молоко', line2: '', collapsed: false, tags: [] }
+          { id: 'milk1', parentId: null, order: 10, status: 'Open', title: 'Молоко', collapsed: false, tags: [] }
         ]
       },
       actionLog: []
@@ -234,10 +233,10 @@ describe('list interpreter', () => {
 
     expect(result.patch).toHaveLength(1);
     expect(result.patch[0].value.slice(1)).toEqual([
-      { id: 'wf0', parentId: null, order: 20, status: 'Open', line1: 'task tree', line2: '', collapsed: false, tags: [] },
-      { id: 'wf1', parentId: 'wf0', order: 10, status: 'Open', line1: 'First', line2: '', collapsed: false, tags: [] },
-      { id: 'wf2', parentId: 'wf1', order: 10, status: 'Open', line1: 'Nested', line2: '', collapsed: false, tags: [] },
-      { id: 'wf3', parentId: 'wf0', order: 20, status: 'Open', line1: 'Second', line2: '', collapsed: false, tags: [] }
+      { id: 'wf0', parentId: null, order: 20, status: 'Open', title: 'task tree', collapsed: false, tags: [] },
+      { id: 'wf1', parentId: 'wf0', order: 10, status: 'Open', title: 'First', collapsed: false, tags: [] },
+      { id: 'wf2', parentId: 'wf1', order: 10, status: 'Open', title: 'Nested', collapsed: false, tags: [] },
+      { id: 'wf3', parentId: 'wf0', order: 20, status: 'Open', title: 'Second', collapsed: false, tags: [] }
     ]);
     expect(result.logEntryDraft).toMatchObject({
       id: 'log-import',

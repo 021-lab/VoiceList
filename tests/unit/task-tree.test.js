@@ -5,9 +5,9 @@ import { taskTreeFromItems } from '../../worker/task-tree.js';
 describe('Worker task tree endpoint data', () => {
   test('exports a nested tree with only id, title, status, and children', () => {
     const tree = taskTreeFromItems([
-      { id: 'apple', parentId: null, line1: 'Яблоки', line2: 'hidden', status: 'Focus', order: 1 },
-      { id: 'goldn', parentId: 'apple', line1: 'Голден', status: 'Open', order: 2 },
-      { id: 'fudji', parentId: 'apple', line1: 'Фуджи', status: 'Pause', tags: ['hidden'], order: 3 }
+      { id: 'apple', parentId: null, title: 'Яблоки', status: 'Focus', order: 1 },
+      { id: 'goldn', parentId: 'apple', title: 'Голден', status: 'Open', order: 2 },
+      { id: 'fudji', parentId: 'apple', title: 'Фуджи', status: 'Pause', tags: ['hidden'], order: 3 }
     ]);
 
     expect(tree).toEqual([{

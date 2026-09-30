@@ -7,15 +7,15 @@ import { Client } from '../../src/v2/client/client.js';
 const graph = {
   revision: 8,
   items: [
-    { id: 'inbox', parentId: null, order: 0, status: 'Open', line1: 'Входящие', line2: '', collapsed: false, tags: [] },
-    { id: 'milk1', parentId: null, order: 10, status: 'Open', line1: 'Купить молоко', line2: '', collapsed: false, tags: [] },
-    { id: 'home', parentId: null, order: 20, status: 'Open', line1: 'Дом', line2: '', collapsed: false, tags: [] }
+    { id: 'inbox', parentId: null, order: 0, status: 'Open', title: 'Входящие', collapsed: false, tags: [] },
+    { id: 'milk1', parentId: null, order: 10, status: 'Open', title: 'Купить молоко', collapsed: false, tags: [] },
+    { id: 'home', parentId: null, order: 20, status: 'Open', title: 'Дом', collapsed: false, tags: [] }
   ]
 };
 
 const payloads = {
-  addItem: { line1: 'Новая задача', line2: 'Подробности' },
-  addChild: { line1: 'Подзадача' }, editItem: { line1: 'Новое название' },
+  addItem: { title: 'Новая задача' },
+  addChild: { title: 'Подзадача' }, editItem: { title: 'Новое название' },
   setStatus: { status: 'Done' }, setParent: { parentId: 'home' }, setTags: { tag: 'важно' },
   setDeadline: { deadline: '2026-10-20' }, toggleCollapse: {}, deleteItem: {},
   reorderItems: { arranged: [{ id: 'milk1', parentId: 'home', order: 10 }] },
@@ -62,7 +62,7 @@ describe('v0.2 action page presentation', () => {
     const page = actionPage([{
       id: 'root', cursor: 1, kind: 'text', text: 'Заверши прежнюю задачу', answer: 'Готово',
       commands: [{ command: 'setStatus', actId: 'deleted-task', payload: { status: 'Done' } }],
-      modelContext: { text: 'Заверши прежнюю задачу', tasks: [{ id: 'deleted-task', line1: 'Touch edit historical' }] }
+      modelContext: { text: 'Заверши прежнюю задачу', tasks: [{ id: 'deleted-task', title: 'Touch edit historical' }] }
     }]);
 
     expect(graph.items.some(item => item.id === 'deleted-task')).toBe(false);

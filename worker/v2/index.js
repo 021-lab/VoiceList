@@ -124,8 +124,8 @@ export default {
         await took('чтение фронтира', () => stub.getTaskFrontier());
         await took('вызов getFrontier целиком', () => call([{id:mark+'f',name:'getFrontier',args:{}}]));
         await took('чтение документа', () => stub.getDocument({}));
-        const one = await took('одна задача', () => call([{id:mark+'1',name:'addItem',args:{line1:mark+' 1'}}]));
-        const two = await took('две задачи', () => call([{id:mark+'2',name:'addItem',args:{line1:mark+' 2'}},{id:mark+'3',name:'addItem',args:{line1:mark+' 3'}}]));
+        const one = await took('одна задача', () => call([{id:mark+'1',name:'addItem',args:{title:mark+' 1'}}]));
+        const two = await took('две задачи', () => call([{id:mark+'2',name:'addItem',args:{title:mark+' 2'}},{id:mark+'3',name:'addItem',args:{title:mark+' 3'}}]));
         const made = [...one.results, ...two.results].map(item => item.response?.target).filter(Boolean);
         await took('уборка', async () => { for (const id of made) await stub.applyTaskCommand({command:'deleteItem',actId:id,actType:'task',payload:{}}); });
         return json({edge: request.cf?.colo || 'unknown', object: env.DOCUMENT_NAME || 'main', snapshot, phases, created: made.length});

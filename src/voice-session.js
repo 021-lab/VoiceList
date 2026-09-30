@@ -58,7 +58,7 @@ function buildOverlay(text, context, tasks) {
 
 function labelOf(tasks, id) {
   const t = tasks.find((x) => x.id === id);
-  return t ? t.line1 : id;
+  return t ? t.title : id;
 }
 
 class VoiceSession {

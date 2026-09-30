@@ -165,7 +165,7 @@ __INLINE_CSS__
     </div>
     <div class="task-page-body">
       <label class="task-page-field">
-        <input type="text" id="task-page-line1" aria-label="Название задачи" maxlength="60">
+        <input type="text" id="task-page-title" aria-label="Название задачи" maxlength="60">
       </label>
       <a class="task-page-parent" id="task-page-parent" href="#" hidden></a>
       <section class="task-page-subtasks">
@@ -183,12 +183,10 @@ __INLINE_CSS__
     <div class="modal">
       <h2 id="modal-title">Новый элемент</h2>
       <div id="modal-view-content" style="display:none; margin-bottom:12px;">
-        <div id="view-line1" style="font-size:17px; font-weight:600; color:#1a1a2e; margin-bottom:5px;"></div>
-        <div id="view-line2" style="font-size:14px; color:#888; margin-bottom:8px;"></div>
+        <div id="view-title" style="font-size:17px; font-weight:600; color:#1a1a2e; margin-bottom:5px;"></div>
         <div id="view-tags" class="item-tags"></div>
       </div>
-      <input type="text" id="input-line1" placeholder="Название (обязательно)" maxlength="60">
-      <input type="text" id="input-line2" placeholder="Подпись (необязательно)" maxlength="80">
+      <input type="text" id="input-title" placeholder="Название (обязательно)" maxlength="60">
       <div class="modal-actions">
         <button class="btn btn-cancel" id="btn-cancel">Отмена</button>
         <button class="btn btn-add" id="btn-confirm">Добавить</button>

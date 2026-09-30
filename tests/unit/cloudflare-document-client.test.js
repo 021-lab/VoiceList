@@ -99,7 +99,7 @@ describe('Cloudflare document client', () => {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: 'Backend task', line2: '' },
+      payload: { title: 'Backend task' },
       source: 'unit-test'
     });
     expect(seq).toBe(1);
@@ -111,7 +111,7 @@ describe('Cloudflare document client', () => {
         actId: 'list',
         actType: 'list',
         command: 'addItem',
-        payload: { line1: 'Backend task', line2: '' },
+        payload: { title: 'Backend task' },
         source: 'unit-test'
       }
     });

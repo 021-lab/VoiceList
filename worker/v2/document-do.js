@@ -282,10 +282,10 @@ export class ListDocumentDO extends Agent {
       return exec(query, ...params);
     };
     try {
-      const line1 = 'profile ' + Date.now().toString(36);
+      const title = 'profile ' + Date.now().toString(36);
       const input = { key: {clientKey:'profile:'+crypto.randomUUID(), seq:1},
         context: {elementId:'app', view:'list', revision: this.runtime.graph.revision},
-        command: {command:'addItem', actId:'list', actType:'list', payload:{line1}} };
+        command: {command:'addItem', actId:'list', actType:'list', payload:{title}} };
 
       const t0 = Date.now();
       const receipt = await this.runtime.submit(input);

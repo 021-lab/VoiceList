@@ -23,10 +23,10 @@ test.afterEach(async ({ request }) => {
 });
 async function add(page, title) {
   await page.locator('#add-btn').click();
-  await page.locator('#input-line1').fill(title);
-  await page.locator('#input-line1').press('Enter');
+  await page.locator('#input-title').fill(title);
+  await page.locator('#input-title').press('Enter');
   await expect(page.locator('#modal-overlay')).not.toHaveClass(/open/);
-  const row = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-line1', { hasText: title }) });
+  const row = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-title', { hasText: title }) });
   await expect(row).toBeVisible(); createdTaskIds.push(await row.getAttribute('data-id')); return row;
 }
 async function swipe(page, row, label, direction = 1) {
@@ -45,9 +45,9 @@ test('actual server flow: create, edit, status, journal, correction chain rollba
   const row = await add(page, title); const taskId = await row.getAttribute('data-id');
   await swipe(page, row.locator('.list-item'), 'Edit');
   await expect(page.locator('#task-page')).toHaveClass(/open/);
-  await page.locator('#task-page-line1').fill(renamed); await page.locator('#task-page-line2').fill('Details retained');
+  await page.locator('#task-page-title').fill(renamed);
   await page.locator('#task-page-save').click();
-  await expect.poll(() => page.locator('#task-page-line1').inputValue()).toBe(renamed);
+  await expect.poll(() => page.locator('#task-page-title').inputValue()).toBe(renamed);
   await page.locator('#task-page-close').click();
   const current = page.locator(`.list-item-wrapper[data-id="${taskId}"]`);
   await expect(current).toContainText(renamed); await expect(current).toContainText('Details retained');
@@ -141,7 +141,7 @@ test('native touch hold-up selects drag, subsequent up-down moves preserve drag 
     await expect(second.locator('.list-item')).toHaveCSS('background-color', 'rgb(248, 251, 255)');
     expect(await second.locator('.list-item').evaluate(el => getComputedStyle(el).boxShadow)).not.toBe('none');
     expect(await second.evaluate(el => el.style.transform)).toMatch(/translateY\(/);
-    await expect(second.locator('.item-line1')).toBeVisible();
+    await expect(second.locator('.item-title')).toBeVisible();
   }
   const previewOrder = await page.locator('#list-container .list-item-wrapper').evaluateAll(elements => elements.map(el => el.dataset.id));
   expect(previewOrder.indexOf(secondId)).toBeLessThan(previewOrder.indexOf(firstId));

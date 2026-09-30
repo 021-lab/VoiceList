@@ -33,7 +33,7 @@ describe('a change made by voice', () => {
   it('reaches the bus as one action: the phrase, the change and the answer', async () => {
     const { runtime, host, heard } = session();
     host.mirror([heard('user', 'Добавь'), heard('user', 'купить молоко')]);
-    await host.invokeAll(call('c1', 'addItem', { line1: 'Купить молоко' }));
+    await host.invokeAll(call('c1', 'addItem', { title: 'Купить молоко' }));
     host.mirror([heard('assistant', 'Готово.')]);
     await host.stop('client');
 
@@ -50,13 +50,13 @@ describe('a change made by voice', () => {
   it('is rolled back with the phrase that caused it', async () => {
     const { runtime, port, host, heard } = session();
     host.mirror([heard('user', 'Добавь хлеб')]);
-    await host.invokeAll(call('c1', 'addItem', { line1: 'Хлеб' }));
+    await host.invokeAll(call('c1', 'addItem', { title: 'Хлеб' }));
     await host.flushSpeech();
-    expect(runtime.graph.read().items.some(item => item.line1 === 'Хлеб')).toBe(true);
+    expect(runtime.graph.read().items.some(item => item.title === 'Хлеб')).toBe(true);
 
     const [action] = runtime.journal.actions();
     await port.applyCommand({ command: 'rollbackAction', actId: action.id, actType: 'action', payload: {} }, { message: { clientKey: 'ui', seq: 1 } });
-    expect(runtime.graph.read().items.some(item => item.line1 === 'Хлеб')).toBe(false);
+    expect(runtime.graph.read().items.some(item => item.title === 'Хлеб')).toBe(false);
   });
 
   it('closes a turn when the page says it ended, without waiting for the session to end', async () => {
@@ -89,7 +89,7 @@ describe('a change made by voice', () => {
 
   it('records a change whose phrase never arrived, rather than dropping it', async () => {
     const { runtime, host } = session();
-    await host.invokeAll(call('c1', 'addItem', { line1: 'Без слов' }));
+    await host.invokeAll(call('c1', 'addItem', { title: 'Без слов' }));
     const [action] = runtime.journal.actions();
     expect(action).toMatchObject({ status: 'applied', source: 'gemini-live' });
     expect(action.label).toBe('addItem');
@@ -103,7 +103,7 @@ describe('when the transcription fails but the model heard right', () => {
   it('shows what the model heard, and keeps the transcription beside it', async () => {
     const { runtime, host, heard } = session();
     host.mirror([heard('user', 'la nuit'), turnEnd]);
-    await host.invokeAll(call('c1', 'addItem', { line1: 'Забронировать отель', heard: 'поставь отель в фокус на завтра' }));
+    await host.invokeAll(call('c1', 'addItem', { title: 'Забронировать отель', heard: 'поставь отель в фокус на завтра' }));
     await host.stop('client');
 
     const [action] = runtime.journal.actions();
@@ -126,21 +126,21 @@ describe('when the transcription fails but the model heard right', () => {
 
   it('does not let the wording defeat the guard against a repeated change', async () => {
     const { runtime, host } = session();
-    await host.invokeAll(call('a', 'addItem', { line1: 'Хлеб', heard: 'добавь хлеб' }));
-    await host.invokeAll(call('b', 'addItem', { line1: 'Хлеб', heard: 'ну добавь хлеб же' }));
-    expect(runtime.graph.read().items.filter(item => item.line1 === 'Хлеб')).toHaveLength(1);
+    await host.invokeAll(call('a', 'addItem', { title: 'Хлеб', heard: 'добавь хлеб' }));
+    await host.invokeAll(call('b', 'addItem', { title: 'Хлеб', heard: 'ну добавь хлеб же' }));
+    expect(runtime.graph.read().items.filter(item => item.title === 'Хлеб')).toHaveLength(1);
   });
 });
 
 describe('what the journal screen shows', () => {
   it('hides a button press and keeps what was said to an agent', async () => {
     const { runtime, port, host, heard } = session();
-    await port.applyCommand({ command: 'addItem', actId: 'list', actType: 'list', payload: { line1: 'Рукой' } }, { message: { clientKey: 'ui', seq: 1 } });
+    await port.applyCommand({ command: 'addItem', actId: 'list', actType: 'list', payload: { title: 'Рукой' } }, { message: { clientKey: 'ui', seq: 1 } });
     host.mirror([heard('user', 'Голосом')]);
-    await host.invokeAll(call('c1', 'addItem', { line1: 'Голосом' }));
+    await host.invokeAll(call('c1', 'addItem', { title: 'Голосом' }));
     await host.stop('client');
 
     expect(runtime.journal.actions().map(action => action.label)).toEqual(['Голосом']);
-    expect(runtime.graph.read().items.map(item => item.line1)).toContain('Рукой');
+    expect(runtime.graph.read().items.map(item => item.title)).toContain('Рукой');
   });
 });

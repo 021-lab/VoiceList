@@ -12,9 +12,9 @@ export function taskFrontierFromItems(items = [], now = new Date()) {
     .map((task) => ({
       parentTitle: task.parentId == null
         ? ROOT_PARENT_TITLE
-        : String(itemById.get(String(task.parentId))?.line1 || ''),
+        : String(itemById.get(String(task.parentId))?.title || ''),
       taskId: String(task.id || ''),
-      taskTitle: String(task.line1 || ''),
+      taskTitle: String(task.title || ''),
       status: String(task.status || 'Open'),
       deadline: isDeadline(task.deadline) ? task.deadline : null
     }));

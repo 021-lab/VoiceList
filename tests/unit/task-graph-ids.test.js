@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { TaskGraph, createIdAllocator, FIRST_TASK_ID_SEQUENCE } from '../../src/v2/domain/task-graph.js';
 
 const emptySeed = { snapshot: { items: [] } };
-const addItem = (line1) => ({ command: 'addItem', actId: 'list', payload: { line1 } });
+const addItem = (title) => ({ command: 'addItem', actId: 'list', payload: { title } });
 
 describe('base36 task ids', () => {
   it('starts the sequence at 1000 rendered in base36', () => {
     const graph = new TaskGraph({}, emptySeed);
     graph.apply([addItem('Молоко')]);
-    const created = graph.read().items.find(item => item.line1 === 'Молоко');
+    const created = graph.read().items.find(item => item.title === 'Молоко');
     expect(created.id).toBe(FIRST_TASK_ID_SEQUENCE.toString(36));
     expect(created.id).toBe('rs');
   });
@@ -30,24 +30,24 @@ describe('base36 task ids', () => {
 
     const restored = new TaskGraph(stored, emptySeed);
     restored.apply([addItem('Вторая')]);
-    expect(restored.read().items.find(item => item.line1 === 'Вторая').id).toBe('rt');
+    expect(restored.read().items.find(item => item.title === 'Вторая').id).toBe('rt');
   });
 
   it('skips a candidate already taken by a legacy id', () => {
     const graph = new TaskGraph({}, {
-      snapshot: { items: [{ id: 'rs', parentId: null, order: 10, status: 'Open', line1: 'Наследная', line2: '', collapsed: false, tags: [] }] }
+      snapshot: { items: [{ id: 'rs', parentId: null, order: 10, status: 'Open', title: 'Наследная', collapsed: false, tags: [] }] }
     });
     graph.apply([addItem('Новая')]);
-    expect(graph.read().items.find(item => item.line1 === 'Новая').id).toBe('rt');
+    expect(graph.read().items.find(item => item.title === 'Новая').id).toBe('rt');
   });
 
   it('never rewinds the counter when an action is rolled back', () => {
     const graph = new TaskGraph({}, emptySeed);
     const outcome = graph.apply([addItem('Ошибочная')]);
     graph.rollback([{ changes: outcome.changes }]);
-    expect(graph.read().items.some(item => item.line1 === 'Ошибочная')).toBe(false);
+    expect(graph.read().items.some(item => item.title === 'Ошибочная')).toBe(false);
     graph.apply([addItem('Следующая')]);
-    expect(graph.read().items.find(item => item.line1 === 'Следующая').id).toBe('rt');
+    expect(graph.read().items.find(item => item.title === 'Следующая').id).toBe('rt');
   });
 
   it('never hands out the reserved inbox id', () => {

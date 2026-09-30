@@ -6,7 +6,7 @@ describe('list store', () => {
     const store = createStore({
       storageKey: 'test-list-store',
       storage: window.localStorage,
-      seedState: { snapshot: { items: [{ id: 'abc12', parentId: null, order: 10, status: 'Open', line1: 'Seed', tags: [], collapsed: false }] }, actionLog: [] }
+      seedState: { snapshot: { items: [{ id: 'abc12', parentId: null, order: 10, status: 'Open', title: 'Seed', tags: [], collapsed: false }] }, actionLog: [] }
     });
 
     const state = store.load();
@@ -17,7 +17,7 @@ describe('list store', () => {
   test('adds inbox when loading legacy state without it', () => {
     window.localStorage.setItem('legacy-list-store', JSON.stringify({
       snapshot: {
-        items: [{ id: 'abc12', parentId: null, order: 10, status: 'Open', line1: 'Seed', tags: [], collapsed: false }]
+        items: [{ id: 'abc12', parentId: null, order: 10, status: 'Open', title: 'Seed', tags: [], collapsed: false }]
       },
       actionLog: []
     }));
@@ -34,7 +34,7 @@ describe('list store', () => {
       parentId: null,
       order: 0,
       status: 'Open',
-      line1: 'Входящие'
+      title: 'Входящие'
     });
     expect(state.snapshot.items.some((item) => item.id === 'abc12')).toBe(true);
   });

@@ -17,11 +17,11 @@ async function run(command, context={}, text) {
   return {input,receipt};
 }
 const title='V02 integration '+clientKey;
-const created=await run({command:'addItem',actId:'list',payload:{line1:title,line2:'durable test'}});
+const created=await run({command:'addItem',actId:'list',payload:{title:title}});
 const id=created.receipt.target; assert.ok(id);
 const duplicate=await post(created.input); assert.equal(duplicate.requestId,created.receipt.requestId);
 const nodes=()=>doc().then(d=>d.root.children[1].children);
-assert.equal((await nodes()).filter(n=>n.props.line1===title).length,1);
+assert.equal((await nodes()).filter(n=>n.props.title===title).length,1);
 const focused=await run(null,{elementId:'task:'+id},'это фокус');
 assert.equal((await nodes()).find(n=>n.props.taskId===id).props.status,'Focus');
 const actionId=focused.receipt.actions[0].id;

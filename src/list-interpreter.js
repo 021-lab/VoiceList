@@ -29,11 +29,11 @@ function noChange() {
 }
 
 function buildLabel(command, payload = {}) {
-  if (command === 'addItem') return `Создана задача: ${payload.line1}`;
-  if (command === 'addChild' && payload.status === 'Info') return `Добавлена информация: ${payload.line1}`;
-  if (command === 'addChild') return `Создана подзадача: ${payload.line1}`;
+  if (command === 'addItem') return `Создана задача: ${payload.title}`;
+  if (command === 'addChild' && payload.status === 'Info') return `Добавлена информация: ${payload.title}`;
+  if (command === 'addChild') return `Создана подзадача: ${payload.title}`;
   if (command === 'setStatus') return `Статус изменён: ${payload.status}`;
-  if (command === 'editItem') return `Изменена задача: ${payload.line1}`;
+  if (command === 'editItem') return `Изменена задача: ${payload.title}`;
   if (command === 'deleteItem') return 'Удалена задача';
   if (command === 'setTags') return `Изменены теги: ${payload.tag}`;
   if (command === 'setDeadline') return `Дедлайн: ${payload.deadline}`;
@@ -89,8 +89,7 @@ function appendImportedTree({ createItemId, existingIds, input, nextItems, paren
     parentId,
     order,
     status: 'Open',
-    line1: title,
-    line2: '',
+    title,
     collapsed: false,
     tags: []
   });
@@ -173,8 +172,7 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
           parentId: null,
           order: nextOrder(nextItems, null),
           status: 'Open',
-          line1: payload.line1,
-          line2: payload.line2 || '',
+          title: payload.title,
           collapsed: false,
           tags: []
         });
@@ -184,16 +182,14 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
           parentId: input.actId,
           order: nextOrder(nextItems, input.actId),
           status: STATUS_VALUES.has(payload.status) ? payload.status : 'Open',
-          line1: payload.line1,
-          line2: payload.line2 || '',
+          title: payload.title,
           collapsed: false,
           tags: []
         });
       } else if (input.command === 'editItem') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);
         if (item) {
-          item.line1 = payload.line1;
-          if ('line2' in payload) item.line2 = payload.line2 || '';
+          item.title = payload.title;
         }
       } else if (input.command === 'setStatus') {
         const item = nextItems.find((candidate) => candidate.id === input.actId);

@@ -39,7 +39,7 @@ export function snapshotRows(items) {
         id: item.id,
         parent: parentId == null ? '-' : parentId,
         status: STATUS_LETTER[item.status],
-        title: cell(item.line1)
+        title: cell(item.title)
       });
       walk(item.id);
     }
@@ -53,7 +53,7 @@ export function snapshotRows(items) {
       id: item.id,
       parent: parentId == null || !known.has(parentId) ? '-' : parentId,
       status: STATUS_LETTER[item.status],
-      title: cell(item.line1)
+      title: cell(item.title)
     });
   }
   return rows;
@@ -78,10 +78,10 @@ export function formatSnapshotDeltas(changes) {
     }
     if (!wasVisible) {
       const parent = after.parentId ?? '-';
-      lines.push(`+ ${change.id} ${parent} ${STATUS_LETTER[after.status]} ${cell(after.line1)}`);
+      lines.push(`+ ${change.id} ${parent} ${STATUS_LETTER[after.status]} ${cell(after.title)}`);
       continue;
     }
-    if (cell(before.line1) !== cell(after.line1)) lines.push(`~ ${change.id} ${cell(after.line1)}`);
+    if (cell(before.title) !== cell(after.title)) lines.push(`~ ${change.id} ${cell(after.title)}`);
     if (before.status !== after.status) lines.push(`* ${change.id} ${STATUS_LETTER[after.status]}`);
     if ((before.parentId ?? null) !== (after.parentId ?? null)) lines.push(`> ${change.id} ${after.parentId ?? '-'}`);
     if (before.deadline !== after.deadline && after.deadline) lines.push(`^ ${change.id} ${after.deadline}`);
@@ -159,12 +159,12 @@ export const DEFAULT_BACKEND_PROMPT = `
 более точная просьба.
 
 Инструменты:
-- addItem(line1) — новая задача в корне.
-- addChild(parentId, line1) — новая задача внутри существующей.
-- addInfo(parentId, line1) — заметка внутри задачи, статус Info.
+- addItem(title) — новая задача в корне.
+- addChild(parentId, title) — новая задача внутри существующей.
+- addInfo(parentId, title) — заметка внутри задачи, статус Info.
 - setStatus(taskId, status) — Open, Focus, Pause, Done, Archive, Info.
 - setDeadline(taskId, deadline) — дата ровно в формате YYYY-MM-DD.
-- editItem(taskId, line1) — переименование.
+- editItem(taskId, title) — переименование.
 - setParent(taskId, parentId) — перенос; parentId null переносит в корень.
 - getFrontier() — текущий фронтир, ничего не меняет.
 - getVoicePrompt(), getBackendPrompt() — прочитать промпт.
@@ -185,15 +185,15 @@ const taskId = { type: 'string', description: 'Точный идентифика
 export const LIVE_TOOLS = [
   {
     type: 'function', name: 'addItem', description: 'Создать задачу в корне списка.',
-    parameters: { type: 'object', properties: { line1: { type: 'string', description: 'Название задачи.' } }, required: ['line1'], additionalProperties: false }
+    parameters: { type: 'object', properties: { title: { type: 'string', description: 'Название задачи.' } }, required: ['title'], additionalProperties: false }
   },
   {
     type: 'function', name: 'addChild', description: 'Создать задачу внутри существующей.',
-    parameters: { type: 'object', properties: { parentId: taskId, line1: { type: 'string', description: 'Название задачи.' } }, required: ['parentId', 'line1'], additionalProperties: false }
+    parameters: { type: 'object', properties: { parentId: taskId, title: { type: 'string', description: 'Название задачи.' } }, required: ['parentId', 'title'], additionalProperties: false }
   },
   {
     type: 'function', name: 'addInfo', description: 'Добавить заметку внутрь задачи: дочерняя задача со статусом Info.',
-    parameters: { type: 'object', properties: { parentId: taskId, line1: { type: 'string', description: 'Текст заметки.' } }, required: ['parentId', 'line1'], additionalProperties: false }
+    parameters: { type: 'object', properties: { parentId: taskId, title: { type: 'string', description: 'Текст заметки.' } }, required: ['parentId', 'title'], additionalProperties: false }
   },
   {
     type: 'function', name: 'setStatus', description: 'Сменить статус задачи.',
@@ -205,7 +205,7 @@ export const LIVE_TOOLS = [
   },
   {
     type: 'function', name: 'editItem', description: 'Переименовать задачу.',
-    parameters: { type: 'object', properties: { taskId, line1: { type: 'string', description: 'Новое название.' } }, required: ['taskId', 'line1'], additionalProperties: false }
+    parameters: { type: 'object', properties: { taskId, title: { type: 'string', description: 'Новое название.' } }, required: ['taskId', 'title'], additionalProperties: false }
   },
   {
     type: 'function', name: 'setParent', description: 'Перенести задачу под другую или в корень.',
@@ -334,11 +334,11 @@ export function toTaskCommand(name, args = {}, source = 'gpt-live') {
 function buildTaskCommand(name, args, source) {
   switch (name) {
     case 'addItem':
-      return { actId: 'list', actType: 'list', command: 'addItem', payload: { line1: requireText(args.line1, 'line1') }, source };
+      return { actId: 'list', actType: 'list', command: 'addItem', payload: { title: requireText(args.title, 'title') }, source };
     case 'addChild':
-      return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { line1: requireText(args.line1, 'line1') }, source };
+      return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { title: requireText(args.title, 'title') }, source };
     case 'addInfo':
-      return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { line1: requireText(args.line1, 'line1'), status: 'Info' }, source };
+      return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { title: requireText(args.title, 'title'), status: 'Info' }, source };
     case 'setStatus': {
       const status = String(args.status || '');
       if (!STATUS_SET.has(status)) fail('INVALID_INPUT', 'Неизвестный статус');
@@ -347,7 +347,7 @@ function buildTaskCommand(name, args, source) {
     case 'setDeadline':
       return { actId: requireText(args.taskId, 'taskId'), actType: 'task', command: 'setDeadline', payload: { deadline: requireText(args.deadline, 'deadline') }, source };
     case 'editItem':
-      return { actId: requireText(args.taskId, 'taskId'), actType: 'task', command: 'editItem', payload: { line1: requireText(args.line1, 'line1') }, source };
+      return { actId: requireText(args.taskId, 'taskId'), actType: 'task', command: 'editItem', payload: { title: requireText(args.title, 'title') }, source };
     case 'setParent':
       return { actId: requireText(args.taskId, 'taskId'), actType: 'task', command: 'setParent', payload: { parentId: args.parentId == null ? null : requireText(args.parentId, 'parentId') }, source };
     default:

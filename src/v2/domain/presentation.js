@@ -20,14 +20,14 @@ const commandLabels = {
   showSettings: 'Открыть настройки', showDialogues: 'Открыть диалоги'
 };
 const fieldLabels = {
-  line1: 'Название', line2: 'Описание', status: 'Статус', parentId: 'Родительская задача',
+  title: 'Название', status: 'Статус', parentId: 'Родительская задача',
   tag: 'Тег', tags: 'Теги', deadline: 'Срок', query: 'Запрос', title: 'Название', actionId: 'Действие'
 };
 
 function textValue(value, byId) {
   if (value == null || value === '') return 'Не задано';
   if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
-  if (typeof value === 'string') return statusLabels[value] || byId.get(value)?.line1 || value;
+  if (typeof value === 'string') return statusLabels[value] || byId.get(value)?.title || value;
   if (typeof value === 'number') return String(value);
   if (Array.isArray(value)) return value.map(item => textValue(item, byId)).join(', ');
   if (typeof value === 'object') return Object.entries(value).map(([key, item]) => `${fieldLabels[key] || key}: ${textValue(item, byId)}`).join('; ');
@@ -36,7 +36,7 @@ function textValue(value, byId) {
 
 function targetLabel(command, byId) {
   const target = byId.get(command?.actId);
-  if (target) return target.line1;
+  if (target) return target.title;
   if (!command?.actId || command.actId === 'list') return 'Список задач';
   if (['rollbackAction', 'undo'].includes(command.command)) return 'Текущее действие';
   return `Элемент ${command.actId}`;
@@ -57,7 +57,7 @@ function commandFields(command, byId) {
   if (command?.command === 'reorderItems') {
     const arranged = Array.isArray(payload.arranged) ? payload.arranged : [];
     return arranged.map((item, index) => ({
-      label: byId.get(item.id)?.line1 || `Элемент ${index + 1}`,
+      label: byId.get(item.id)?.title || `Элемент ${index + 1}`,
       value: `${item.parentId == null ? 'Корень списка' : `в ${textValue(item.parentId, byId)}`}, позиция ${Number(item.order) || index + 1}`
     }));
   }
@@ -100,7 +100,7 @@ export class Presentation {
     for (const siblings of groups.values()) siblings.sort((a,b) => a.order - b.order);
     const task = (item, level = 0, hidden = false) => node('task', 'task:' + item.id, {
       ...clone(item), taskId: item.id, level, hidden, hasChildren: (groups.get(item.id) || []).some(x => x.status !== 'Archive'),
-      parent: item.parentId ? clone(byId.get(item.parentId)) : { id: '__root__', line1: 'Мой список', status: 'Open' },
+      parent: item.parentId ? clone(byId.get(item.parentId)) : { id: '__root__', title: 'Мой список', status: 'Open' },
       allowedActions: ['editItem','setStatus','setParent','setDeadline','setTags','addChild','toggleCollapse','reorderItems']
     });
     let body;
@@ -140,11 +140,11 @@ export class Presentation {
       const item = byId.get(context.taskId);
       const isAdd = context.mode === 'add' || !context.taskId;
       body = !item && !isAdd ? node('text', 'screen:missing', { text: 'Задача не найдена' }) : node('task-editor', item ? 'task:' + item.id : 'screen:add', {
-        ...(item ? clone(item) : { line1: '', line2: '', status: 'Open' }),
+        ...(item ? clone(item) : { title: '', status: 'Open' }),
         taskId: item?.id || null, mode: isAdd ? 'add' : 'edit', parentId: context.parentId || item?.parentId || null,
         parent: byId.get(item?.parentId || context.parentId) || null,
         subtasks: clone(groups.get(item?.id) || []).filter(x => x.status !== 'Archive').sort((a,b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status) || a.order - b.order),
-        parentOptions: items.filter(x => x.id !== item?.id && x.status !== 'Archive').map(x => ({ id: x.id, line1: x.line1 }))
+        parentOptions: items.filter(x => x.id !== item?.id && x.status !== 'Archive').map(x => ({ id: x.id, title: x.title }))
       });
     } else if (view === 'settings' || view === 'dialogues') {
       body = node(view, 'screen:' + view);
@@ -153,7 +153,7 @@ export class Presentation {
       if (view === 'frontier') {
         const result = calculateFrontier(items);
         rows = [...result.frontier].sort(compareByDeadline).map(x => task(x));
-        props.focusHighlights = result.focusHighlights.map(x => ({ id: x.id, line1: x.line1 }));
+        props.focusHighlights = result.focusHighlights.map(x => ({ id: x.id, title: x.title }));
       } else if (view === 'search') {
         rows = findCandidates(context.query || '', adaptSnapshot(items)).map(x => byId.get(x.id)).filter(x => x && x.status !== 'Archive').map(x => task(x));
         props.query = context.query || '';

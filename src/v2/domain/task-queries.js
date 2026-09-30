@@ -1,7 +1,7 @@
 import { clone } from './contracts.js';
 function itemSort(left, right) {
   return (left.order || 0) - (right.order || 0) ||
-    String(left.line1 || '').localeCompare(String(right.line1 || '')) ||
+    String(left.title || '').localeCompare(String(right.title || '')) ||
     String(left.id || '').localeCompare(String(right.id || ''));
 }
 
@@ -35,8 +35,8 @@ function formatTaskTitleTree(items) {
       if (visited.has(item.id)) continue;
       visited.add(item.id);
       const parent = item.parentId ? byId.get(item.parentId) : null;
-      const parentLabel = parent ? oneLine(parent.line1) : 'root';
-      lines.push(`${item.id} >> ${'  '.repeat(depth)}${oneLine(item.line1)} >> ${parentLabel}`);
+      const parentLabel = parent ? oneLine(parent.title) : 'root';
+      lines.push(`${item.id} >> ${'  '.repeat(depth)}${oneLine(item.title)} >> ${parentLabel}`);
       appendChildren(item.id, depth + 1);
     }
   }
@@ -47,7 +47,7 @@ function formatTaskTitleTree(items) {
     if (!visited.has(item.id)) {
       visited.add(item.id);
       const parentLabel = item.parentId ? 'missing parent' : 'root';
-      lines.push(`${item.id} >> ${oneLine(item.line1)} >> ${parentLabel}`);
+      lines.push(`${item.id} >> ${oneLine(item.title)} >> ${parentLabel}`);
       appendChildren(item.id, 1);
     }
   }
@@ -84,7 +84,7 @@ function findTaskTree(items, query = {}) {
 function toTaskSummary(item) {
   return {
     id: item.id,
-    title: item.line1,
+    title: item.title,
     status: item.status
   };
 }

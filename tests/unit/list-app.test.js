@@ -16,7 +16,7 @@ describe('list app', () => {
         return {
           snapshot: {
             items: [
-              { id: 'new01', parentId: null, order: 10, status: 'Open', line1: 'Task from app', line2: '', collapsed: false, tags: [] }
+              { id: 'new01', parentId: null, order: 10, status: 'Open', title: 'Task from app', collapsed: false, tags: [] }
             ]
           }
         };
@@ -47,7 +47,7 @@ describe('list app', () => {
           id: 'log-1',
           createdAt: '2026-08-02T10:00:00.000Z',
           transcript: 'добавь задачу',
-          command: { command: 'addItem', payload: { line1: 'Task from app', line2: '' } },
+          command: { command: 'addItem', payload: { title: 'Task from app' } },
           patch: [{ op: 'replace', path: '/snapshot/items', value: [] }],
           syncStatus: 'pending',
           comments: []
@@ -70,7 +70,7 @@ describe('list app', () => {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: 'Task from app', line2: '' },
+      payload: { title: 'Task from app' },
       transcript: 'добавь задачу',
       source: 'voice'
     });
@@ -80,7 +80,7 @@ describe('list app', () => {
       id: 'log-1',
       createdAt: '2026-08-02T10:00:00.000Z',
       transcript: 'добавь задачу',
-      command: { command: 'addItem', payload: { line1: 'Task from app', line2: '' } },
+      command: { command: 'addItem', payload: { title: 'Task from app' } },
       patch: [{ op: 'replace', path: '/snapshot/items', value: [] }],
       syncStatus: 'pending',
       comments: []
@@ -139,7 +139,7 @@ describe('list app', () => {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: 'Backend task', line2: '' },
+      payload: { title: 'Backend task' },
       source: 'unit-test'
     });
 
@@ -147,7 +147,7 @@ describe('list app', () => {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: 'Backend task', line2: '' },
+      payload: { title: 'Backend task' },
       source: 'unit-test'
     });
     expect(interpreter.execute).not.toHaveBeenCalled();
@@ -158,7 +158,7 @@ describe('list app', () => {
       content: {
         snapshot: {
           items: [
-            { id: 'rs', parentId: null, order: 10, status: 'Open', line1: 'Backend task', line2: '', collapsed: false, tags: [] }
+            { id: 'rs', parentId: null, order: 10, status: 'Open', title: 'Backend task', collapsed: false, tags: [] }
           ]
         },
         actionLog: []
@@ -167,7 +167,7 @@ describe('list app', () => {
     expect(renderer.render).toHaveBeenLastCalledWith({
       snapshot: {
         items: [
-          { id: 'rs', parentId: null, order: 10, status: 'Open', line1: 'Backend task', line2: '', collapsed: false, tags: [] }
+          { id: 'rs', parentId: null, order: 10, status: 'Open', title: 'Backend task', collapsed: false, tags: [] }
         ]
       },
       actionLog: []

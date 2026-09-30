@@ -23,11 +23,11 @@ function durableStorage() {
   };
 }
 
-const item = (id, line1) => ({ id, parentId: null, order: 10, status: 'Open', line1, line2: '', collapsed: false, tags: [] });
+const item = (id, title) => ({ id, parentId: null, order: 10, status: 'Open', title, collapsed: false, tags: [] });
 const entry = (cursor) => ({ id: 'e' + cursor, cursor, type: 'interaction', kind: 'ui', key: { clientKey: 'c', seq: cursor }, context: {} });
 const ledger = (id, outcomes = 1) => ({
   status: 'complete', nextIndex: outcomes,
-  outcomes: Array.from({ length: outcomes }, (_, index) => ({ key: `${id}:${index}`, command: { command: 'addItem' }, changes: [{ id: 'x', fields: ['line1'] }] }))
+  outcomes: Array.from({ length: outcomes }, (_, index) => ({ key: `${id}:${index}`, command: { command: 'addItem' }, changes: [{ id: 'x', fields: ['title'] }] }))
 });
 const state = (ids, cursor = ids.length) => ({
   graph: { revision: cursor, nextId: 1000 + cursor, items: ids.map(id => item(id, 'Задача ' + id)) },

@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import { taskFrontierFromItems } from '../../worker/task-frontier.js';
 
-function task(id, parentId, status, order, line1, deadline = null) {
-  return { id, parentId, status, order, line1, deadline };
+function task(id, parentId, status, order, title, deadline = null) {
+  return { id, parentId, status, order, title, deadline };
 }
 
 describe('Worker task frontier endpoint data', () => {

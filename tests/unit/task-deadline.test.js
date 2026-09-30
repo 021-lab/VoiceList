@@ -24,7 +24,7 @@ describe('task deadlines', () => {
   test('stores only a valid deadline in the task document', () => {
     const interpreter = createInterpreter();
     const state = {
-      snapshot: { items: [{ id: 'task', parentId: null, order: 10, status: 'Open', line1: 'Task' }] },
+      snapshot: { items: [{ id: 'task', parentId: null, order: 10, status: 'Open', title: 'Task' }] },
       actionLog: []
     };
 

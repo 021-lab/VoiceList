@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AGENT_SYSTEM, buildCorrectionMessages, resolveOpenAI } from '../../worker/v2/model.js';
 
-const task = (id, line1, over = {}) => ({
-  id, parentId: null, order: 10, status: 'Open', line1, line2: '', collapsed: false, tags: [], ...over
+const task = (id, title, over = {}) => ({
+  id, parentId: null, order: 10, status: 'Open', title, collapsed: false, tags: [], ...over
 });
 const context = () => ({
   text: 'Так неправильно, надо было в той же ветке', today: '2026-09-29', graphRevision: 31,
@@ -15,17 +15,17 @@ const context = () => ({
   ],
   correction: {
     userText: 'Так неправильно, надо было в той же ветке',
-    element: { вид: 'действие', id: 'e36', просьба: 'Разнеси на две задачи' },
+    element: { kind: 'action', actionId: 'e36', request: 'Разнеси на две задачи' },
     actionId: 'e36',
     original: {
       id: 'e36', kind: 'text', text: 'Разнеси на две задачи', heard: null, source: 'agent',
       modelContext: { text: 'Разнеси на две задачи', target: 'sm', tasks: [task('sm', 'Данные сторон')] },
-      rawModelResponse: '{"reply":"","commands":[{"command":"addItem","payload":{"line1":"Продавец"}}]}',
-      answer: '', commands: [{ command: 'addItem', payload: { line1: 'Продавец' } }]
+      rawModelResponse: '{"reply":"","commands":[{"command":"addItem","payload":{"title":"Продавец"}}]}',
+      answer: '', commands: [{ command: 'addItem', payload: { title: 'Продавец' } }]
     },
     outcome: {
       status: 'applied', error: null, target: 'sr',
-      changed: [{ id: 'sr', операция: 'создана', задача: { line1: 'Данные сторон - продавец' } }]
+      changed: [{ taskId: 'sr', operation: 'created', task: { title: 'Данные сторон - продавец' } }]
     }
   }
 });
@@ -34,10 +34,10 @@ describe('бриф для модели коррекции', () => {
   const [system, user] = buildCorrectionMessages(context());
 
   it('идёт шестью блоками в согласованном порядке', () => {
-    const order = [...user.content.matchAll(/<([а-яё_]+)>/g)].map(match => match[1]);
+    const order = [...user.content.matchAll(/<([a-z_]+)>/g)].map(match => match[1]);
     expect(order).toEqual([
-      'инструкция_исходной_модели', 'контекст_исходной_модели', 'ответ_исходной_модели',
-      'что_получилось', 'состояние_задач_сейчас', 'что_сказал_пользователь'
+      'instructions_given_to_first_model', 'context_given_to_first_model', 'answer_returned_by_first_model',
+      'what_the_answer_did', 'active_tasks_now', 'what_the_user_said'
     ]);
   });
 
@@ -45,17 +45,17 @@ describe('бриф для модели коррекции', () => {
     expect(user.content).toContain(AGENT_SYSTEM);
     expect(user.content).toContain('"reply":"","commands"');
     // Список задач того момента не едет вторым экземпляром.
-    expect(user.content).toContain('<опущено: 1 задач на тот момент');
+    expect(user.content).toContain('<omitted: 1 tasks as of that moment');
   });
 
   it('в исходе несёт идентификатор действия для отката и сами изменённые строки', () => {
-    expect(user.content).toContain('"идентификатор_действия":"e36"');
-    expect(user.content).toContain('"операция":"создана"');
+    expect(user.content).toContain('"actionId":"e36"');
+    expect(user.content).toContain('"operation":"created"');
     expect(user.content).toContain('Данные сторон - продавец');
   });
 
   it('состояние задач — только активные и без служебных полей отрисовки', () => {
-    const state = user.content.match(/<состояние_задач_сейчас>\n(.*)\n<\/состояние_задач_сейчас>/s)[1];
+    const state = user.content.match(/<active_tasks_now>\n(.*)\n<\/active_tasks_now>/s)[1];
     const items = JSON.parse(state);
     expect(items.map(item => item.id)).toEqual(['sm', 'sr']);
     expect(items[0]).not.toHaveProperty('order');
@@ -63,9 +63,9 @@ describe('бриф для модели коррекции', () => {
   });
 
   it('слова пользователя идут последними и несут нажатый элемент', () => {
-    expect(user.content.indexOf('<что_сказал_пользователь>')).toBeGreaterThan(user.content.indexOf('<состояние_задач_сейчас>'));
-    expect(user.content).toContain('"нажатый_элемент"');
-    expect(user.content).toContain('"вид":"действие"');
+    expect(user.content.indexOf('<what_the_user_said>')).toBeGreaterThan(user.content.indexOf('<active_tasks_now>'));
+    expect(user.content).toContain('"elementInHand"');
+    expect(user.content).toContain('"kind":"action"');
     expect(user.content).toContain('Сегодня 2026-09-29.');
   });
 
@@ -73,7 +73,7 @@ describe('бриф для модели коррекции', () => {
     expect(system.content).toMatch(/управляющей списком задач/);
     expect(system.content).toMatch(/отправь в архив setStatus со статусом Archive/);
     expect(system.content).toMatch(/deleteItem применяй только когда пользователь прямо просит удалить/);
-    expect(system.content).toMatch(/rollbackAction с actId, равным идентификатору_действия/);
+    expect(system.content).toMatch(/rollbackAction с actId, равным actionId из блока what_the_answer_did/);
   });
 
   it('у голосового действия честно говорит, что рассуждения модели нет', () => {
@@ -105,5 +105,11 @@ describe('вызов модели', () => {
   it('коррекция уходит своей модели, обычная реплика — агентской', async () => {
     expect((await call(context())).model).toBe('gpt-5.6-sol');
     expect((await call({ text: 'добавь хлеб', tasks: [] })).model).toBe('gpt-4.1-mini');
+  });
+
+  it('температуру просит только там, где её принимают', async () => {
+    // Живой отказ: «Unsupported value: temperature does not support 0 with this model».
+    expect((await call(context()))).not.toHaveProperty('temperature');
+    expect((await call({ text: 'добавь хлеб', tasks: [] })).temperature).toBe(0);
   });
 });

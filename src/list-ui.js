@@ -55,7 +55,7 @@ function deriveArrangedFromWrappers(wrappers) {
   });
 }
 
-export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, input2, modalTitle, btnConfirm, btnCancel, viewContent, viewLine1, viewLine2, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageLine1, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
+export function createUI({ rootPanel, header, viewToggleButton, frontierButton, settingsButton, undoButton, addButton, container, toastEl, dropPanel, tagPanel, voiceOverlay, overlay, input1, modalTitle, btnConfirm, btnCancel, viewContent, viewTitle, viewTagsEl, actionLogPanel, taskPage, taskPageClose, taskPageSave, taskPageTitle, taskPageStatus, taskPageParent, taskPageSubtasks, taskPageChildInput, taskPageAddChild, settingsOverlay, settingsClose, workflowyUrlInput, workflowyImportButton, workflowyImportStatus }) {
   let dispatchUserInput = () => {};
   let getState = () => ({ snapshot: { items: [] }, actionLog: [] });
   let boundGlobals = false;
@@ -87,7 +87,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function itemLabel(id) {
-    return findItem(getState(), id)?.line1 || '';
+    return findItem(getState(), id)?.title || '';
   }
 
   function logEntryLabel(id) {
@@ -155,10 +155,10 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function labelVoiceCommand(command) {
     if (!command) return '';
-    if (command.command === 'addChild') return `Добавить: задачу ${command.payload.line1}`;
+    if (command.command === 'addChild') return `Добавить: задачу ${command.payload.title}`;
     if (command.command === 'setStatus') return `Статус: ${command.payload.status}`;
     if (command.command === 'setParent') return 'Перенести';
-    if (command.command === 'editItem') return `Переименовать: ${command.payload.line1}`;
+    if (command.command === 'editItem') return `Переименовать: ${command.payload.title}`;
     if (command.command === 'showSearch') return `Поиск: ${command.payload.query}`;
     if (command.command === 'undo') return 'Отменить';
     return command.command;
@@ -530,38 +530,31 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     viewContent.style.display = 'none';
     input1.style.display = '';
-    input2.style.display = '';
     btnConfirm.style.display = '';
     btnCancel.textContent = 'Отмена';
     input1.style.borderColor = '';
 
     if (mode === 'view') {
       const item = findItem(state, targetId);
-      viewLine1.textContent = item?.line1 || '';
-      viewLine2.textContent = item?.line2 || '';
-      viewLine2.style.display = item?.line2 ? '' : 'none';
+      viewTitle.textContent = item?.title || '';
       viewTagsEl.innerHTML = (item?.tags || []).map((tag) => `<span class="item-tag">${escHtml(tag)}</span>`).join('');
       viewTagsEl.style.display = item?.tags?.length ? '' : 'none';
       viewContent.style.display = '';
       input1.style.display = 'none';
-      input2.style.display = 'none';
       btnConfirm.style.display = 'none';
       btnCancel.textContent = 'Закрыть';
       modalTitle.textContent = 'Просмотр';
     } else if (mode === 'edit') {
       const item = findItem(state, targetId);
-      input1.value = item?.line1 || '';
-      input2.value = item?.line2 || '';
+      input1.value = item?.title || '';
       modalTitle.textContent = 'Редактировать';
       btnConfirm.textContent = 'Сохранить';
     } else if (mode === 'nest') {
       input1.value = '';
-      input2.value = '';
       modalTitle.textContent = 'Новый вложенный';
       btnConfirm.textContent = 'Добавить';
     } else {
       input1.value = '';
-      input2.value = '';
       modalTitle.textContent = 'Новый элемент';
       btnConfirm.textContent = 'Добавить';
     }
@@ -624,10 +617,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
   }
 
   function confirmModal() {
-    const line1 = input1.value.trim();
-    const line2 = input2.value.trim();
+    const title = input1.value.trim();
 
-    if (modalMode !== 'view' && !line1) {
+    if (modalMode !== 'view' && !title) {
       input1.focus();
       input1.style.borderColor = '#ff3b30';
       return;
@@ -640,7 +632,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: modalTargetId,
         actType: 'task',
         command: 'editItem',
-        payload: { line1, line2 },
+        payload: { title },
         source: 'modal-confirm'
       });
       showToast('Сохранено');
@@ -649,7 +641,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: modalTargetId,
         actType: 'task',
         command: 'addChild',
-        payload: { line1, line2 },
+        payload: { title },
         source: 'modal-confirm'
       });
       showToast('Добавлен вложенный');
@@ -658,7 +650,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: 'list',
         actType: 'list',
         command: 'addItem',
-        payload: { line1, line2 },
+        payload: { title },
         source: 'modal-confirm'
       });
       showToast('Элемент добавлен');
@@ -683,7 +675,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     taskPageSubtasks.innerHTML = children.map((child) => `
       <button class="task-page-subtask" type="button" data-task-id="${escHtml(child.id)}">
-        ${escHtml(child.line1)}
+        ${escHtml(child.title)}
         <small>${TASK_PAGE_CHILD_STATUS_LABELS[child.status || 'Open']}</small>
       </button>
     `).join('');
@@ -694,7 +686,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
     const parent = item?.parentId ? findItem(state, item.parentId) : null;
     taskPageParent.hidden = !parent;
     taskPageParent.dataset.taskId = parent?.id || '';
-    taskPageParent.textContent = parent ? `Родитель: ${parent.line1}` : '';
+    taskPageParent.textContent = parent ? `Родитель: ${parent.title}` : '';
   }
 
   function openTaskPage(itemId, state = getState()) {
@@ -703,9 +695,9 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
     taskPageTargetId = itemId;
     taskPageOpen = true;
-    taskPageLine1.value = item.line1 || '';
+    taskPageTitle.value = item.title || '';
     taskPageStatus.value = item.status || 'Open';
-    taskPageInitial = { line1: item.line1 || '', line2: item.line2 || '', status: item.status || 'Open' };
+    taskPageInitial = { title: item.title || '', status: item.status || 'Open' };
     taskPageChildInput.value = '';
     renderTaskPageParent(item, state);
     renderTaskPageSubtasks(itemId, state);
@@ -724,14 +716,14 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
 
   function saveTaskPage() {
     if (!taskPageTargetId) return;
-    const line1 = taskPageLine1.value.trim();
+    const title = taskPageTitle.value.trim();
     const status = taskPageStatus.value;
-    if (!line1) {
-      taskPageLine1.focus();
+    if (!title) {
+      taskPageTitle.focus();
       return;
     }
 
-    const titleChanged = line1 !== taskPageInitial?.line1;
+    const titleChanged = title !== taskPageInitial?.title;
     const statusChanged = status !== taskPageInitial?.status;
     if (titleChanged || statusChanged) saveUndoSnapshot();
 
@@ -740,7 +732,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         actId: taskPageTargetId,
         actType: 'task',
         command: 'editItem',
-        payload: { line1, line2: taskPageInitial?.line2 || '' },
+        payload: { title },
         source: 'task-page-save'
       });
     }
@@ -753,14 +745,14 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
         source: 'task-page-save'
       });
     }
-    taskPageInitial = { line1, line2: taskPageInitial?.line2 || '', status };
+    taskPageInitial = { title, status };
     if (titleChanged || statusChanged) showToast('Сохранено');
   }
 
   function addTaskPageChild() {
     if (!taskPageTargetId) return;
-    const line1 = taskPageChildInput.value.trim();
-    if (!line1) {
+    const title = taskPageChildInput.value.trim();
+    if (!title) {
       taskPageChildInput.focus();
       return;
     }
@@ -769,7 +761,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       actId: taskPageTargetId,
       actType: 'task',
       command: 'addChild',
-      payload: { line1, line2: '' },
+      payload: { title },
       source: 'task-page-add-child'
     });
     taskPageChildInput.value = '';
@@ -825,9 +817,7 @@ export function createUI({ rootPanel, header, viewToggleButton, frontierButton, 
       finishVoiceAtDy(VOICE_C.DEADZONE_PX + (overlayIndex * VOICE_C.ROW_H_PX) + 1);
     });
     btnConfirm.addEventListener('click', confirmModal);
-    [input1, input2].forEach((input) => input.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') confirmModal();
-    }));
+    input1.addEventListener('keydown', (event) => { if (event.key === 'Enter') confirmModal(); });
     taskPageClose?.addEventListener('click', closeTaskPage);
     taskPageSave?.addEventListener('click', saveTaskPage);
     taskPageParent?.addEventListener('click', (event) => {

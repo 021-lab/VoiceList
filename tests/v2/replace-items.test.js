@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DocumentRuntime } from '../../src/v2/domain/document-runtime.js';
 
-const item = (id, line1, extra = {}) => ({
-  id, parentId: null, order: 10, status: 'Open', line1, line2: '', collapsed: false, tags: [], ...extra
+const item = (id, title, extra = {}) => ({
+  id, parentId: null, order: 10, status: 'Open', title, collapsed: false, tags: [], ...extra
 });
 const command = (runtime, items, seq = 1) => ({
   key: { clientKey: 'import', seq },
@@ -23,13 +23,13 @@ describe('replacing the whole list', () => {
     const carried = [
       item('inbox', 'Входящие'),
       item('s5', 'Легализовать землю', { status: 'Focus', deadline: '2026-10-01' }),
-      item('s6', 'Собрать документы', { parentId: 's5', status: 'Archive', line2: 'у Андрея', tags: ['дом'] })
+      item('s6', 'Собрать документы', { parentId: 's5', status: 'Archive', tags: ['дом'] })
     ];
     const receipt = await runtime.executeAndWait(command(runtime, carried));
     expect(receipt.status).toBe('completed');
 
     expect(runtime.graph.read().items).toEqual(carried);
-    expect(runtime.graph.read({ id: 's6' })).toMatchObject({ parentId: 's5', status: 'Archive', line2: 'у Андрея', tags: ['дом'] });
+    expect(runtime.graph.read({ id: 's6' })).toMatchObject({ parentId: 's5', status: 'Archive', tags: ['дом'] });
   });
 
   it('can be rolled back, so a wrong list is not the end of the document', async () => {

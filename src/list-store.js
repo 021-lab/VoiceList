@@ -7,8 +7,7 @@ const INBOX_ITEM = {
   parentId: null,
   order: 0,
   status: 'Open',
-  line1: 'Входящие',
-  line2: '',
+  title: 'Входящие',
   collapsed: false,
   tags: []
 };

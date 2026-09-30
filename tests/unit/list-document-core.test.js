@@ -30,7 +30,7 @@ describe('Cloudflare list document core', () => {
     expect(initial.rev).toBe(0);
     expect(initial.content.snapshot.items[0]).toMatchObject({
       id: 'inbox',
-      line1: 'Входящие'
+      title: 'Входящие'
     });
     expect(initial.content.snapshot.items.some((item) => item.id === 'milk1')).toBe(true);
 
@@ -42,7 +42,7 @@ describe('Cloudflare list document core', () => {
         actId: 'list',
         actType: 'list',
         command: 'addItem',
-        payload: { line1: 'Server task', line2: '' },
+        payload: { title: 'Server task' },
         source: 'unit-test'
       }
     });
@@ -57,7 +57,7 @@ describe('Cloudflare list document core', () => {
       id: 'rs',
       parentId: null,
       status: 'Open',
-      line1: 'Server task'
+      title: 'Server task'
     });
     expect(core.listLog()).toHaveLength(1);
     expect(core.listLog()[0]).toMatchObject({
@@ -77,7 +77,7 @@ describe('Cloudflare list document core', () => {
         actId: 'list',
         actType: 'list',
         command: 'addItem',
-        payload: { line1: 'Server task again', line2: '' },
+        payload: { title: 'Server task again' },
         source: 'unit-test'
       }
     });
@@ -121,7 +121,7 @@ describe('Cloudflare list document core', () => {
         actId: 'list',
         actType: 'list',
         command: 'addItem',
-        payload: { line1: 'Commented task', line2: '' },
+        payload: { title: 'Commented task' },
         source: 'unit-test'
       }
     });
@@ -200,7 +200,7 @@ describe('Cloudflare list document core', () => {
     });
     expect(result.state.rev).toBe(1);
     expect(result.state.content.snapshot.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'milk1', line1: 'Молоко 3.2%' })
+      expect.objectContaining({ id: 'milk1', title: 'Молоко 3.2%' })
     ]));
     expect(result.state.content.actionLog).toHaveLength(1);
     expect(result.state.content.actionLog[0]).toMatchObject({
@@ -259,13 +259,12 @@ describe('Cloudflare list document core', () => {
       parentId: null,
       order: 20,
       status: 'Open',
-      line1: 'Хлеб ржаной',
-      line2: '',
+      title: 'Хлеб ржаной',
       collapsed: false,
       tags: [],
       children: [
-        expect.objectContaining({ id: 'borod', line1: 'Бородинский', children: [] }),
-        expect.objectContaining({ id: 'stoli', line1: 'Столичный', children: [] })
+        expect.objectContaining({ id: 'borod', title: 'Бородинский', children: [] }),
+        expect.objectContaining({ id: 'stoli', title: 'Столичный', children: [] })
       ]
     });
     expect(core.getTaskTree({ title: 'Хлеб ржаной' })).toEqual({ status: 'missing-query' });
@@ -278,7 +277,7 @@ describe('Cloudflare list document core', () => {
         snapshot: {
           items: [
             ...seedState.snapshot.items,
-            { id: 'hidden', parentId: 'shamp', order: 10, status: 'Open', line1: 'Hidden child', line2: '', collapsed: false, tags: [] }
+            { id: 'hidden', parentId: 'shamp', order: 10, status: 'Open', title: 'Hidden child', collapsed: false, tags: [] }
           ]
         },
         actionLog: []
@@ -304,7 +303,7 @@ describe('Cloudflare list document core', () => {
         snapshot: {
           items: [
             ...seedState.snapshot.items,
-            { id: 'oldbread', parentId: 'bread', order: 30, status: 'Archive', line1: 'Old bread', line2: '', collapsed: false, tags: [] }
+            { id: 'oldbread', parentId: 'bread', order: 30, status: 'Archive', title: 'Old bread', collapsed: false, tags: [] }
           ]
         },
         actionLog: []
@@ -322,7 +321,7 @@ describe('Cloudflare list document core', () => {
     expect(result.status).toBe('found');
     expect(result.subgraph).toMatchObject({
       path: [],
-      task: { id: 'bread', line1: 'Хлеб ржаной', line2: '', parentId: null },
+      task: { id: 'bread', title: 'Хлеб ржаной', parentId: null },
       children: [
         { id: 'borod', title: 'Бородинский', status: 'Open' },
         { id: 'stoli', title: 'Столичный', status: 'Open' }
@@ -340,11 +339,11 @@ describe('Cloudflare list document core', () => {
       actId: 'list',
       actType: 'list',
       command: 'addItem',
-      payload: { line1: 'MCP task', line2: '' },
+      payload: { title: 'MCP task' },
       source: 'unit-test'
     }, { message: { clientKey: 'mcp-test', seq: 1 } });
     expect(added.status).toBe('applied');
-    expect(core.getTaskById(added.newTarget)).toMatchObject({ line1: 'MCP task', status: 'Open' });
+    expect(core.getTaskById(added.newTarget)).toMatchObject({ title: 'MCP task', status: 'Open' });
 
     await core.applyCommand({
       actId: added.newTarget,
@@ -473,9 +472,9 @@ describe('Cloudflare list document core', () => {
     const importedRoot = result.state.content.snapshot.items.find((item) => item.id === 'rs');
     const importedChild = result.state.content.snapshot.items.find((item) => item.parentId === 'rs');
     const importedNested = result.state.content.snapshot.items.find((item) => item.parentId === importedChild.id);
-    expect(importedRoot).toMatchObject({ line1: 'task tree', status: 'Open', parentId: null });
-    expect(importedChild).toMatchObject({ line1: 'Child task', status: 'Open' });
-    expect(importedNested).toMatchObject({ line1: 'Nested task', status: 'Open' });
+    expect(importedRoot).toMatchObject({ title: 'task tree', status: 'Open', parentId: null });
+    expect(importedChild).toMatchObject({ title: 'Child task', status: 'Open' });
+    expect(importedNested).toMatchObject({ title: 'Nested task', status: 'Open' });
     expect(core.listLog()[0]).toMatchObject({
       op: 'importWorkflowyTree',
       label: 'Импортировано дерево Workflowy: task tree'
