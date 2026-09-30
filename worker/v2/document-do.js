@@ -74,8 +74,13 @@ export class ListDocumentDO extends Agent {
     if (!existing) await this.runtime.submit({ ...input, key: {clientKey,seq}, context: {...input.context,revision:this.runtime.graph.revision} });
     await this.processPending();
   }
+  /** Страница второй версии рисует документ, полученный по HTTP, а не снимок из сокета:
+   *  ей достаточно знать, что документ сдвинулся. Признак живёт в адресе подключения, а он
+   *  переживает засыпание объекта, поэтому отдельного состояния соединения не нужно. */
+  isWatcher(connection) { return String(connection.uri || '').includes('client=v2'); }
   async onConnect(connection) {
     this.setConnectionReadonly(connection, true);
+    if (this.isWatcher(connection)) { connection.send(JSON.stringify({type:'changed',...this.runtime.watermark()})); return; }
     connection.send(JSON.stringify({type:'state',state:this.port.getSnapshot()}));
   }
   async onMessage(connection, raw) {
@@ -101,8 +106,15 @@ export class ListDocumentDO extends Agent {
     const connections = [...this.getConnections()];
     const live = Boolean(this.live?.active);
     if (!connections.length && !live) return;
+    const watchers = connections.filter(connection => this.isWatcher(connection));
+    if (watchers.length) {
+      const signal = JSON.stringify({type:'changed',...this.runtime.watermark()});
+      for (const connection of watchers) { try { connection.send(signal); } catch {} }
+    }
+    const listeners = connections.filter(connection => !this.isWatcher(connection));
+    if (!listeners.length && !live) return;
     const payload = JSON.stringify({type:'state',state:this.port.getSnapshot()});
-    for (const connection of connections) { try { connection.send(payload); } catch {} }
+    for (const connection of listeners) { try { connection.send(payload); } catch {} }
     // An edit made by hand has to reach the voice layer too, not only its own tool calls.
     if (this.live?.active) this.live.syncSnapshot().catch(() => {});
   }

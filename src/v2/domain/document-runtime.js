@@ -168,6 +168,9 @@ export class DocumentRuntime {
    *  downloaded continuously by a client that was looking at the task list. The action list
    *  is also built once rather than once per event: rebuilding it inside the loop made a poll
    *  quadratic in the number of events. */
+  /** Где документ находится сейчас — две цифры, по которым клиент решает, есть ли что
+   *  забирать. Этого хватает, чтобы разбудить страницу, и не требует собирать снимок. */
+  watermark() { return { cursor: this.state.technical.cursor, revision: this.graph.revision }; }
   follow(cursor = 0, clientKey = '') {
     const after = Math.max(0, Number(cursor) || 0), technical = this.state.technical;
     const events = technical.events.filter(event => event.cursor > after);

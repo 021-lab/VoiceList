@@ -12,7 +12,7 @@ const walk = (node, fn) => { if (!node) return; fn(node); for (const child of no
 
 /** Browser boundary. Owns view/input state, never a mutable task projection. */
 export class Client {
-  constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15000, asrFactory } = {}) {
+  constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15000, watchPollMs = 120000, WebSocketCtor, asrFactory } = {}) {
     this.dom = dom;
     this.win = dom.defaultView;
     this.fetch = fetcher;
@@ -24,7 +24,12 @@ export class Client {
     // растёт до idlePollMs, а скрытая вкладка не опрашивает вовсе; и то и другое
     // сбрасывается, как только пользователь что-то сделал или вкладка снова видна.
     this.idlePollMs = idlePollMs;
+    this.watchPollMs = watchPollMs;
     this.quietPolls = 0;
+    this.WebSocketCtor = WebSocketCtor || this.win?.WebSocket;
+    this.socket = null;
+    this.socketAttempts = 0;
+    this.socketRetryTimer = null;
     this.asrFactory = asrFactory || (() => this.win.__voiceTest ? new MockASR(this.win.__voiceTest) : new BrowserASR());
     this.clientKey = this.readStorage('voicelist.v02.client') || this.win.crypto.randomUUID();
     this.writeStorage('voicelist.v02.client', this.clientKey);
@@ -75,11 +80,54 @@ export class Client {
     this.mount();
     try { await this.loadDocument(); await this.flush(); this.connection(''); }
     catch (error) { this.connection('Нет соединения. Повторяем подключение…'); this.showToast(error.message); }
+    this.openSocket();
     this.schedulePoll();
+  }
+  /** Сервер сам говорит, что документ сдвинулся.
+   *
+   *  Опрос спрашивал объект каждую секунду, чтобы почти всегда услышать «ничего нового»:
+   *  открытая вкладка обходилась в тысячи обращений в час и выбирала дневной лимит объекта.
+   *  Сокет молчит, пока ничего не произошло, и стоит одного подключения. Опрос остаётся
+   *  редким подстраховочным ударом — на случай, если сообщение потерялось, — и возвращается
+   *  к прежней частоте, если сокет не открылся вовсе. */
+  openSocket() {
+    if (!this.WebSocketCtor || this.socket || !this.connected) return;
+    clearTimeout(this.socketRetryTimer);
+    const base = this.win?.location;
+    if (!base) return;
+    const url = `${base.protocol === 'https:' ? 'wss:' : 'ws:'}//${base.host}/ws?client=v2&clientKey=${encodeURIComponent(this.clientKey)}`;
+    let socket;
+    try { socket = new this.WebSocketCtor(url); } catch { this.retrySocket(); return; }
+    this.socket = socket;
+    socket.addEventListener('message', (event) => {
+      let message = null;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message?.type !== 'changed') return;
+      // Своя же команда тоже приходит обратно: ответ появляется раньше, чем по таймеру.
+      if (this.dom.visibilityState === 'hidden') { this.missedPush = true; return; }
+      this.resume().then(() => this.schedulePoll());
+    });
+    socket.addEventListener('open', () => { this.socketAttempts = 0; this.schedulePoll(); });
+    const dropped = () => { if (this.socket === socket) { this.socket = null; this.schedulePoll(); this.retrySocket(); } };
+    socket.addEventListener('close', dropped);
+    socket.addEventListener('error', dropped);
+  }
+  retrySocket() {
+    if (!this.connected || this.socketRetryTimer) return;
+    this.socketAttempts = (this.socketAttempts || 0) + 1;
+    const wait = Math.min(30000, 1000 * 2 ** Math.min(this.socketAttempts, 5));
+    this.socketRetryTimer = setTimeout(() => { this.socketRetryTimer = null; this.openSocket(); }, wait);
+  }
+  closeSocket() {
+    clearTimeout(this.socketRetryTimer); this.socketRetryTimer = null;
+    const socket = this.socket;
+    this.socket = null;
+    try { socket?.close(); } catch { /* уже закрыт */ }
   }
   disconnect() {
     this.connected = false;
     clearTimeout(this.pollTimer);
+    this.closeSocket();
     this.gesture.cancel();
     this.dragController?.cancel();
     this.realtime?.stop();
@@ -108,9 +156,14 @@ export class Client {
     } catch { this.connection('Нет соединения. Команды будут отправлены при восстановлении связи.'); }
     finally { this.polling = false; }
   }
-  /** Ничего не происходит — значит и спрашивать реже. Первые ответы приходят с прежней
-   *  частотой, чтобы выполнение команды выглядело мгновенным. */
-  pollDelay() { return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs; }
+  /** Пока сокет открыт, опрос — только подстраховка от потерянного сообщения. Без сокета он
+   *  единственный канал: первые ответы приходят часто, чтобы выполнение команды выглядело
+   *  мгновенным, а череда пустых замедляет его. */
+  socketOpen() { return this.socket?.readyState === 1; }
+  pollDelay() {
+    if (this.socketOpen()) return Math.max(this.pollMs, this.watchPollMs);
+    return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs;
+  }
   schedulePoll() {
     clearTimeout(this.pollTimer);
     if (!this.connected || !this.pollMs) return;
@@ -251,10 +304,12 @@ export class Client {
       else this.dragController.cancel();
     });
     this.dom.addEventListener('visibilitychange', () => {
-      if (this.dom.visibilityState === 'hidden') { this.gesture.cancel(); this.dragController.cancel(); clearTimeout(this.pollTimer); return; }
-      // Вкладку вернули: сначала догоняем пропущенное, потом снова в обычном ритме.
-      this.quietPolls = 0;
-      if (this.connected) this.resume().then(() => this.schedulePoll());
+      if (this.dom.visibilityState === 'hidden') {
+        this.gesture.cancel(); this.dragController.cancel(); clearTimeout(this.pollTimer); this.closeSocket(); return;
+      }
+      // Вкладку вернули: сначала догоняем пропущенное, потом снова слушаем сервер.
+      this.quietPolls = 0; this.missedPush = false;
+      if (this.connected) this.resume().then(() => { this.openSocket(); this.schedulePoll(); });
     });
     this.win.addEventListener('online', () => void this.resume());
   }

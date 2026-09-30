@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-aea1538e97475c7f">
+<meta name="preview-build-hash" content="v02-cef0387f901b232e">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1091,7 +1091,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-aea1538e97475c7f";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-cef0387f901b232e";
 </script>
 <script>
 (() => {
@@ -1561,14 +1561,19 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
     for (const child of node.children || []) walk(child, fn);
   };
   var Client = class {
-    constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15e3, asrFactory } = {}) {
+    constructor({ document: dom = globalThis.document, fetch: fetcher = globalThis.fetch?.bind(globalThis), storage = globalThis.sessionStorage, pollMs = 1200, idlePollMs = 15e3, watchPollMs = 12e4, WebSocketCtor, asrFactory } = {}) {
       this.dom = dom;
       this.win = dom.defaultView;
       this.fetch = fetcher;
       this.storage = storage;
       this.pollMs = pollMs;
       this.idlePollMs = idlePollMs;
+      this.watchPollMs = watchPollMs;
       this.quietPolls = 0;
+      this.WebSocketCtor = WebSocketCtor || this.win?.WebSocket;
+      this.socket = null;
+      this.socketAttempts = 0;
+      this.socketRetryTimer = null;
       this.asrFactory = asrFactory || (() => this.win.__voiceTest ? new MockASR(this.win.__voiceTest) : new BrowserASR());
       this.clientKey = this.readStorage("voicelist.v02.client") || this.win.crypto.randomUUID();
       this.writeStorage("voicelist.v02.client", this.clientKey);
@@ -1647,11 +1652,81 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         this.connection("\u041D\u0435\u0442 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F. \u041F\u043E\u0432\u0442\u043E\u0440\u044F\u0435\u043C \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u2026");
         this.showToast(error.message);
       }
+      this.openSocket();
       this.schedulePoll();
+    }
+    /** Сервер сам говорит, что документ сдвинулся.
+     *
+     *  Опрос спрашивал объект каждую секунду, чтобы почти всегда услышать «ничего нового»:
+     *  открытая вкладка обходилась в тысячи обращений в час и выбирала дневной лимит объекта.
+     *  Сокет молчит, пока ничего не произошло, и стоит одного подключения. Опрос остаётся
+     *  редким подстраховочным ударом — на случай, если сообщение потерялось, — и возвращается
+     *  к прежней частоте, если сокет не открылся вовсе. */
+    openSocket() {
+      if (!this.WebSocketCtor || this.socket || !this.connected) return;
+      clearTimeout(this.socketRetryTimer);
+      const base = this.win?.location;
+      if (!base) return;
+      const url = `${base.protocol === "https:" ? "wss:" : "ws:"}//${base.host}/ws?client=v2&clientKey=${encodeURIComponent(this.clientKey)}`;
+      let socket;
+      try {
+        socket = new this.WebSocketCtor(url);
+      } catch {
+        this.retrySocket();
+        return;
+      }
+      this.socket = socket;
+      socket.addEventListener("message", (event) => {
+        let message = null;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (message?.type !== "changed") return;
+        if (this.dom.visibilityState === "hidden") {
+          this.missedPush = true;
+          return;
+        }
+        this.resume().then(() => this.schedulePoll());
+      });
+      socket.addEventListener("open", () => {
+        this.socketAttempts = 0;
+        this.schedulePoll();
+      });
+      const dropped = () => {
+        if (this.socket === socket) {
+          this.socket = null;
+          this.schedulePoll();
+          this.retrySocket();
+        }
+      };
+      socket.addEventListener("close", dropped);
+      socket.addEventListener("error", dropped);
+    }
+    retrySocket() {
+      if (!this.connected || this.socketRetryTimer) return;
+      this.socketAttempts = (this.socketAttempts || 0) + 1;
+      const wait = Math.min(3e4, 1e3 * 2 ** Math.min(this.socketAttempts, 5));
+      this.socketRetryTimer = setTimeout(() => {
+        this.socketRetryTimer = null;
+        this.openSocket();
+      }, wait);
+    }
+    closeSocket() {
+      clearTimeout(this.socketRetryTimer);
+      this.socketRetryTimer = null;
+      const socket = this.socket;
+      this.socket = null;
+      try {
+        socket?.close();
+      } catch {
+      }
     }
     disconnect() {
       this.connected = false;
       clearTimeout(this.pollTimer);
+      this.closeSocket();
       this.gesture.cancel();
       this.dragController?.cancel();
       this.realtime?.stop();
@@ -1689,9 +1764,14 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         this.polling = false;
       }
     }
-    /** Ничего не происходит — значит и спрашивать реже. Первые ответы приходят с прежней
-     *  частотой, чтобы выполнение команды выглядело мгновенным. */
+    /** Пока сокет открыт, опрос — только подстраховка от потерянного сообщения. Без сокета он
+     *  единственный канал: первые ответы приходят часто, чтобы выполнение команды выглядело
+     *  мгновенным, а череда пустых замедляет его. */
+    socketOpen() {
+      return this.socket?.readyState === 1;
+    }
     pollDelay() {
+      if (this.socketOpen()) return Math.max(this.pollMs, this.watchPollMs);
       return this.quietPolls >= 5 ? Math.max(this.pollMs, this.idlePollMs) : this.pollMs;
     }
     schedulePoll() {
@@ -1888,10 +1968,15 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
           this.gesture.cancel();
           this.dragController.cancel();
           clearTimeout(this.pollTimer);
+          this.closeSocket();
           return;
         }
         this.quietPolls = 0;
-        if (this.connected) this.resume().then(() => this.schedulePoll());
+        this.missedPush = false;
+        if (this.connected) this.resume().then(() => {
+          this.openSocket();
+          this.schedulePoll();
+        });
       });
       this.win.addEventListener("online", () => void this.resume());
     }
@@ -3481,7 +3566,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-aea1538e97475c7f";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-cef0387f901b232e";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

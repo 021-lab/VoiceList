@@ -39,6 +39,18 @@ assert.equal(invalid.status,403);
 const status=await request('/api/live/key/status');assert.equal(typeof status.configured,'boolean');assert.equal('apiKey' in status,false);
 const socket=new WebSocket(base.replace(/^http/,'ws')+'/ws');
 await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('WebSocket timeout')),5000);socket.onmessage=event=>{const value=JSON.parse(event.data);if(value.type==='state'){clearTimeout(timer);assert.ok(value.state.content.snapshot.items.find(x=>x.id===id));resolve();}};socket.onerror=reject;});socket.close();
+// Наблюдатель второй версии получает не снимок, а признак сдвига — и получает его на
+// каждое изменение, без опроса.
+const watcher=new WebSocket(base.replace(/^http/,'ws')+'/ws?client=v2');
+const signals=[];
+await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('watcher timeout')),5000);
+  watcher.onmessage=event=>{const value=JSON.parse(event.data);if(value.type!=='changed')return;assert.equal(value.state,undefined);assert.equal(typeof value.cursor,'number');assert.equal(typeof value.revision,'number');signals.push(value);clearTimeout(timer);resolve();};
+  watcher.onerror=reject;});
+const pushed=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('push timeout')),5000);
+  watcher.onmessage=event=>{const value=JSON.parse(event.data);if(value.type==='changed'&&value.revision>signals[0].revision){clearTimeout(timer);resolve(value);}};});
+await run({command:'editItem',actId:id,payload:{title:'пуш без опроса'}},{elementId:'task:'+id});
+assert.ok((await pushed).cursor>=signals[0].cursor);
+watcher.close();
 if(new URL(base).hostname==='127.0.0.1') {
   const mcp=await request('/mcp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list',params:{}})});
   assert.ok(mcp.result.tools.some(t=>t.name==='voicelist_get_task_tree'));

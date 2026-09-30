@@ -20,8 +20,19 @@ beforeEach(() => {
 });
 afterEach(() => { client?.disconnect(); vi.restoreAllMocks(); });
 
-const create = () => {
-  client = new Client({ document, storage: sessionStorage, pollMs: 1200, idlePollMs: 15000, fetch: vi.fn(serve) });
+/** Сокет, которым можно управлять из теста: открыть, уронить, прислать сообщение. */
+class FakeSocket {
+  static last = null;
+  constructor(url) { this.url = url; this.readyState = 0; this.listeners = new Map(); FakeSocket.last = this; }
+  addEventListener(type, handler) { this.listeners.set(type, [...(this.listeners.get(type) || []), handler]); }
+  emit(type, event) { for (const handler of this.listeners.get(type) || []) handler(event); }
+  open() { this.readyState = 1; this.emit('open', {}); }
+  push(message) { this.emit('message', { data: JSON.stringify(message) }); }
+  close() { this.readyState = 3; this.emit('close', {}); }
+}
+
+const create = (options = {}) => {
+  client = new Client({ document, storage: sessionStorage, pollMs: 1200, idlePollMs: 15000, watchPollMs: 120000, fetch: vi.fn(serve), ...options });
   client.mount();
   client.render(documentTree());
   client.connected = true;
@@ -54,5 +65,58 @@ describe('частота опроса', () => {
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
     client.schedulePoll();
     expect(client.pollTimer).toBeDefined();
+  });
+});
+
+describe('сервер сам будит страницу', () => {
+  beforeEach(() => { FakeSocket.last = null; });
+
+  it('подключается к объекту как наблюдатель и не просит снимок', async () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.connected = false;
+    await client.connect();
+    expect(FakeSocket.last.url).toContain('/ws?client=v2');
+  });
+
+  it('сообщение об изменении забирает обновление, не дожидаясь таймера', async () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.openSocket();
+    FakeSocket.last.open();
+    const before = client.fetch.mock.calls.length;
+    FakeSocket.last.push({ type: 'changed', cursor: 7, revision: 4 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.fetch.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it('пока сокет открыт, опрос становится редкой подстраховкой', () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.openSocket();
+    expect(client.pollDelay()).toBe(1200);
+    FakeSocket.last.open();
+    expect(client.pollDelay()).toBe(120000);
+  });
+
+  it('упавший сокет возвращает обычный опрос и переподключается с отсрочкой', () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.openSocket();
+    FakeSocket.last.open();
+    FakeSocket.last.close();
+    expect(client.socketOpen()).toBe(false);
+    expect(client.pollDelay()).toBe(1200);
+    expect(client.socketRetryTimer).toBeTruthy();
+  });
+
+  it('скрытая вкладка закрывает сокет, видимая открывает снова', async () => {
+    create({ WebSocketCtor: FakeSocket });
+    client.mount();
+    client.openSocket();
+    FakeSocket.last.open();
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(client.socket).toBeNull();
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.socket).toBeTruthy();
   });
 });
