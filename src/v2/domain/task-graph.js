@@ -21,19 +21,6 @@ export function createIdAllocator(start) {
     get sequence() { return sequence; }
   };
 }
-/** A task as it is stored today, whatever it was stored as.
- *
- *  The title used to be `line1` and there used to be a second line beside it. Documents
- *  written before the rename are still on disk, in journal entries and in the outcomes a
- *  rollback replays, so the shape is fixed on the way in rather than by a one-off script that
- *  would miss those. `line2` is dropped on sight: the field is gone and what was in it is
- *  not kept, which is what was asked for. */
-export function normalizeTask(task) {
-  if (!task || typeof task !== 'object') return task;
-  const { line1, line2, ...rest } = task;
-  return line1 !== undefined && rest.title === undefined ? { ...rest, title: line1 } : rest;
-}
-export const normalizeTasks = (items) => (Array.isArray(items) ? items.map(normalizeTask) : items);
 
 export function validateItems(items) {
   const byId = new Map(items.map(item => [item.id, item]));
@@ -58,19 +45,10 @@ export function changesBetween(before, after) {
     return [{ id, before: clone(prev), after: clone(next), fields }];
   });
 }
-/** A recorded change, read in today's shape. Outcomes written before the rename name the
- *  title `line1`, and a rollback that compared them field by field would call every one of
- *  them a conflict. A change that only touched the second line has nothing left to undo. */
-function carried(change) {
-  const fields = change.fields
-    ? [...new Set(change.fields.map(field => (field === 'line1' ? 'title' : field)).filter(field => field !== 'line2'))]
-    : change.fields;
-  return { ...change, fields, before: normalizeTask(change.before), after: normalizeTask(change.after) };
-}
 
 export class TaskGraph {
   constructor(state = {}, seed = {}) {
-    this.items = normalizeTasks(clone(state.items || seed.snapshot?.items || []));
+    this.items = clone(state.items || seed.snapshot?.items || []);
     if (!this.items.some(x => x.id === 'inbox')) this.items.unshift(clone(inbox));
     this.revision = state.revision || 0;
     this.nextId = Math.max(FIRST_TASK_ID_SEQUENCE, Number(state.nextId) || FIRST_TASK_ID_SEQUENCE);
@@ -86,10 +64,7 @@ export class TaskGraph {
     const allocator = createIdAllocator(this.nextId);
     let next = clone(before), label = '';
     for (const raw of commands) {
-      // Old shape accepted, new shape stored: a command written before the rename — a pending
-      // entry replayed after a restart, an MCP client that has not caught up — still says
-      // what it means, and `line2` in it is dropped rather than written back.
-      const input = { ...raw, payload: normalizeTask(raw.payload || {}) };
+      const input = { ...raw, payload: raw.payload || {} };
       const { command, actId, payload } = input;
       if (!graphCommands.has(command)) fail('UNSUPPORTED_COMMAND', 'Команда не поддерживается графом');
       const target = next.find(x => x.id === actId);
@@ -136,7 +111,7 @@ export class TaskGraph {
     const before = clone(this.items);
     const map = new Map(before.map(x => [x.id, clone(x)]));
     for (const outcome of [...outcomes].reverse()) {
-      for (const change of [...(outcome.changes || [])].reverse().map(carried)) {
+      for (const change of [...(outcome.changes || [])].reverse()) {
         const current = map.get(change.id) || null;
         if (!change.fields) {
           if (stable(current) !== stable(change.after)) fail('CONFLICT', 'Задача изменена другим действием; безопасный откат невозможен');

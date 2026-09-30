@@ -24,24 +24,6 @@ const LIVE_SETTINGS_KEYS = [
   GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, CORRECTION_MODEL_KEY, PROMPT_HISTORY_KEY
 ];
 
-/** TEMPORARY (одноразовая чистка line1/line2). Ходит по любой записи документа: line1
- *  становится title, если title ещё нет, line2 исчезает, а список изменённых полей в исходе
- *  переписывается тем же правилом, чтобы откат не считал такое изменение конфликтом. */
-function withoutLegacyFields(value) {
-  if (Array.isArray(value)) return value.map(withoutLegacyFields);
-  if (!value || typeof value !== 'object') return value;
-  const out = {};
-  for (const [key, inner] of Object.entries(value)) {
-    if (key === 'line2') continue;
-    if (key === 'line1') { if (!('title' in value)) out.title = inner; continue; }
-    if (key === 'fields' && Array.isArray(inner) && inner.every(field => typeof field === 'string')) {
-      out.fields = [...new Set(inner.map(field => (field === 'line1' ? 'title' : field)).filter(field => field !== 'line2'))];
-      continue;
-    }
-    out[key] = withoutLegacyFields(inner);
-  }
-  return out;
-}
 export class ListDocumentDO extends Agent {
   static options = { sendIdentityOnConnect: false };
   async onStart() {
@@ -390,36 +372,6 @@ export class ListDocumentDO extends Agent {
   getTaskFrontier() { return taskFrontierFromItems(this.runtime.graph.read().items); }
   getTaskTitleTreeText() { return this.port.getTaskTitleTreeText(); }
   getTaskItem(id) { return this.port.getTaskTree({id}); }
-  /** TEMPORARY (одноразовая чистка). Переписывает документ без полей line1/line2: заголовок
-   *  переезжает в title, вторая строка выбрасывается вместе с данными, списки изменённых
-   *  полей в исходах чинятся тем же правилом. Затрагивает задачи, команды в записях журнала
-   *  и записанные исходы — всё, что лежит на диске. Удалить вместе с forgetWritten в
-   *  runtime-storage.js и маршрутом /api/v2/drop-legacy-fields. */
-  async dropLegacyFields() {
-    if (this.runtime.processing) await this.runtime.processing;
-    await this.runtime.tail;
-    const before = JSON.stringify(this.runtime.exportState());
-    const cleaned = withoutLegacyFields(JSON.parse(before));
-    const after = JSON.stringify(cleaned);
-    // Каждая строка считается изменившейся, иначе обновятся только те, которых коснулась
-    // чистка, а переписать нужно всё хранилище разом.
-    this.runtimeStorage.forgetWritten();
-    await this.runtimeStorage.save(cleaned);
-    this.initializeRuntime(this.runtimeStorage.load());
-    this.broadcastState();
-    const state = this.runtime.exportState();
-    const rows = [];
-    for (const table of ['vl_projection', 'vl_journal', 'vl_technical']) {
-      for (const row of this.ctx.storage.sql.exec(`SELECT value FROM ${table}`).toArray()) {
-        if (/line1|line2/.test(row.value)) rows.push(table + ': ' + row.value.slice(0, 400));
-      }
-    }
-    return {
-      items: state.graph.items.length, entries: state.entries.length, revision: state.graph.revision,
-      changed: before !== after,
-      remaining: { memory: /line1|line2/.test(JSON.stringify(state)), rows: rows.length, sample: rows.slice(0, 3) }
-    };
-  }
   async reset() {
     if (this.runtime.processing) await this.runtime.processing;
     await this.runtime.tail;

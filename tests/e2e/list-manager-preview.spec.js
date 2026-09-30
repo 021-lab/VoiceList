@@ -431,7 +431,6 @@ test('OpenAI Realtime button sends hidden task context, applies a tool call, and
   expect(JSON.stringify(sessionRequest.taskTree)).toContain('"id":"milk1"');
   expect(JSON.stringify(sessionRequest.taskTree)).toContain('"title":"Молоко 3.2%"');
   expect(JSON.stringify(sessionRequest)).not.toContain('actionLog');
-  expect(JSON.stringify(sessionRequest)).not.toContain('"line2"');
 
   await page.evaluate(() => {
     const channel = window.__realtimeChannels.at(-1);
