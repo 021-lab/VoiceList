@@ -711,7 +711,7 @@ export class Client {
           ...toggles.map((next) => [next, () => this.command('setStatus', target.taskId, { status: next }), colors[next]]),
           ['Edit', () => this.navigate('edit', { taskId: target.taskId }), '#007aff']
         ] : ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'].map((tag) => [tag, () => this.command('setTags', target.taskId, { tag }), '#5856d6']);
-        if (status === 'Focus' && delta.dx < 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
+        if (this.viewContext.view === 'frontier' && delta.dx < 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
         const rowHeight = Math.min(72, (this.win.innerHeight - 80) / actions.length);
         for (const [label, run, color] of actions) {
           const item = this.node('div', { className: 'panel-item' }); item.append(this.node('span', { className: 'panel-label' }, label));

@@ -76,6 +76,20 @@ test('actual server flow: create, edit, status, journal, correction chain rollba
   expect(errors).toEqual([]);
 });
 
+test('frontier: left swipe on any task sets a deadline', async ({ page }) => {
+  const stamp = Date.now(); const parent = await add(page, `Deadline parent ${stamp}`); const parentId = await parent.getAttribute('data-id');
+  await swipe(page, parent.locator('.list-item'), 'Focus'); await expect(parent).toContainText('Focus');
+  const title = `Deadline UAT ${stamp}`;
+  await page.evaluate(([id, t]) => window.__voiceListClient.command('addChild', id, { title: t }), [parentId, title]);
+  await page.getByRole('button', { name: 'Фронтир' }).click();
+  const row = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-title', { hasText: title }) });
+  await expect(row).toContainText('Open'); createdTaskIds.push(await row.getAttribute('data-id'));
+  await swipe(page, row.locator('.list-item'), 'Завтра', -1);
+  await expect(row.locator('.item-deadline')).toHaveText('1');
+  await page.reload(); await page.getByRole('button', { name: 'Фронтир' }).click();
+  await expect(row.locator('.item-deadline')).toHaveText('1');
+});
+
 test('top-edge swipe opens journal; native touch hold accepts voice input', async ({ page, browser }) => {
   await page.mouse.move(300, 10); await page.mouse.down(); await page.mouse.move(300, 120, { steps: 6 }); await page.mouse.up();
   await expect(page.locator('#action-log-panel')).toBeVisible();
