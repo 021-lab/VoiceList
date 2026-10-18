@@ -69,11 +69,11 @@ describe('бриф для модели коррекции', () => {
     expect(user.content).toContain('Сегодня 2026-09-29.');
   });
 
-  it('велит архивировать, а не удалять, и даёт откат по идентификатору действия', () => {
+  it('велит архивировать, а не удалять', () => {
     expect(system.content).toMatch(/управляющей списком задач/);
     expect(system.content).toMatch(/отправь в архив setStatus со статусом Archive/);
-    expect(system.content).toMatch(/deleteItem применяй только когда пользователь прямо просит удалить/);
-    expect(system.content).toMatch(/rollbackAction с actId, равным actionId из блока what_the_answer_did/);
+    expect(system.content).toMatch(/Удаления нет/);
+    expect(system.content).not.toMatch(/rollbackAction|deleteItem|JSON/);
   });
 
   it('на вопрос пользователя отвечает по существу, а не исправляет молча', () => {
@@ -97,17 +97,38 @@ describe('вызов модели', () => {
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
     return { body: { getReader: () => { let done = false; return { read: async () => done ? { done: true } : (done = true, { done: false, value: bytes }), cancel: async () => {} }; } } };
   };
-  async function call(modelContext) {
+  async function call(modelContext, message = { content: '' }) {
     let sent = null;
-    await resolveOpenAI({
+    const answer = await resolveOpenAI({
       apiKey: 'k', model: 'gpt-4.1-mini', correctionModel: 'gpt-5.6-sol', modelContext,
       fetchImpl: async (url, options) => {
         sent = JSON.parse(options.body);
-        return { ok: true, ...stubBody({ choices: [{ message: { content: '{}' } }] }) };
+        return { ok: true, ...stubBody({ choices: [{ message }] }) };
       }
     });
-    return sent;
+    return Object.assign(sent, { answer: JSON.parse(answer) });
   }
+  const toolCall = (name, args) => ({ id: 'c1', type: 'function', function: { name, arguments: JSON.stringify(args) } });
+
+  it('обычная реплика и коррекция получают инструменты голосовых моделей, без JSON-формата', async () => {
+    for (const sent of [await call({ text: 'добавь хлеб', tasks: [] }), await call(context())]) {
+      expect(sent).not.toHaveProperty('response_format');
+      expect(sent.tools.map(tool => tool.function.name)).toEqual(['addItem', 'addChild', 'addInfo', 'setStatus', 'setDeadline', 'editItem', 'setParent']);
+      expect(sent.tools.find(tool => tool.function.name === 'editItem').function.parameters.required).toEqual(['taskId', 'title']);
+    }
+  });
+
+  it('вызов инструмента становится командой с payload — случай с переименованием', async () => {
+    const { answer } = await call({ text: 'переименуй в Вари', target: 'tt', tasks: [] },
+      { content: 'Переименовываю', tool_calls: [toolCall('editItem', { taskId: 'tt', title: 'Написать предложение для Вари' })] });
+    expect(answer.answer).toBe('Переименовываю');
+    expect(answer.commands).toEqual([{ command: 'editItem', actId: 'tt', actType: 'task', payload: { title: 'Написать предложение для Вари' }, source: 'agent' }]);
+  });
+
+  it('вызов без обязательного поля отказывает с именем поля', async () => {
+    await expect(call({ text: 'переименуй', target: 'tt', tasks: [] }, { content: '', tool_calls: [toolCall('editItem', { taskId: 'tt' })] }))
+      .rejects.toThrow('Не указано поле title');
+  });
 
   it('коррекция уходит своей модели, обычная реплика — агентской', async () => {
     expect((await call(context())).model).toBe('gpt-5.6-sol');
