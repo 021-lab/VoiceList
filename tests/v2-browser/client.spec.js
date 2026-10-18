@@ -125,6 +125,20 @@ test('reverse swipe flips the panel only after 10% of the screen within 10 degre
   await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
 });
 
+test('active swipe menu item continues as a translucent full-width band', async ({ page }) => {
+  const row = await add(page, `Band UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
+  const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
+  const band = page.locator('#swipe-band');
+  await page.mouse.move(width * 0.5, y); await page.mouse.down(); await page.mouse.move(width * 0.65, y, { steps: 6 });
+  const item = page.locator('#tag-panel .panel-item.active'); await expect(item).toHaveCount(1); await expect(band).toBeVisible();
+  const [b, i] = [await band.boundingBox(), await item.boundingBox()];
+  expect(b.x).toBe(0); expect(b.width).toBe(width); expect(Math.abs(b.y - i.y)).toBeLessThan(1); expect(Math.abs(b.height - i.height)).toBeLessThan(1);
+  expect(await band.evaluate(e => getComputedStyle(e).backgroundColor)).toBe(await item.evaluate(e => getComputedStyle(e).backgroundColor));
+  const opacity = Number(await band.evaluate(e => getComputedStyle(e).opacity)); expect(opacity).toBeGreaterThan(0); expect(opacity).toBeLessThan(1);
+  await page.mouse.move(width * 0.65, page.viewportSize().height - 2, { steps: 4 }); await expect(band).toBeHidden();
+  await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up(); await expect(band).toBeHidden();
+});
+
 test('top-edge swipe opens journal; native touch hold accepts voice input', async ({ page, browser }) => {
   await page.mouse.move(300, 10); await page.mouse.down(); await page.mouse.move(300, 120, { steps: 6 }); await page.mouse.up();
   await expect(page.locator('#action-log-panel')).toBeVisible();

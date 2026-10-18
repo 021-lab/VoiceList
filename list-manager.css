@@ -436,6 +436,17 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 #drop-zone-panel { right: 0; border-radius: 12px 0 0 12px; }
 #tag-panel       { left:  0; border-radius: 0 12px 12px 0; }
 .swipe-panel.visible { display: flex; }
+/* Translucent full-width continuation of the active swipe menu item. */
+#swipe-band {
+  position: fixed;
+  left: 0;
+  right: 0;
+  display: none;
+  z-index: 399;
+  pointer-events: none;
+  opacity: 0.3;
+}
+#swipe-band.visible { display: block; }
 
 .panel-item {
   height: 72px;

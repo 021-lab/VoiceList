@@ -734,10 +734,17 @@ export class Client {
       }
       const item = [...panel.children].find((child) => { const rect = child.getBoundingClientRect(); return p.y >= rect.top && p.y < rect.bottom; });
       for (const child of panel.children) child.classList.toggle('active', child === item);
-      if (item) this.swipeSelection = item;
+      const band = this.$('swipe-band'); band.classList.toggle('visible', Boolean(item));
+      if (item) {
+        // Layout box, not getBoundingClientRect: the active item is still scaling up.
+        const top = panel.getBoundingClientRect().top + panel.clientTop + item.offsetTop;
+        Object.assign(band.style, { top: `${top}px`, height: `${item.offsetHeight}px`, background: item.style.background });
+        this.swipeSelection = item;
+      }
       return;
     }
     if (phase === 'end') this.swipeSelection?.runAction?.();
+    this.$('swipe-band').classList.remove('visible');
     this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null; this.swipeDir = 0;
   }
   /** Read-only bridge for the reused Realtime transport, not a client task store. */

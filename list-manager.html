@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-9014d4de29bad8f9">
+<meta name="preview-build-hash" content="v02-d870b4dfce5c4d49">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -444,6 +444,17 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 #drop-zone-panel { right: 0; border-radius: 12px 0 0 12px; }
 #tag-panel       { left:  0; border-radius: 0 12px 12px 0; }
 .swipe-panel.visible { display: flex; }
+/* Translucent full-width continuation of the active swipe menu item. */
+#swipe-band {
+  position: fixed;
+  left: 0;
+  right: 0;
+  display: none;
+  z-index: 399;
+  pointer-events: none;
+  opacity: 0.3;
+}
+#swipe-band.visible { display: block; }
 
 .panel-item {
   height: 72px;
@@ -950,6 +961,8 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 
   <div id="drop-zone-panel" class="swipe-panel"></div>
 
+  <div id="swipe-band"></div>
+
 	  <div id="voice-overlay" class="voice-overlay" aria-hidden="true"></div>
 
 	  <div class="settings-overlay" id="settings-overlay" aria-hidden="true">
@@ -1091,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-9014d4de29bad8f9";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-d870b4dfce5c4d49";
 </script>
 <script>
 (() => {
@@ -2560,10 +2573,17 @@ ${text}`;
           return p.y >= rect.top && p.y < rect.bottom;
         });
         for (const child of panel.children) child.classList.toggle("active", child === item);
-        if (item) this.swipeSelection = item;
+        const band = this.$("swipe-band");
+        band.classList.toggle("visible", Boolean(item));
+        if (item) {
+          const top = panel.getBoundingClientRect().top + panel.clientTop + item.offsetTop;
+          Object.assign(band.style, { top: `${top}px`, height: `${item.offsetHeight}px`, background: item.style.background });
+          this.swipeSelection = item;
+        }
         return;
       }
       if (phase === "end") this.swipeSelection?.runAction?.();
+      this.$("swipe-band").classList.remove("visible");
       this.swipePanel?.classList.remove("visible");
       this.swipePanel = null;
       this.swipeSelection = null;
@@ -3598,7 +3618,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-9014d4de29bad8f9";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-d870b4dfce5c4d49";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
