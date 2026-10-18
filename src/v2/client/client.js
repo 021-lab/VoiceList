@@ -1,4 +1,5 @@
 import { BrowserASR } from '../../asr-browser.js';
+import { ServerASR } from '../../asr-server.js';
 import { MockASR } from '../../asr-mock.js';
 import { deadlineDaysLabel, deadlineFromToday } from '../../task-deadline.js';
 import { GestureController } from './gesture-controller.js';
@@ -12,6 +13,7 @@ const asrErrors = {
   denied: 'Нет доступа к микрофону — разрешите его в настройках сайта',
   microphone: 'Микрофон не отвечает — проверьте, что он подключён и не занят другим приложением',
   network: 'Распознавание не ответило — проверьте сеть',
+  server: 'Сервер не распознал речь — попробуйте ещё раз',
   silence: 'Речь не расслышана — попробуйте ещё раз',
   timeout: 'Речь не расслышана — попробуйте ещё раз',
   aborted: 'Распознавание прервалось — попробуйте ещё раз'
@@ -47,7 +49,10 @@ export class Client {
     this.socket = null;
     this.socketAttempts = 0;
     this.socketRetryTimer = null;
-    this.asrFactory = asrFactory || (() => this.win.__voiceTest ? new MockASR(this.win.__voiceTest) : new BrowserASR());
+    // Speech from a held task is recognised on the server (docs/DECISIONS.md); browser
+    // recognition stays only for browsers that cannot record sound.
+    this.asrFactory = asrFactory || ((target) => this.win.__voiceTest ? new MockASR(this.win.__voiceTest)
+      : ServerASR.supported(this.win) ? new ServerASR({ target: target?.taskId || null, fetchImpl: this.fetch }) : new BrowserASR());
     this.clientKey = this.readStorage('voicelist.v02.client') || this.win.crypto.randomUUID();
     this.writeStorage('voicelist.v02.client', this.clientKey);
     this.seq = Number(this.readStorage('voicelist.v02.seq') || 0);
@@ -646,7 +651,7 @@ export class Client {
   }
   startVoice(target, p) {
     this.realtime?.stop();
-    this.voice = { target, text: '', final: '', error: false, asr: this.asrFactory() };
+    this.voice = { target, text: '', final: '', error: false, asr: this.asrFactory(target) };
     const voice = this.voice;
     target.element.classList.add('v02-voice-target');
     const overlay = this.$('v02-transcript'); overlay.hidden = false; overlay.dataset.state = 'recording';
@@ -676,6 +681,7 @@ export class Client {
     // await because the user activation has already expired.
     const initialDraft = (voice.final || voice.text).trim();
     const editor = edit ? this.editTranscript(initialDraft, target) : null;
+    if (voice.asr.hasInterim?.() === false && this.voice === voice && this.$('v02-transcript')) this.$('v02-transcript').textContent = 'Распознаю…';
     await voice.asr.stop();
     const text = (voice.final || voice.text).trim();
     if (this.voice === voice) {

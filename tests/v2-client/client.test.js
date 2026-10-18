@@ -84,6 +84,21 @@ describe('server component Client', () => {
     expect(document.getElementById('transcript-edit-input').value).toBe('купи хлеб');
     expect(document.querySelectorAll('.v02-toast')).toHaveLength(0);
   });
+  it('recognises a held phrase on the server when the browser can record, showing that it is working', async () => {
+    create().render(documentTree());
+    window.MediaRecorder = class {}; navigator.mediaDevices = { getUserMedia: async () => ({}) };
+    try {
+      const asr = client.asrFactory({ taskId: 'one' });
+      expect(asr.constructor.name).toBe('ServerASR'); expect(asr.target).toBe('one');
+    } finally { delete window.MediaRecorder; delete navigator.mediaDevices; }
+    let release;
+    client.asrFactory = () => ({ start() {}, stop: () => new Promise(resolve => { release = resolve; }), hasInterim: () => false });
+    const target = { id: 'task:one', taskId: 'one', element: document.querySelector('[data-id="one"]') };
+    client.startVoice(target, { x: 100, y: 200 });
+    const finishing = client.finishVoice(target);
+    expect(document.getElementById('v02-transcript').textContent).toBe('Распознаю…');
+    release(); await finishing;
+  });
   it('downward edit keeps transcript local until Send, Cancel sends nothing', async () => {
     const fetcher = vi.fn(async () => response(documentTree())); create(fetcher).render(documentTree());
     client.asrFactory = () => new MockASR({ phrase: 'исправь задачу' });
