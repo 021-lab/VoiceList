@@ -372,8 +372,10 @@ export class ListDocumentDO extends Agent {
     this.broadcastState(); return response;
   }
   async transcribe(audio, contentType, target) {
-    const prompt = transcriptionPrompt(this.runtime.graph.read().items, target);
-    return { text: await transcribeOpenAI({ apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(), audio, contentType, prompt }) };
+    const { items } = this.runtime.graph.read();
+    const prompt = transcriptionPrompt(items, target);
+    const held = items.find(item => item.id === target)?.title || '';
+    return { text: await transcribeOpenAI({ apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(), audio, contentType, prompt, held }) };
   }
   async getOpenAIApiKey() { return await this.ctx.storage.get(API_KEY) || ''; }
   async isOpenAIKeyConfigured() { return Boolean(this.env.OPENAI_API_KEY || await this.getOpenAIApiKey()); }

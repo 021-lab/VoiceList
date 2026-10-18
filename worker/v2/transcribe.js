@@ -35,10 +35,13 @@ const normalize = (text) => String(text).toLowerCase().replace(/[^\p{L}\p{N}]+/g
  *  second of silence came back as the whole list of titles. A reply that carries the header,
  *  or is made almost entirely of two or more prompted titles, is that echo and counts as empty.
  *  One title said on its own, or inside a request, is speech. */
-export function isPromptEcho(text, prompt) {
+export function isPromptEcho(text, prompt, held = '') {
   const said = normalize(text);
   if (!said) return false;
   if (said.includes(normalize(HEADER))) return true;
+  // Saying only the name of the task in hand while holding it asks nothing; on prod a second
+  // of silence came back as exactly that name, the first line of the prompt.
+  if (held && said === normalize(held)) return true;
   const titles = [...new Set(prompt.slice(HEADER.length).split('\n').map(normalize).filter(title => title.length >= 4))];
   // A title inside a longer one that also matched is the same words, not a second title.
   const matched = titles.filter(title => said.includes(title));
@@ -47,7 +50,7 @@ export function isPromptEcho(text, prompt) {
   return found.length >= 2 && covered >= said.replace(/ /g, '').length * 0.8;
 }
 
-export async function transcribeOpenAI({ apiKey, audio, contentType = '', prompt = '', fetchImpl = (...args) => fetch(...args) }) {
+export async function transcribeOpenAI({ apiKey, audio, contentType = '', prompt = '', held = '', fetchImpl = (...args) => fetch(...args) }) {
   const type = String(contentType).split(';')[0].trim().toLowerCase();
   const extension = EXTENSIONS.find(([known]) => known === type)?.[1];
   if (!extension) fail('INVALID_INPUT', 'Неподдерживаемый формат звука');
@@ -63,5 +66,5 @@ export async function transcribeOpenAI({ apiKey, audio, contentType = '', prompt
   if (!response.ok) { await response.body?.cancel(); fail('MODEL_UNAVAILABLE', `Распознавание недоступно (${response.status})`); }
   const data = await response.json();
   const text = String(data.text || '').trim();
-  return isPromptEcho(text, prompt) ? '' : text;
+  return isPromptEcho(text, prompt, held) ? '' : text;
 }
