@@ -701,7 +701,14 @@ export class Client {
   }
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
+    // The middle 30% of the screen is a dead zone: neither panel opens while the finger is there.
+    const x = p.x / this.win.innerWidth;
+    const inZone = delta.dx < 0 ? x < 0.35 : delta.dx > 0 && x > 0.65;
     const panel = delta.dx >= 0 ? this.$('drop-zone-panel') : this.$('tag-panel');
+    if (phase === 'move' && !inZone) {
+      this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null;
+      return;
+    }
     if (phase === 'move') {
       if (this.swipePanel !== panel) {
         this.swipePanel?.classList.remove('visible'); this.swipePanel = panel; panel.replaceChildren();

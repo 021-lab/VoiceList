@@ -33,7 +33,8 @@ async function swipe(page, row, label, direction = 1) {
   await row.scrollIntoViewIfNeeded(); const rect = await row.boundingBox();
   const startX = direction > 0 ? rect.x + 24 : rect.x + rect.width - 24;
   await page.mouse.move(startX, rect.y + rect.height / 2); await page.mouse.down();
-  await page.mouse.move(startX + direction * 360, rect.y + rect.height / 2, { steps: 8 });
+  const width = page.viewportSize().width;
+  await page.mouse.move(direction > 0 ? width - 40 : 40, rect.y + rect.height / 2, { steps: 8 });
   const item = page.locator(`${direction > 0 ? '#drop-zone-panel' : '#tag-panel'} .panel-item`).filter({ hasText: label });
   await expect(item).toBeVisible(); const target = await item.boundingBox();
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 5 }); await page.mouse.up();
@@ -88,6 +89,21 @@ test('frontier: left swipe on any task sets a deadline', async ({ page }) => {
   await expect(row.locator('.item-deadline')).toHaveText('1');
   await page.reload(); await page.getByRole('button', { name: 'Фронтир' }).click();
   await expect(row.locator('.item-deadline')).toHaveText('1');
+});
+
+test('middle 30% of the screen opens neither swipe panel', async ({ page }) => {
+  const row = await add(page, `Dead zone UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
+  const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
+  for (const [from, to] of [[width * 0.2, width * 0.6], [width * 0.8, width * 0.4]]) {
+    await page.mouse.move(from, y); await page.mouse.down();
+    await page.mouse.move(to, y, { steps: 8 });
+    await expect(page.locator('.swipe-panel.visible')).toHaveCount(0);
+    await page.mouse.up();
+  }
+  await page.mouse.move(width * 0.5, y); await page.mouse.down();
+  await page.mouse.move(width * 0.8, y, { steps: 8 }); await expect(page.locator('#drop-zone-panel')).toBeVisible();
+  await page.mouse.move(width * 0.5, y, { steps: 4 }); await expect(page.locator('.swipe-panel.visible')).toHaveCount(0);
+  await page.mouse.up(); await expect(row).toContainText('Open');
 });
 
 test('top-edge swipe opens journal; native touch hold accepts voice input', async ({ page, browser }) => {
