@@ -4,6 +4,7 @@ import { safeError, fail } from '../../src/v2/domain/contracts.js';
 import { CompatibilityPort } from './compatibility.js';
 import { handleMcpRequest } from './mcp.js';
 import { resolveOpenAI } from './model.js';
+import { transcribeOpenAI, transcriptionPrompt } from './transcribe.js';
 import { RuntimeStorage } from './runtime-storage.js';
 import { LiveLog } from './live-log.js';
 import { LiveHost } from './live-host.js';
@@ -369,6 +370,10 @@ export class ListDocumentDO extends Agent {
   async mcpRequest(request) {
     const response = await handleMcpRequest(request, this.port);
     this.broadcastState(); return response;
+  }
+  async transcribe(audio, contentType, target) {
+    const prompt = transcriptionPrompt(this.runtime.graph.read().items, target);
+    return { text: await transcribeOpenAI({ apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(), audio, contentType, prompt }) };
   }
   async getOpenAIApiKey() { return await this.ctx.storage.get(API_KEY) || ''; }
   async isOpenAIKeyConfigured() { return Boolean(this.env.OPENAI_API_KEY || await this.getOpenAIApiKey()); }

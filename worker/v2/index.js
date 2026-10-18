@@ -7,7 +7,7 @@ import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from '../openai-key-setup
 import { isMcpHostAllowed } from './mcp.js';
 import { PROMPT_TARGETS } from '../../src/v2/domain/live-settings.js';
 import { readBoundedJson } from './model.js';
-import { safeError } from '../../src/v2/domain/contracts.js';
+import { safeError, fail } from '../../src/v2/domain/contracts.js';
 export { ListDocumentDO };
 const json = (data,status=200) => Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 /** Which object holds the document, and where it lives.
@@ -19,6 +19,14 @@ const json = (data,status=200) => Response.json(data,{status,headers:{'Cache-Con
 const documentStub = (env) => getAgentByName(env.LIST_DOCUMENT, env.DOCUMENT_NAME || 'main',
   env.DO_LOCATION_HINT ? { locationHint: env.DO_LOCATION_HINT } : undefined);
 const missing = () => new Response('Not found',{status:404});
+/** A held phrase is seconds of compressed speech; a few megabytes is minutes of it. */
+async function readAudio(request, limit = 4_000_000) {
+  if (Number(request.headers.get('Content-Length') || 0) > limit) fail('TOO_LARGE','Запись слишком длинная');
+  const audio = await request.arrayBuffer();
+  if (audio.byteLength > limit) fail('TOO_LARGE','Запись слишком длинная');
+  if (!audio.byteLength) fail('INVALID_INPUT','Пустая запись');
+  return audio;
+}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -35,6 +43,7 @@ export default {
       if (!['/ws','/mcp','/reset'].includes(url.pathname) && !url.pathname.startsWith('/api/')) return missing();
       if (url.pathname === '/mcp' && !isMcpHostAllowed(request,env)) return missing();
       const stub = await documentStub(env);
+      if (url.pathname === '/api/transcribe' && request.method === 'POST') return json(await stub.transcribe(await readAudio(request),request.headers.get('Content-Type')||'',url.searchParams.get('target')||null));
       if (url.pathname === '/api/v2/input' && request.method === 'POST') return json(await stub.submit(await readBoundedJson(request,64000)),202);
       if (url.pathname === '/api/v2/document' && request.method === 'GET') return json(await stub.getDocument(Object.fromEntries(url.searchParams)));
       if (url.pathname === '/api/v2/updates' && request.method === 'GET') return json(await stub.follow(Number(url.searchParams.get('cursor')||0),url.searchParams.get('clientKey')||''));
