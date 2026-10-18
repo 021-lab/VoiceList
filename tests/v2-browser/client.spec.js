@@ -128,7 +128,7 @@ test('reverse swipe counts only movement within 20 degrees of horizontal', async
   await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
 });
 
-test('left menu: warm-to-cold outline icons for deadlines, filled icons and own colors for tags', async ({ page }) => {
+test('left menu: warm-to-cold outline icons for deadlines, black-and-white hashtags for tags', async ({ page }) => {
   const row = await add(page, `Menu style UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
   const width = page.viewportSize().width;
   const openLeftMenu = async (target) => {
@@ -137,15 +137,14 @@ test('left menu: warm-to-cold outline icons for deadlines, filled icons and own 
     await expect(page.locator('#tag-panel')).toBeVisible();
     const items = await page.locator('#tag-panel .panel-item').evaluateAll(els => els.map(e => {
       const svg = e.querySelector('.panel-icon svg'); const [r, g, b] = getComputedStyle(e).backgroundColor.match(/\d+/g).map(Number);
-      return { label: e.textContent.trim(), fill: svg?.getAttribute('fill'), stroke: svg?.getAttribute('stroke'), r, b };
+      return { label: e.querySelector('.panel-label').textContent, mark: e.querySelector('.panel-icon')?.textContent, fill: svg?.getAttribute('fill'), stroke: svg?.getAttribute('stroke'), r, g, b, color: getComputedStyle(e).color };
     }));
     await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
     return items;
   };
   const tags = await openLeftMenu(row);
   expect(tags.map(t => t.label)).toEqual(['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить']);
-  for (const t of tags) { expect(t.fill).toBe('currentColor'); expect(t.stroke).toBeFalsy(); }
-  expect(new Set(tags.map(t => `${t.r},${t.b}`)).size).toBe(tags.length);
+  for (const t of tags) { expect(t.mark).toBe('#'); expect(t.fill).toBeUndefined(); expect(t.r === t.g && t.g === t.b && t.r < 50).toBe(true); expect(t.color).toBe('rgb(255, 255, 255)'); }
   const stamp = Date.now(); const parent = await add(page, `Menu style parent ${stamp}`); const parentId = await parent.getAttribute('data-id');
   await swipe(page, parent.locator('.list-item'), 'Focus'); await expect(parent).toContainText('Focus');
   const title = `Menu style child ${stamp}`;
