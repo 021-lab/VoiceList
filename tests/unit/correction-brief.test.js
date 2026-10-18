@@ -76,6 +76,13 @@ describe('бриф для модели коррекции', () => {
     expect(system.content).toMatch(/rollbackAction с actId, равным actionId из блока what_the_answer_did/);
   });
 
+  it('на вопрос пользователя отвечает по существу, а не исправляет молча', () => {
+    expect(system.content).toMatch(/Если пользователь спрашивает/);
+    expect(system.content).toMatch(/status и error из блока what_the_answer_did/);
+    expect(system.content).toMatch(/исправляй, только если он об этом просит/);
+    expect(system.content).not.toMatch(/недовольный/);
+  });
+
   it('у голосового действия честно говорит, что рассуждения модели нет', () => {
     const voice = context();
     voice.correction.original = { ...voice.correction.original, modelContext: null, rawModelResponse: null, heard: 'разнеси на две' };
