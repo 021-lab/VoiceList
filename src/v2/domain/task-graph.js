@@ -70,6 +70,7 @@ export class TaskGraph {
       const target = next.find(x => x.id === actId);
       if (!['addItem', 'importWorkflowyTree', 'reorderItems', 'replaceItems'].includes(command) && !target) fail('NOT_FOUND', 'Задача не найдена');
       if (actId === 'inbox' && ['editItem', 'deleteItem', 'setParent'].includes(command)) fail('PROTECTED', 'Входящие нельзя изменить этой командой');
+      if (command === 'editItem' && !('title' in payload)) fail('INVALID_INPUT', 'В команде переименования нет нового названия');
       if ((['addItem', 'addChild'].includes(command) || (command === 'editItem' && 'title' in payload)) && (typeof payload.title !== 'string' || !payload.title.trim())) fail('INVALID_INPUT', 'Введите название');
       if (command === 'setStatus' && !statuses.includes(payload.status)) fail('INVALID_INPUT', 'Неизвестный статус');
       if (command === 'reorderItems') {
