@@ -7,6 +7,25 @@ import { clientStyles } from './styles.js';
 
 const statuses = ['Open', 'Focus', 'Pause', 'Done', 'Archive', 'Info'];
 const colors = { Open: '#007aff', Focus: '#ff9500', Pause: '#5856d6', Done: '#34c759', Archive: '#8e8e93', Info: '#0a84ff' };
+const icon = (style, paths) => `<svg viewBox="0 0 24 24" width="24" height="24" ${style}>${paths.map((d) => `<path d="${d}"/>`).join('')}</svg>`;
+const outlineIcon = (...paths) => icon('fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"', paths);
+const filledIcon = (...paths) => icon('fill="currentColor"', paths);
+// Left swipe menus. Deadlines go warm to cold as the date moves away and use outline icons; tags use filled icons.
+const deadlineMenu = [
+  [0, 'Сегодня', '#ff3b30', outlineIcon('M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-6 1 1 2 2 3 2 0-2-1-4 0-6z')],
+  [1, 'Завтра', '#f5792a', outlineIcon('M4 12h14', 'M13 6l6 6-6 6')],
+  [3, 'Три дня', '#d9a21b', outlineIcon('M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z', 'M12 7v5l3 2')],
+  [7, 'Неделя', '#2fa9b8', outlineIcon('M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z', 'M3 10h18', 'M8 3v4', 'M16 3v4')],
+  [30, 'Месяц', '#3a6ff0', outlineIcon('M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z')]
+];
+const tagMenu = [
+  ['Важное', '#af52de', filledIcon('M12 2l3 6.5 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21l1.4-7L2 9.3l7-.8z')],
+  ['Срочно', '#ff2d55', filledIcon('M13 2L4 14h7l-1 8 9-12h-7z')],
+  ['Купить', '#34c759', filledIcon('M5 8h14l-1 13H6z', 'M9 8V6a3 3 0 0 1 6 0v2h-2V6a1 1 0 0 0-2 0v2z')],
+  ['Дом', '#a2845e', filledIcon('M12 3l9 8h-3v10h-5v-6h-2v6H6V11H3z')],
+  ['Работа', '#5856d6', filledIcon('M9 4h6a2 2 0 0 1 2 2v1h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V6a2 2 0 0 1 2-2zm0 3h6V6H9z')],
+  ['Отложить', '#8e8e93', filledIcon('M6 4h4v16H6z', 'M14 4h4v16h-4z')]
+];
 const point = (event) => ({ x: event.clientX, y: event.clientY });
 const walk = (node, fn) => { if (!node) return; fn(node); for (const child of node.children || []) walk(child, fn); };
 
@@ -733,11 +752,13 @@ export class Client {
         let actions = this.swipeDir < 0 ? [
           ...toggles.map((next) => [next, () => this.command('setStatus', target.taskId, { status: next }), colors[next]]),
           ['Edit', () => this.navigate('edit', { taskId: target.taskId }), '#007aff']
-        ] : ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'].map((tag) => [tag, () => this.command('setTags', target.taskId, { tag }), '#5856d6']);
-        if (this.viewContext.view === 'frontier' && this.swipeDir > 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
+        ] : tagMenu.map(([tag, color, svg]) => [tag, () => this.command('setTags', target.taskId, { tag }), color, svg]);
+        if (this.viewContext.view === 'frontier' && this.swipeDir > 0) actions = deadlineMenu.map(([days, label, color, svg]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), color, svg]);
         const rowHeight = Math.min(72, (this.win.innerHeight - 80) / actions.length);
-        for (const [label, run, color] of actions) {
-          const item = this.node('div', { className: 'panel-item' }); item.append(this.node('span', { className: 'panel-label' }, label));
+        for (const [label, run, color, svg] of actions) {
+          const item = this.node('div', { className: 'panel-item' });
+          if (svg) item.append(this.node('span', { className: 'panel-icon', innerHTML: svg }));
+          item.append(this.node('span', { className: 'panel-label' }, label));
           item.style.background = color; item.style.height = `${rowHeight}px`; item.runAction = run; panel.append(item);
         }
         panel.classList.add('visible'); panel.style.top = `${Math.max(72, Math.min(p.y - 100, this.win.innerHeight - actions.length * rowHeight - 8))}px`;

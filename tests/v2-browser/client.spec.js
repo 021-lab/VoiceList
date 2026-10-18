@@ -128,6 +128,37 @@ test('reverse swipe counts only movement within 20 degrees of horizontal', async
   await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
 });
 
+test('left menu: warm-to-cold outline icons for deadlines, filled icons and own colors for tags', async ({ page }) => {
+  const row = await add(page, `Menu style UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
+  const width = page.viewportSize().width;
+  const openLeftMenu = async (target) => {
+    const rect = await target.boundingBox(); const y = rect.y + rect.height / 2;
+    await page.mouse.move(width * 0.4, y); await page.mouse.down(); await page.mouse.move(width * 0.6, y, { steps: 6 });
+    await expect(page.locator('#tag-panel')).toBeVisible();
+    const items = await page.locator('#tag-panel .panel-item').evaluateAll(els => els.map(e => {
+      const svg = e.querySelector('.panel-icon svg'); const [r, g, b] = getComputedStyle(e).backgroundColor.match(/\d+/g).map(Number);
+      return { label: e.textContent.trim(), fill: svg?.getAttribute('fill'), stroke: svg?.getAttribute('stroke'), r, b };
+    }));
+    await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
+    return items;
+  };
+  const tags = await openLeftMenu(row);
+  expect(tags.map(t => t.label)).toEqual(['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить']);
+  for (const t of tags) { expect(t.fill).toBe('currentColor'); expect(t.stroke).toBeFalsy(); }
+  expect(new Set(tags.map(t => `${t.r},${t.b}`)).size).toBe(tags.length);
+  const stamp = Date.now(); const parent = await add(page, `Menu style parent ${stamp}`); const parentId = await parent.getAttribute('data-id');
+  await swipe(page, parent.locator('.list-item'), 'Focus'); await expect(parent).toContainText('Focus');
+  const title = `Menu style child ${stamp}`;
+  await page.evaluate(([id, t]) => window.__voiceListClient.command('addChild', id, { title: t }), [parentId, title]);
+  await page.getByRole('button', { name: 'Фронтир' }).click();
+  const child = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-title', { hasText: title }) });
+  await expect(child).toBeVisible(); createdTaskIds.push(await child.getAttribute('data-id'));
+  const deadlines = await openLeftMenu(child);
+  expect(deadlines.map(t => t.label)).toEqual(['Сегодня', 'Завтра', 'Три дня', 'Неделя', 'Месяц']);
+  for (const t of deadlines) { expect(t.fill).toBe('none'); expect(t.stroke).toBe('currentColor'); }
+  for (let i = 1; i < deadlines.length; i++) expect(deadlines[i].b - deadlines[i].r).toBeGreaterThan(deadlines[i - 1].b - deadlines[i - 1].r);
+});
+
 test('active swipe menu item continues as a translucent full-width band', async ({ page }) => {
   const row = await add(page, `Band UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
   const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;

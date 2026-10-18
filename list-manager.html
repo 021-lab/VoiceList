@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-9da8fd35ea7336fd">
+<meta name="preview-build-hash" content="v02-45ea791f589c542c">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1104,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-9da8fd35ea7336fd";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-45ea791f589c542c";
 </script>
 <script>
 (() => {
@@ -1567,6 +1567,24 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
 
   // src/v2/client/client.js
   var colors = { Open: "#007aff", Focus: "#ff9500", Pause: "#5856d6", Done: "#34c759", Archive: "#8e8e93", Info: "#0a84ff" };
+  var icon = (style, paths) => `<svg viewBox="0 0 24 24" width="24" height="24" ${style}>${paths.map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+  var outlineIcon = (...paths) => icon('fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"', paths);
+  var filledIcon = (...paths) => icon('fill="currentColor"', paths);
+  var deadlineMenu = [
+    [0, "\u0421\u0435\u0433\u043E\u0434\u043D\u044F", "#ff3b30", outlineIcon("M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-6 1 1 2 2 3 2 0-2-1-4 0-6z")],
+    [1, "\u0417\u0430\u0432\u0442\u0440\u0430", "#f5792a", outlineIcon("M4 12h14", "M13 6l6 6-6 6")],
+    [3, "\u0422\u0440\u0438 \u0434\u043D\u044F", "#d9a21b", outlineIcon("M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z", "M12 7v5l3 2")],
+    [7, "\u041D\u0435\u0434\u0435\u043B\u044F", "#2fa9b8", outlineIcon("M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M3 10h18", "M8 3v4", "M16 3v4")],
+    [30, "\u041C\u0435\u0441\u044F\u0446", "#3a6ff0", outlineIcon("M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z")]
+  ];
+  var tagMenu = [
+    ["\u0412\u0430\u0436\u043D\u043E\u0435", "#af52de", filledIcon("M12 2l3 6.5 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21l1.4-7L2 9.3l7-.8z")],
+    ["\u0421\u0440\u043E\u0447\u043D\u043E", "#ff2d55", filledIcon("M13 2L4 14h7l-1 8 9-12h-7z")],
+    ["\u041A\u0443\u043F\u0438\u0442\u044C", "#34c759", filledIcon("M5 8h14l-1 13H6z", "M9 8V6a3 3 0 0 1 6 0v2h-2V6a1 1 0 0 0-2 0v2z")],
+    ["\u0414\u043E\u043C", "#a2845e", filledIcon("M12 3l9 8h-3v10h-5v-6h-2v6H6V11H3z")],
+    ["\u0420\u0430\u0431\u043E\u0442\u0430", "#5856d6", filledIcon("M9 4h6a2 2 0 0 1 2 2v1h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V6a2 2 0 0 1 2-2zm0 3h6V6H9z")],
+    ["\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C", "#8e8e93", filledIcon("M6 4h4v16H6z", "M14 4h4v16h-4z")]
+  ];
   var point = (event) => ({ x: event.clientX, y: event.clientY });
   var walk = (node, fn) => {
     if (!node) return;
@@ -2570,11 +2588,12 @@ ${text}`;
           let actions = this.swipeDir < 0 ? [
             ...toggles.map((next) => [next, () => this.command("setStatus", target.taskId, { status: next }), colors[next]]),
             ["Edit", () => this.navigate("edit", { taskId: target.taskId }), "#007aff"]
-          ] : ["\u0412\u0430\u0436\u043D\u043E\u0435", "\u0421\u0440\u043E\u0447\u043D\u043E", "\u041A\u0443\u043F\u0438\u0442\u044C", "\u0414\u043E\u043C", "\u0420\u0430\u0431\u043E\u0442\u0430", "\u041E\u0442\u043B\u043E\u0436\u0438\u0442\u044C"].map((tag) => [tag, () => this.command("setTags", target.taskId, { tag }), "#5856d6"]);
-          if (this.viewContext.view === "frontier" && this.swipeDir > 0) actions = [[0, "\u0421\u0435\u0433\u043E\u0434\u043D\u044F"], [1, "\u0417\u0430\u0432\u0442\u0440\u0430"], [3, "\u0422\u0440\u0438 \u0434\u043D\u044F"], [7, "\u041D\u0435\u0434\u0435\u043B\u044F"], [30, "\u041C\u0435\u0441\u044F\u0446"]].map(([days, label]) => [label, () => this.command("setDeadline", target.taskId, { deadline: deadlineFromToday(days) }), "#5856d6"]);
+          ] : tagMenu.map(([tag, color, svg]) => [tag, () => this.command("setTags", target.taskId, { tag }), color, svg]);
+          if (this.viewContext.view === "frontier" && this.swipeDir > 0) actions = deadlineMenu.map(([days, label, color, svg]) => [label, () => this.command("setDeadline", target.taskId, { deadline: deadlineFromToday(days) }), color, svg]);
           const rowHeight = Math.min(72, (this.win.innerHeight - 80) / actions.length);
-          for (const [label, run, color] of actions) {
+          for (const [label, run, color, svg] of actions) {
             const item2 = this.node("div", { className: "panel-item" });
+            if (svg) item2.append(this.node("span", { className: "panel-icon", innerHTML: svg }));
             item2.append(this.node("span", { className: "panel-label" }, label));
             item2.style.background = color;
             item2.style.height = `${rowHeight}px`;
@@ -3635,7 +3654,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-9da8fd35ea7336fd";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-45ea791f589c542c";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
