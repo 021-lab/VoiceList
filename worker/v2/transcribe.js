@@ -5,6 +5,7 @@ import { fail } from '../../src/v2/domain/contracts.js';
  *  told the titles around the task in hand, so names already in the list come back spelled. */
 const MODEL = 'gpt-4o-transcribe';
 const PROMPT_LIMIT = 800;
+const HEADER = 'Задачи из списка:';
 const ACTIVE = new Set(['Open', 'Focus', 'Pause', 'Info']);
 const EXTENSIONS = [['audio/webm', 'webm'], ['audio/mp4', 'mp4'], ['audio/m4a', 'm4a'], ['audio/x-m4a', 'm4a'], ['audio/aac', 'mp4'], ['audio/ogg', 'ogg'], ['audio/wav', 'wav'], ['audio/mpeg', 'mp3']];
 
@@ -19,13 +20,31 @@ export function transcriptionPrompt(items = [], targetId = null) {
     ...active.filter(item => item.id !== target.id && (item.parentId === target.parentId || item.parentId === target.id))
   ] : [];
   const titles = [...new Set([...near, ...active].map(item => item.title.trim()).filter(Boolean))];
-  let prompt = 'Задачи из списка:';
+  let prompt = HEADER;
   for (const title of titles) {
-    const next = `${prompt} ${title}.`;
+    const next = `${prompt}\n${title}`;
     if (next.length > PROMPT_LIMIT) break;
     prompt = next;
   }
   return prompt;
+}
+
+const normalize = (text) => String(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/** On silence the model does not return nothing: it reads the prompt back. Seen on prod — a
+ *  second of silence came back as the whole list of titles. A reply that carries the header,
+ *  or is made almost entirely of two or more prompted titles, is that echo and counts as empty.
+ *  One title said on its own, or inside a request, is speech. */
+export function isPromptEcho(text, prompt) {
+  const said = normalize(text);
+  if (!said) return false;
+  if (said.includes(normalize(HEADER))) return true;
+  const titles = [...new Set(prompt.slice(HEADER.length).split('\n').map(normalize).filter(title => title.length >= 4))];
+  // A title inside a longer one that also matched is the same words, not a second title.
+  const matched = titles.filter(title => said.includes(title));
+  const found = matched.filter(title => !matched.some(other => other !== title && other.includes(title)));
+  const covered = found.reduce((sum, title) => sum + title.length, 0);
+  return found.length >= 2 && covered >= said.replace(/ /g, '').length * 0.8;
 }
 
 export async function transcribeOpenAI({ apiKey, audio, contentType = '', prompt = '', fetchImpl = (...args) => fetch(...args) }) {
@@ -43,5 +62,6 @@ export async function transcribeOpenAI({ apiKey, audio, contentType = '', prompt
   });
   if (!response.ok) { await response.body?.cancel(); fail('MODEL_UNAVAILABLE', `Распознавание недоступно (${response.status})`); }
   const data = await response.json();
-  return String(data.text || '').trim();
+  const text = String(data.text || '').trim();
+  return isPromptEcho(text, prompt) ? '' : text;
 }

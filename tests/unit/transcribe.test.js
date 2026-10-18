@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { transcriptionPrompt, transcribeOpenAI } from '../../worker/v2/transcribe.js';
+import { isPromptEcho, transcriptionPrompt, transcribeOpenAI } from '../../worker/v2/transcribe.js';
 
 const task = (id, title, over = {}) => ({ id, parentId: null, status: 'Open', title, ...over });
 const items = [
@@ -54,5 +54,26 @@ describe('вызов расшифровки', () => {
   it('отказ сервиса превращается в понятную ошибку', async () => {
     await expect(transcribeOpenAI({ apiKey: 'k', audio: new ArrayBuffer(1), contentType: 'audio/webm', prompt: '',
       fetchImpl: async () => ({ ok: false, status: 500, body: { cancel: async () => {} } }) })).rejects.toThrow('Распознавание недоступно (500)');
+  });
+});
+
+describe('эхо подсказки', () => {
+  const prompt = transcriptionPrompt(items, 'tt');
+  it('на тишине модель повторяет подсказку — это пустой результат (случай с прода)', () => {
+    expect(isPromptEcho(prompt, prompt)).toBe(true);
+    expect(isPromptEcho('Написать предложение для парень. Написать предложение для сестры. Провести рисёрч по сауне', prompt)).toBe(true);
+  });
+  it('сказанное название одной задачи или фраза с ним — не эхо', () => {
+    expect(isPromptEcho('Провести рисёрч по сауне', prompt)).toBe(false);
+    expect(isPromptEcho('переименуй в написать предложение для Вари', prompt)).toBe(false);
+    expect(isPromptEcho('', prompt)).toBe(false);
+  });
+  it('вложенные и повторяющиеся названия, точка в названии — не ложное эхо', () => {
+    const list = [task('a', 'Купить хлеб'), task('b', 'Купить хлеб и молоко'), task('c', 'Релиз v1.2 подготовить'), task('d', 'купить хлеб!')];
+    const p = transcriptionPrompt(list, null);
+    expect(isPromptEcho('Купить хлеб и молоко', p)).toBe(false);
+    expect(isPromptEcho('купить хлеб', p)).toBe(false);
+    expect(isPromptEcho('Релиз v1.2 подготовить', p)).toBe(false);
+    expect(isPromptEcho('Купить хлеб и молоко. Релиз v1.2 подготовить', p)).toBe(true);
   });
 });
