@@ -705,7 +705,7 @@ export class Client {
       // A side is chosen after 10% of the screen width from the swipe start. It flips after 10% back,
       // counted from where a movement within 10 degrees of horizontal began, so vertical picking
       // in the menu never flips it. 8px of vertical slack absorbs finger jitter at the start.
-      // A left swipe opens the right-hand panel and vice versa.
+      // A swipe opens the panel on its own side: left swipe, left-hand panel.
       const step = this.win.innerWidth * 0.1;
       if (!this.swipeDir) {
         if (Math.abs(delta.dx) >= step) { this.swipeDir = Math.sign(delta.dx); this.swipeEdge = p; }
@@ -715,7 +715,7 @@ export class Client {
         else if (back >= step) { this.swipeDir = -this.swipeDir; this.swipeEdge = p; }
       }
       if (!this.swipeDir) return;
-      const panel = this.swipeDir > 0 ? this.$('tag-panel') : this.$('drop-zone-panel');
+      const panel = this.swipeDir > 0 ? this.$('drop-zone-panel') : this.$('tag-panel');
       if (this.swipePanel !== panel) {
         this.swipePanel?.classList.remove('visible'); this.swipePanel = panel; this.swipeSelection = null; panel.replaceChildren();
         const status = target.node?.props.status;

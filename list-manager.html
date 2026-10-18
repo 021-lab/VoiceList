@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-d870b4dfce5c4d49">
+<meta name="preview-build-hash" content="v02-8d9681f80cf7b00b">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1104,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-d870b4dfce5c4d49";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-8d9681f80cf7b00b";
 </script>
 <script>
 (() => {
@@ -2543,7 +2543,7 @@ ${text}`;
           }
         }
         if (!this.swipeDir) return;
-        const panel = this.swipeDir > 0 ? this.$("tag-panel") : this.$("drop-zone-panel");
+        const panel = this.swipeDir > 0 ? this.$("drop-zone-panel") : this.$("tag-panel");
         if (this.swipePanel !== panel) {
           this.swipePanel?.classList.remove("visible");
           this.swipePanel = panel;
@@ -3618,7 +3618,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-d870b4dfce5c4d49";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-8d9681f80cf7b00b";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
