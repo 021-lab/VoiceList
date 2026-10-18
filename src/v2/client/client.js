@@ -702,13 +702,18 @@ export class Client {
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
     if (phase === 'move') {
-      // A side is chosen after 10% of the screen width from the swipe start, and flips after 10%
-      // back from the farthest point. A left swipe opens the right-hand panel and vice versa.
+      // A side is chosen after 10% of the screen width from the swipe start. It flips after 10% back,
+      // counted from where a movement within 10 degrees of horizontal began, so vertical picking
+      // in the menu never flips it. 8px of vertical slack absorbs finger jitter at the start.
+      // A left swipe opens the right-hand panel and vice versa.
       const step = this.win.innerWidth * 0.1;
       if (!this.swipeDir) {
-        if (Math.abs(delta.dx) >= step) { this.swipeDir = Math.sign(delta.dx); this.swipeEdge = p.x; }
-      } else if ((p.x - this.swipeEdge) * this.swipeDir > 0) this.swipeEdge = p.x;
-      else if ((this.swipeEdge - p.x) * this.swipeDir >= step) { this.swipeDir = -this.swipeDir; this.swipeEdge = p.x; }
+        if (Math.abs(delta.dx) >= step) { this.swipeDir = Math.sign(delta.dx); this.swipeEdge = p; }
+      } else {
+        const back = (this.swipeEdge.x - p.x) * this.swipeDir;
+        if (back < 0 || Math.abs(p.y - this.swipeEdge.y) > Math.max(8, back * Math.tan(Math.PI / 18))) this.swipeEdge = p;
+        else if (back >= step) { this.swipeDir = -this.swipeDir; this.swipeEdge = p; }
+      }
       if (!this.swipeDir) return;
       const panel = this.swipeDir > 0 ? this.$('tag-panel') : this.$('drop-zone-panel');
       if (this.swipePanel !== panel) {

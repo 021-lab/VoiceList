@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-a55a395c56c4b36e">
+<meta name="preview-build-hash" content="v02-9014d4de29bad8f9">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1091,7 +1091,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-a55a395c56c4b36e";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-9014d4de29bad8f9";
 </script>
 <script>
 (() => {
@@ -2519,12 +2519,15 @@ ${text}`;
         if (!this.swipeDir) {
           if (Math.abs(delta.dx) >= step) {
             this.swipeDir = Math.sign(delta.dx);
-            this.swipeEdge = p.x;
+            this.swipeEdge = p;
           }
-        } else if ((p.x - this.swipeEdge) * this.swipeDir > 0) this.swipeEdge = p.x;
-        else if ((this.swipeEdge - p.x) * this.swipeDir >= step) {
-          this.swipeDir = -this.swipeDir;
-          this.swipeEdge = p.x;
+        } else {
+          const back = (this.swipeEdge.x - p.x) * this.swipeDir;
+          if (back < 0 || Math.abs(p.y - this.swipeEdge.y) > Math.max(8, back * Math.tan(Math.PI / 18))) this.swipeEdge = p;
+          else if (back >= step) {
+            this.swipeDir = -this.swipeDir;
+            this.swipeEdge = p;
+          }
         }
         if (!this.swipeDir) return;
         const panel = this.swipeDir > 0 ? this.$("tag-panel") : this.$("drop-zone-panel");
@@ -3595,7 +3598,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-a55a395c56c4b36e";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-9014d4de29bad8f9";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

@@ -109,6 +109,22 @@ test('10% from the swipe start opens a side panel; 10% back from the farthest po
   }
 });
 
+test('reverse swipe flips the panel only after 10% of the screen within 10 degrees of horizontal', async ({ page }) => {
+  const row = await add(page, `Reverse UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
+  const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
+  const left = page.locator('#tag-panel'), right = page.locator('#drop-zone-panel');
+  const to = (share, dy = 0) => page.mouse.move(width * share, y + dy, { steps: 6 });
+  await page.mouse.move(width * 0.5, y); await page.mouse.down();
+  await to(0.65); await expect(left).toBeVisible();
+  await to(0.65, 120); await expect(left).toBeVisible(); await expect(right).toBeHidden();
+  await to(0.52, 40); await expect(left).toBeVisible(); await expect(right).toBeHidden();
+  await to(0.47, 40); await expect(left).toBeVisible(); await expect(right).toBeHidden();
+  await to(0.41, 40); await expect(right).toBeVisible(); await expect(left).toBeHidden();
+  for (let i = 1; i <= 40; i++) await page.mouse.move(width * (0.41 + i * 0.003), y + 40 + (i % 2 ? 2 : -1));
+  await expect(left).toBeVisible(); await expect(right).toBeHidden();
+  await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
+});
+
 test('top-edge swipe opens journal; native touch hold accepts voice input', async ({ page, browser }) => {
   await page.mouse.move(300, 10); await page.mouse.down(); await page.mouse.move(300, 120, { steps: 6 }); await page.mouse.up();
   await expect(page.locator('#action-log-panel')).toBeVisible();
