@@ -6,6 +6,16 @@ import { DragController } from './drag-controller.js';
 import { clientStyles } from './styles.js';
 
 const statuses = ['Open', 'Focus', 'Pause', 'Done', 'Archive', 'Info'];
+// What a failed recognition means to the person holding the task. Browser recognition listens
+// through the microphone and, in Chrome and Safari, sends the sound to the vendor's service.
+const asrErrors = {
+  denied: 'Нет доступа к микрофону — разрешите его в настройках сайта',
+  microphone: 'Микрофон не отвечает — проверьте, что он подключён и не занят другим приложением',
+  network: 'Распознавание не ответило — проверьте сеть',
+  silence: 'Речь не расслышана — попробуйте ещё раз',
+  timeout: 'Речь не расслышана — попробуйте ещё раз',
+  aborted: 'Распознавание прервалось — попробуйте ещё раз'
+};
 const colors = { Open: '#007aff', Focus: '#ff9500', Pause: '#5856d6', Done: '#34c759', Archive: '#8e8e93', Info: '#0a84ff' };
 const icon = (style, paths) => `<svg viewBox="0 0 24 24" width="24" height="24" ${style}>${paths.map((d) => `<path d="${d}"/>`).join('')}</svg>`;
 const outlineIcon = (...paths) => icon('fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"', paths);
@@ -645,7 +655,7 @@ export class Client {
     voice.asr.start({
       onInterim: (text) => { voice.text = text; if (this.voice === voice) overlay.textContent = voice.final ? `${voice.final} ${text}` : text; },
       onFinal: (text) => { voice.final = text; voice.text = text; if (this.voice === voice) overlay.textContent = text; },
-      onError: (code) => { voice.error = true; if (this.voice === voice) overlay.textContent = code === 'denied' ? 'Микрофон недоступен' : 'Не удалось распознать речь'; }
+      onError: (code) => { voice.error = asrErrors[code] || asrErrors.aborted; if (this.voice === voice) overlay.textContent = voice.error; }
     });
     voice.asr.speak?.();
   }
@@ -683,10 +693,10 @@ export class Client {
       }
       // Editing mode is also the text-input fallback. Keep its focused editor
       // open when recognition yields no text or reports an error.
-      if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.');
+      if (voice.error) this.showToast(`Речь не отправлена. ${voice.error}.`);
       return;
     }
-    if (!text || voice.error) { if (voice.error) this.showToast('Речь не отправлена: проверьте доступ к микрофону.'); return; }
+    if (!text || voice.error) { if (voice.error) this.showToast(`Речь не отправлена. ${voice.error}.`); return; }
     await this.handleInput({ text, context: this.context(target) });
   }
   editTranscript(text, target) {

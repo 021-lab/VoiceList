@@ -50,6 +50,26 @@ describe('server component Client', () => {
     expect(posts[0]).toMatchObject({ text: 'назови это новая задача', context: { elementId: 'task:one', revision: 3 } });
     expect(posts[0].command).toBeUndefined();
   });
+  it('names the real reason when recognition fails, not always the microphone', async () => {
+    const reasons = {
+      denied: 'Нет доступа к микрофону — разрешите его в настройках сайта',
+      microphone: 'Микрофон не отвечает — проверьте, что он подключён и не занят другим приложением',
+      network: 'Распознавание не ответило — проверьте сеть',
+      silence: 'Речь не расслышана — попробуйте ещё раз',
+      timeout: 'Речь не расслышана — попробуйте ещё раз',
+      aborted: 'Распознавание прервалось — попробуйте ещё раз'
+    };
+    const fetcher = vi.fn(async () => response(documentTree())); create(fetcher).render(documentTree());
+    for (const [code, message] of Object.entries(reasons)) {
+      client.asrFactory = () => ({ start: (handlers) => handlers.onError(code), stop: async () => {} });
+      const target = { id: 'task:one', element: document.querySelector('[data-id="one"]') };
+      client.startVoice(target, { x: 100, y: 200 });
+      expect(document.getElementById('v02-transcript').textContent).toBe(message);
+      await client.finishVoice(target);
+      expect([...document.querySelectorAll('.v02-toast')].at(-1).textContent).toContain(message);
+    }
+    expect(fetcher.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
+  });
   it('downward edit keeps transcript local until Send, Cancel sends nothing', async () => {
     const fetcher = vi.fn(async () => response(documentTree())); create(fetcher).render(documentTree());
     client.asrFactory = () => new MockASR({ phrase: 'исправь задачу' });

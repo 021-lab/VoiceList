@@ -3,6 +3,12 @@
 
 'use strict';
 
+// Speech recognition errors, by what the person can do about them.
+const ERROR_CODES = {
+  'not-allowed': 'denied', 'service-not-allowed': 'denied', 'audio-capture': 'microphone',
+  network: 'network', 'no-speech': 'silence'
+};
+
 class BrowserASR {
   constructor({ recognitionFactory = null, finalTimeoutMs = 1500 } = {}) {
     this.recognitionFactory = recognitionFactory;
@@ -48,7 +54,7 @@ class BrowserASR {
       }
     };
     recognition.onerror = (event) => {
-      const code = event.error === 'not-allowed' || event.error === 'service-not-allowed' ? 'denied' : 'aborted';
+      const code = ERROR_CODES[event.error] || 'aborted';
       handlers.onError(code);
     };
 
