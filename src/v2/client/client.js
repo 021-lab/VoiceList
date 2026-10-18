@@ -701,24 +701,25 @@ export class Client {
   }
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
-    // Within 10% of the screen width from the touch nothing opens. A left swipe opens the
-    // right-hand panel and a right swipe the left-hand one, so the menu is never under the finger.
-    const inDeadZone = Math.abs(delta.dx) < this.win.innerWidth * 0.1;
-    const panel = delta.dx >= 0 ? this.$('tag-panel') : this.$('drop-zone-panel');
-    if (phase === 'move' && inDeadZone) {
-      this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null;
-      return;
-    }
     if (phase === 'move') {
+      // A side is chosen after 10% of the screen width from the swipe start, and flips after 10%
+      // back from the farthest point. A left swipe opens the right-hand panel and vice versa.
+      const step = this.win.innerWidth * 0.1;
+      if (!this.swipeDir) {
+        if (Math.abs(delta.dx) >= step) { this.swipeDir = Math.sign(delta.dx); this.swipeEdge = p.x; }
+      } else if ((p.x - this.swipeEdge) * this.swipeDir > 0) this.swipeEdge = p.x;
+      else if ((this.swipeEdge - p.x) * this.swipeDir >= step) { this.swipeDir = -this.swipeDir; this.swipeEdge = p.x; }
+      if (!this.swipeDir) return;
+      const panel = this.swipeDir > 0 ? this.$('tag-panel') : this.$('drop-zone-panel');
       if (this.swipePanel !== panel) {
-        this.swipePanel?.classList.remove('visible'); this.swipePanel = panel; panel.replaceChildren();
+        this.swipePanel?.classList.remove('visible'); this.swipePanel = panel; this.swipeSelection = null; panel.replaceChildren();
         const status = target.node?.props.status;
         const toggles = ['Done', status === 'Pause' ? 'Open' : 'Pause', status === 'Focus' ? 'Open' : 'Focus', status === 'Info' ? 'Open' : 'Info', 'Archive'];
-        let actions = delta.dx >= 0 ? [
+        let actions = this.swipeDir > 0 ? [
           ...toggles.map((next) => [next, () => this.command('setStatus', target.taskId, { status: next }), colors[next]]),
           ['Edit', () => this.navigate('edit', { taskId: target.taskId }), '#007aff']
         ] : ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'].map((tag) => [tag, () => this.command('setTags', target.taskId, { tag }), '#5856d6']);
-        if (this.viewContext.view === 'frontier' && delta.dx < 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
+        if (this.viewContext.view === 'frontier' && this.swipeDir < 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
         const rowHeight = Math.min(72, (this.win.innerHeight - 80) / actions.length);
         for (const [label, run, color] of actions) {
           const item = this.node('div', { className: 'panel-item' }); item.append(this.node('span', { className: 'panel-label' }, label));
@@ -732,7 +733,7 @@ export class Client {
       return;
     }
     if (phase === 'end') this.swipeSelection?.runAction?.();
-    this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null;
+    this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null; this.swipeDir = 0;
   }
   /** Read-only bridge for the reused Realtime transport, not a client task store. */
   getTaskState() { return { snapshot: { items: [...this.nodes.values()].filter((node) => node.type === 'task').map((node) => ({ ...node.props, id: node.props.taskId })) } }; }

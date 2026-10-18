@@ -91,20 +91,22 @@ test('frontier: left swipe on any task sets a deadline', async ({ page }) => {
   await expect(row.locator('.item-deadline')).toHaveText('1');
 });
 
-test('swipe within 10% of the screen from the touch is a dead zone; beyond it opens the opposite-side panel', async ({ page }) => {
+test('10% from the swipe start opens a side panel; 10% back from the farthest point flips to the other one', async ({ page }) => {
   const row = await add(page, `Dead zone UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
   const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
-  const visible = page.locator('.swipe-panel.visible');
-  for (const from of [0.2, 0.5, 0.8]) for (const dir of [1, -1]) {
-    await page.mouse.move(width * from, y); await page.mouse.down();
-    await page.mouse.move(width * (from + dir * 0.08), y, { steps: 6 }); await expect(visible).toHaveCount(0);
-    await page.mouse.move(width * (from + dir * 0.15), y, { steps: 4 });
-    const panel = page.locator(dir > 0 ? '#tag-panel' : '#drop-zone-panel'); await expect(panel).toBeVisible();
-    const box = await panel.boundingBox(); expect(dir > 0 ? box.x : width - box.x - box.width).toBeLessThan(1);
-    await page.mouse.move(width * (from + dir * 0.05), y, { steps: 4 }); await expect(visible).toHaveCount(0);
-    await page.mouse.up();
+  const left = page.locator('#tag-panel'), right = page.locator('#drop-zone-panel'), visible = page.locator('.swipe-panel.visible');
+  const to = (share) => page.mouse.move(width * share, y, { steps: 4 });
+  for (const dir of [1, -1]) {
+    const opened = dir > 0 ? left : right, other = dir > 0 ? right : left;
+    await page.mouse.move(width * 0.5, y); await page.mouse.down();
+    await to(0.5 + dir * 0.08); await expect(visible).toHaveCount(0);
+    await to(0.5 + dir * 0.12); await expect(opened).toBeVisible();
+    const box = await opened.boundingBox(); expect(dir > 0 ? box.x : width - box.x - box.width).toBeLessThan(1);
+    await to(0.5 + dir * 0.2); await to(0.5 + dir * 0.13); await expect(opened).toBeVisible(); await expect(other).toBeHidden();
+    await to(0.5 + dir * 0.09); await expect(other).toBeVisible(); await expect(opened).toBeHidden();
+    await to(0.5 - dir * 0.1); await to(0.5 + dir * 0.01); await expect(opened).toBeVisible(); await expect(other).toBeHidden();
+    await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up(); await expect(visible).toHaveCount(0);
   }
-  await expect(row).toContainText('Open');
 });
 
 test('top-edge swipe opens journal; native touch hold accepts voice input', async ({ page, browser }) => {
