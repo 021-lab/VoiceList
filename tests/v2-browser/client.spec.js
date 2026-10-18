@@ -29,12 +29,12 @@ async function add(page, title) {
   const row = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-title', { hasText: title }) });
   await expect(row).toBeVisible(); createdTaskIds.push(await row.getAttribute('data-id')); return row;
 }
-async function swipe(page, row, label, direction = 1) {
+async function swipe(page, row, label, direction = -1) {
   await row.scrollIntoViewIfNeeded(); const rect = await row.boundingBox();
   const startX = rect.x + rect.width / 2, endX = startX + direction * page.viewportSize().width * 0.3;
   await page.mouse.move(startX, rect.y + rect.height / 2); await page.mouse.down();
   await page.mouse.move(endX, rect.y + rect.height / 2, { steps: 8 });
-  const item = page.locator(`${direction > 0 ? '#drop-zone-panel' : '#tag-panel'} .panel-item`).filter({ hasText: label });
+  const item = page.locator(`${direction > 0 ? '#tag-panel' : '#drop-zone-panel'} .panel-item`).filter({ hasText: label });
   await expect(item).toBeVisible(); const target = await item.boundingBox();
   await page.mouse.move(endX, target.y + target.height / 2, { steps: 5 }); await expect(item).toHaveClass(/active/);
   await page.mouse.up();
@@ -77,7 +77,7 @@ test('actual server flow: create, edit, status, journal, correction chain rollba
   expect(errors).toEqual([]);
 });
 
-test('frontier: left swipe on any task sets a deadline', async ({ page }) => {
+test('frontier: right swipe on any task sets a deadline', async ({ page }) => {
   const stamp = Date.now(); const parent = await add(page, `Deadline parent ${stamp}`); const parentId = await parent.getAttribute('data-id');
   await swipe(page, parent.locator('.list-item'), 'Focus'); await expect(parent).toContainText('Focus');
   const title = `Deadline UAT ${stamp}`;
@@ -85,43 +85,46 @@ test('frontier: left swipe on any task sets a deadline', async ({ page }) => {
   await page.getByRole('button', { name: 'Фронтир' }).click();
   const row = page.locator('.list-item-wrapper').filter({ has: page.locator('.item-title', { hasText: title }) });
   await expect(row).toContainText('Open'); createdTaskIds.push(await row.getAttribute('data-id'));
-  await swipe(page, row.locator('.list-item'), 'Завтра', -1);
+  await swipe(page, row.locator('.list-item'), 'Завтра', 1);
   await expect(row.locator('.item-deadline')).toHaveText('1');
   await page.reload(); await page.getByRole('button', { name: 'Фронтир' }).click();
   await expect(row.locator('.item-deadline')).toHaveText('1');
 });
 
-test('10% from the swipe start opens a side panel; 10% back from the farthest point flips to the other one', async ({ page }) => {
-  const row = await add(page, `Dead zone UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
+test('10% from the start opens a menu; 5% back from the farthest point closes it, 20% more opens the opposite one', async ({ page }) => {
+  const row = await add(page, `Swipe menus UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
   const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
-  const left = page.locator('#tag-panel'), right = page.locator('#drop-zone-panel'), visible = page.locator('.swipe-panel.visible');
+  const leftMenu = page.locator('#tag-panel'), rightMenu = page.locator('#drop-zone-panel'), visible = page.locator('.swipe-panel.visible');
   const to = (share) => page.mouse.move(width * share, y, { steps: 4 });
   for (const dir of [1, -1]) {
-    const opened = dir > 0 ? right : left, other = dir > 0 ? left : right;
+    const opened = dir > 0 ? leftMenu : rightMenu, other = dir > 0 ? rightMenu : leftMenu;
     await page.mouse.move(width * 0.5, y); await page.mouse.down();
     await to(0.5 + dir * 0.08); await expect(visible).toHaveCount(0);
     await to(0.5 + dir * 0.12); await expect(opened).toBeVisible();
-    const box = await opened.boundingBox(); expect(dir > 0 ? width - box.x - box.width : box.x).toBeLessThan(1);
-    await to(0.5 + dir * 0.2); await to(0.5 + dir * 0.13); await expect(opened).toBeVisible(); await expect(other).toBeHidden();
-    await to(0.5 + dir * 0.09); await expect(other).toBeVisible(); await expect(opened).toBeHidden();
-    await to(0.5 - dir * 0.1); await to(0.5 + dir * 0.01); await expect(opened).toBeVisible(); await expect(other).toBeHidden();
+    const box = await opened.boundingBox(); expect(dir > 0 ? box.x : width - box.x - box.width).toBeLessThan(1);
+    await expect(opened).toContainText(dir > 0 ? 'Важное' : 'Done');
+    await to(0.5 + dir * 0.25); await to(0.5 + dir * 0.215); await expect(opened).toBeVisible();
+    await to(0.5 + dir * 0.19); await expect(visible).toHaveCount(0); await expect(page.locator('#swipe-band')).toBeHidden();
+    await to(0.5 + dir * 0.03); await expect(visible).toHaveCount(0);
+    await to(0.5 - dir * 0.03); await expect(other).toBeVisible(); await expect(opened).toBeHidden();
     await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up(); await expect(visible).toHaveCount(0);
   }
 });
 
-test('reverse swipe flips the panel only after 10% of the screen within 10 degrees of horizontal', async ({ page }) => {
+test('reverse swipe counts only movement within 20 degrees of horizontal', async ({ page }) => {
   const row = await add(page, `Reverse UAT ${Date.now()}`); await row.scrollIntoViewIfNeeded();
   const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
-  const first = page.locator('#drop-zone-panel'), second = page.locator('#tag-panel');
+  const leftMenu = page.locator('#tag-panel'), rightMenu = page.locator('#drop-zone-panel'), visible = page.locator('.swipe-panel.visible');
   const to = (share, dy = 0) => page.mouse.move(width * share, y + dy, { steps: 6 });
   await page.mouse.move(width * 0.5, y); await page.mouse.down();
-  await to(0.65); await expect(first).toBeVisible();
-  await to(0.65, 120); await expect(first).toBeVisible(); await expect(second).toBeHidden();
-  await to(0.52, 40); await expect(first).toBeVisible(); await expect(second).toBeHidden();
-  await to(0.47, 40); await expect(first).toBeVisible(); await expect(second).toBeHidden();
-  await to(0.41, 40); await expect(second).toBeVisible(); await expect(first).toBeHidden();
-  for (let i = 1; i <= 40; i++) await page.mouse.move(width * (0.41 + i * 0.003), y + 40 + (i % 2 ? 2 : -1));
-  await expect(first).toBeVisible(); await expect(second).toBeHidden();
+  await to(0.65); await expect(leftMenu).toBeVisible();
+  await to(0.65, 120); await expect(leftMenu).toBeVisible();
+  await to(0.55, 60); await expect(leftMenu).toBeVisible();
+  await to(0.51, 60); await expect(leftMenu).toBeVisible();
+  await to(0.49, 60); await expect(visible).toHaveCount(0);
+  await to(0.27, 60); await expect(rightMenu).toBeVisible(); await expect(leftMenu).toBeHidden();
+  for (let i = 1; i <= 100; i++) await page.mouse.move(width * (0.27 + i * 0.003), y + 60 + (i % 2 ? 2 : -1));
+  await expect(leftMenu).toBeVisible(); await expect(rightMenu).toBeHidden();
   await page.evaluate(() => window.__voiceListClient.gesture.cancel()); await page.mouse.up();
 });
 
@@ -130,7 +133,7 @@ test('active swipe menu item continues as a translucent full-width band', async 
   const rect = await row.boundingBox(); const width = page.viewportSize().width; const y = rect.y + rect.height / 2;
   const band = page.locator('#swipe-band');
   await page.mouse.move(width * 0.5, y); await page.mouse.down(); await page.mouse.move(width * 0.65, y, { steps: 6 });
-  const item = page.locator('#drop-zone-panel .panel-item.active'); await expect(item).toHaveCount(1); await expect(band).toBeVisible();
+  const item = page.locator('#tag-panel .panel-item.active'); await expect(item).toHaveCount(1); await expect(band).toBeVisible();
   const [b, i] = [await band.boundingBox(), await item.boundingBox()];
   expect(b.x).toBe(0); expect(b.width).toBe(width); expect(Math.abs(b.y - i.y)).toBeLessThan(1); expect(Math.abs(b.height - i.height)).toBeLessThan(1);
   expect(await band.evaluate(e => getComputedStyle(e).backgroundColor)).toBe(await item.evaluate(e => getComputedStyle(e).backgroundColor));

@@ -702,29 +702,39 @@ export class Client {
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
     if (phase === 'move') {
-      // A side is chosen after 10% of the screen width from the swipe start. It flips after 10% back,
-      // counted from where a movement within 10 degrees of horizontal began, so vertical picking
-      // in the menu never flips it. 8px of vertical slack absorbs finger jitter at the start.
-      // A swipe opens the panel on its own side: left swipe, left-hand panel.
-      const step = this.win.innerWidth * 0.1;
+      // Rules: docs/Voice-Interface-v0.2-Specification.md, «Боковые меню свайпа». A menu opens 10% of
+      // the screen width from the touch. Moving back within 20 degrees of horizontal closes it after 5%
+      // from the farthest point and opens the opposite one after 20% more. A steeper move restarts the
+      // count, so picking an item vertically never closes the menu; 8px of slack absorbs finger jitter.
+      const width = this.win.innerWidth;
+      const drift = (from, run) => Math.abs(p.y - from.y) > Math.max(8, run * Math.tan(Math.PI / 9));
       if (!this.swipeDir) {
-        if (Math.abs(delta.dx) >= step) { this.swipeDir = Math.sign(delta.dx); this.swipeEdge = p; }
-      } else {
+        if (Math.abs(delta.dx) >= width * 0.1) { this.swipeDir = Math.sign(delta.dx); this.swipeOpen = true; this.swipeEdge = p; }
+      } else if (this.swipeOpen) {
         const back = (this.swipeEdge.x - p.x) * this.swipeDir;
-        if (back < 0 || Math.abs(p.y - this.swipeEdge.y) > Math.max(8, back * Math.tan(Math.PI / 18))) this.swipeEdge = p;
-        else if (back >= step) { this.swipeDir = -this.swipeDir; this.swipeEdge = p; }
+        if (back < 0 || drift(this.swipeEdge, back)) this.swipeEdge = p;
+        else if (back >= width * 0.05) { this.swipeOpen = false; this.swipeEdge = p; }
+      } else {
+        const run = p.x - this.swipeEdge.x;
+        if (drift(this.swipeEdge, Math.abs(run))) this.swipeEdge = p;
+        else if (Math.abs(run) >= width * 0.2) { this.swipeDir = Math.sign(run); this.swipeOpen = true; this.swipeEdge = p; }
       }
-      if (!this.swipeDir) return;
-      const panel = this.swipeDir > 0 ? this.$('drop-zone-panel') : this.$('tag-panel');
+      if (!this.swipeOpen) {
+        this.$('swipe-band').classList.remove('visible');
+        this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null;
+        return;
+      }
+      // Left swipe: statuses on the right. Right swipe: deadlines (Frontier) or tags on the left.
+      const panel = this.swipeDir < 0 ? this.$('drop-zone-panel') : this.$('tag-panel');
       if (this.swipePanel !== panel) {
         this.swipePanel?.classList.remove('visible'); this.swipePanel = panel; this.swipeSelection = null; panel.replaceChildren();
         const status = target.node?.props.status;
         const toggles = ['Done', status === 'Pause' ? 'Open' : 'Pause', status === 'Focus' ? 'Open' : 'Focus', status === 'Info' ? 'Open' : 'Info', 'Archive'];
-        let actions = this.swipeDir > 0 ? [
+        let actions = this.swipeDir < 0 ? [
           ...toggles.map((next) => [next, () => this.command('setStatus', target.taskId, { status: next }), colors[next]]),
           ['Edit', () => this.navigate('edit', { taskId: target.taskId }), '#007aff']
         ] : ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'].map((tag) => [tag, () => this.command('setTags', target.taskId, { tag }), '#5856d6']);
-        if (this.viewContext.view === 'frontier' && this.swipeDir < 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
+        if (this.viewContext.view === 'frontier' && this.swipeDir > 0) actions = [[0, 'Сегодня'], [1, 'Завтра'], [3, 'Три дня'], [7, 'Неделя'], [30, 'Месяц']].map(([days, label]) => [label, () => this.command('setDeadline', target.taskId, { deadline: deadlineFromToday(days) }), '#5856d6']);
         const rowHeight = Math.min(72, (this.win.innerHeight - 80) / actions.length);
         for (const [label, run, color] of actions) {
           const item = this.node('div', { className: 'panel-item' }); item.append(this.node('span', { className: 'panel-label' }, label));
@@ -745,7 +755,7 @@ export class Client {
     }
     if (phase === 'end') this.swipeSelection?.runAction?.();
     this.$('swipe-band').classList.remove('visible');
-    this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null; this.swipeDir = 0;
+    this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null; this.swipeDir = 0; this.swipeOpen = false;
   }
   /** Read-only bridge for the reused Realtime transport, not a client task store. */
   getTaskState() { return { snapshot: { items: [...this.nodes.values()].filter((node) => node.type === 'task').map((node) => ({ ...node.props, id: node.props.taskId })) } }; }
