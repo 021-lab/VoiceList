@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-071fe2d40a7a712d">
+<meta name="preview-build-hash" content="v02-6ca8c6878986ced7">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1091,7 +1091,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-071fe2d40a7a712d";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-6ca8c6878986ced7";
 </script>
 <script>
 (() => {
@@ -2514,10 +2514,9 @@ ${text}`;
     }
     swipe(phase, target, p, delta) {
       if (!target.taskId) return;
-      const x = p.x / this.win.innerWidth;
-      const inZone = delta.dx < 0 ? x < 0.35 : delta.dx > 0 && x > 0.65;
-      const panel = delta.dx >= 0 ? this.$("drop-zone-panel") : this.$("tag-panel");
-      if (phase === "move" && !inZone) {
+      const inDeadZone = Math.abs(delta.dx) < this.win.innerWidth * 0.1;
+      const panel = delta.dx >= 0 ? this.$("tag-panel") : this.$("drop-zone-panel");
+      if (phase === "move" && inDeadZone) {
         this.swipePanel?.classList.remove("visible");
         this.swipePanel = null;
         this.swipeSelection = null;
@@ -3589,7 +3588,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-071fe2d40a7a712d";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-6ca8c6878986ced7";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

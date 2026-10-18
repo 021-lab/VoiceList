@@ -701,11 +701,11 @@ export class Client {
   }
   swipe(phase, target, p, delta) {
     if (!target.taskId) return;
-    // The middle 30% of the screen is a dead zone: neither panel opens while the finger is there.
-    const x = p.x / this.win.innerWidth;
-    const inZone = delta.dx < 0 ? x < 0.35 : delta.dx > 0 && x > 0.65;
-    const panel = delta.dx >= 0 ? this.$('drop-zone-panel') : this.$('tag-panel');
-    if (phase === 'move' && !inZone) {
+    // Within 10% of the screen width from the touch nothing opens. A left swipe opens the
+    // right-hand panel and a right swipe the left-hand one, so the menu is never under the finger.
+    const inDeadZone = Math.abs(delta.dx) < this.win.innerWidth * 0.1;
+    const panel = delta.dx >= 0 ? this.$('tag-panel') : this.$('drop-zone-panel');
+    if (phase === 'move' && inDeadZone) {
       this.swipePanel?.classList.remove('visible'); this.swipePanel = null; this.swipeSelection = null;
       return;
     }
