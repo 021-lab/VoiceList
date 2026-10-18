@@ -70,6 +70,20 @@ describe('server component Client', () => {
     }
     expect(fetcher.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0);
   });
+  it('sends what was recognised even when recognition fails after it', async () => {
+    const posts = [];
+    create(async (url, options) => { if (options?.method === 'POST') { posts.push(JSON.parse(options.body)); return response({ status: 'completed', requestId: 'e1' }); } return response(documentTree()); });
+    client.render(documentTree());
+    client.asrFactory = () => ({ start: (handlers) => { handlers.onFinal('купи хлеб'); handlers.onError('network'); }, stop: async () => {} });
+    const target = { id: 'task:one', element: document.querySelector('[data-id="one"]') };
+    client.startVoice(target, { x: 100, y: 200 });
+    await client.finishVoice(target);
+    expect(posts).toHaveLength(1); expect(posts[0].text).toBe('купи хлеб');
+    expect(document.querySelectorAll('.v02-toast')).toHaveLength(0);
+    client.startVoice(target, { x: 100, y: 200 }); await client.finishVoice(target, true);
+    expect(document.getElementById('transcript-edit-input').value).toBe('купи хлеб');
+    expect(document.querySelectorAll('.v02-toast')).toHaveLength(0);
+  });
   it('downward edit keeps transcript local until Send, Cancel sends nothing', async () => {
     const fetcher = vi.fn(async () => response(documentTree())); create(fetcher).render(documentTree());
     client.asrFactory = () => new MockASR({ phrase: 'исправь задачу' });

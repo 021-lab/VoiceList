@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-6a03ada3835190c5">
+<meta name="preview-build-hash" content="v02-c86b15ee253d8f91">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1104,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-6a03ada3835190c5";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-c86b15ee253d8f91";
 </script>
 <script>
 (() => {
@@ -2458,7 +2458,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         },
         onError: (code) => {
           voice.error = asrErrors[code] || asrErrors.aborted;
-          if (this.voice === voice) overlay.textContent = voice.error;
+          if (this.voice === voice && !(voice.final || voice.text)) overlay.textContent = voice.error;
         }
       });
       voice.asr.speak?.();
@@ -2493,15 +2493,15 @@ ${text}`;
         if (this.$("v02-transcript")) this.$("v02-transcript").hidden = true;
       }
       if (edit) {
-        if (text && !voice.error && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
+        if (text && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
           editor.input.value = text;
           const end = editor.input.value.length;
           editor.input.setSelectionRange(end, end);
         }
-        if (voice.error) this.showToast(`\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430. ${voice.error}.`);
+        if (!text && voice.error) this.showToast(`\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430. ${voice.error}.`);
         return;
       }
-      if (!text || voice.error) {
+      if (!text) {
         if (voice.error) this.showToast(`\u0420\u0435\u0447\u044C \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430. ${voice.error}.`);
         return;
       }
@@ -3661,7 +3661,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-6a03ada3835190c5";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-c86b15ee253d8f91";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({

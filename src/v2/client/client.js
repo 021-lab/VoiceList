@@ -655,7 +655,7 @@ export class Client {
     voice.asr.start({
       onInterim: (text) => { voice.text = text; if (this.voice === voice) overlay.textContent = voice.final ? `${voice.final} ${text}` : text; },
       onFinal: (text) => { voice.final = text; voice.text = text; if (this.voice === voice) overlay.textContent = text; },
-      onError: (code) => { voice.error = asrErrors[code] || asrErrors.aborted; if (this.voice === voice) overlay.textContent = voice.error; }
+      onError: (code) => { voice.error = asrErrors[code] || asrErrors.aborted; if (this.voice === voice && !(voice.final || voice.text)) overlay.textContent = voice.error; }
     });
     voice.asr.speak?.();
   }
@@ -686,17 +686,18 @@ export class Client {
     if (edit) {
       // A final ASR result may arrive during stop(). Apply it only while the
       // user has not changed the draft that was shown on release.
-      if (text && !voice.error && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
+      if (text && this.transcriptEditor === editor.overlay && editor.input.value === initialDraft) {
         editor.input.value = text;
         const end = editor.input.value.length;
         editor.input.setSelectionRange(end, end);
       }
       // Editing mode is also the text-input fallback. Keep its focused editor
       // open when recognition yields no text or reports an error.
-      if (voice.error) this.showToast(`Речь не отправлена. ${voice.error}.`);
+      if (!text && voice.error) this.showToast(`Речь не отправлена. ${voice.error}.`);
       return;
     }
-    if (!text || voice.error) { if (voice.error) this.showToast(`Речь не отправлена. ${voice.error}.`); return; }
+    // What was recognised is sent even if recognition failed after it: the words are the person's.
+    if (!text) { if (voice.error) this.showToast(`Речь не отправлена. ${voice.error}.`); return; }
     await this.handleInput({ text, context: this.context(target) });
   }
   editTranscript(text, target) {
