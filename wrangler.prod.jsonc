@@ -18,5 +18,5 @@
   "durable_objects": { "bindings": [{ "name": "LIST_DOCUMENT", "class_name": "ListDocumentDO" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ListDocumentDO"] }],
   "observability": { "enabled": true },
-  "vars": { "AGENT_MODEL": "gpt-4.1-mini", "MCP_ALLOWED_HOSTS": "vlist-v02-prod.smileme.ai" }
+  "vars": { "AGENT_MODEL": "gpt-6-luna", "MCP_ALLOWED_HOSTS": "vlist-v02-prod.smileme.ai" }
 }
