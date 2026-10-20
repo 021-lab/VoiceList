@@ -97,10 +97,10 @@ describe('вызов модели', () => {
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
     return { body: { getReader: () => { let done = false; return { read: async () => done ? { done: true } : (done = true, { done: false, value: bytes }), cancel: async () => {} }; } } };
   };
-  async function call(modelContext, message = { content: '' }) {
+  async function call(modelContext, message = { content: '' }, model = 'gpt-4.1-mini') {
     let sent = null;
     const answer = await resolveOpenAI({
-      apiKey: 'k', model: 'gpt-4.1-mini', correctionModel: 'gpt-5.6-sol', modelContext,
+      apiKey: 'k', model, correctionModel: 'gpt-5.6-sol', modelContext,
       fetchImpl: async (url, options) => {
         sent = JSON.parse(options.body);
         return { ok: true, ...stubBody({ choices: [{ message }] }) };
@@ -111,11 +111,27 @@ describe('вызов модели', () => {
   const toolCall = (name, args) => ({ id: 'c1', type: 'function', function: { name, arguments: JSON.stringify(args) } });
 
   it('обычная реплика и коррекция получают инструменты голосовых моделей, без JSON-формата', async () => {
-    for (const sent of [await call({ text: 'добавь хлеб', tasks: [] }), await call(context())]) {
+    const voice = ['addItem', 'addChild', 'addInfo', 'setStatus', 'setDeadline', 'editItem', 'setParent'];
+    const text = await call({ text: 'добавь хлеб', tasks: [] });
+    const correction = await call(context());
+    for (const sent of [text, correction]) {
       expect(sent).not.toHaveProperty('response_format');
-      expect(sent.tools.map(tool => tool.function.name)).toEqual(['addItem', 'addChild', 'addInfo', 'setStatus', 'setDeadline', 'editItem', 'setParent']);
       expect(sent.tools.find(tool => tool.function.name === 'editItem').function.parameters.required).toEqual(['taskId', 'title']);
     }
+    expect(text.tools.map(tool => tool.function.name)).toEqual([...voice, 'notDone']);
+    expect(correction.tools.map(tool => tool.function.name)).toEqual(voice);
+  });
+
+  it('notDone не становится командой, а попадает в ответ как невыполненное', async () => {
+    const { answer } = await call({ text: 'готово и включи музыку', target: 'r2', tasks: [] },
+      { content: null, tool_calls: [toolCall('setStatus', { taskId: 'r2', status: 'Done' }), toolCall('notDone', { parts: ['включи музыку'] })] });
+    expect(answer.commands.map(command => command.command)).toEqual(['setStatus']);
+    expect(answer.answer).toBe('Не выполнено: включи музыку');
+  });
+
+  it('текстовая модель отвечает без рассуждений, коррекция — с ними', async () => {
+    expect((await call({ text: 'добавь хлеб', tasks: [] }, undefined, 'gpt-6-luna')).reasoning_effort).toBe('none');
+    expect(await call(context(), undefined, 'gpt-6-luna')).not.toHaveProperty('reasoning_effort');
   });
 
   it('вызов инструмента становится командой с payload — случай с переименованием', async () => {
