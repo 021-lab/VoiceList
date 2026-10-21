@@ -1,0 +1,5 @@
+// Benchmark proxy for scripts/eval-text-agent.mjs --provider workers-ai. Not part of the app.
+// Deploy: npx wrangler deploy -c scripts/ai-bench-worker/wrangler.jsonc, then
+// npx wrangler secret put BENCH_KEY -c scripts/ai-bench-worker/wrangler.jsonc;
+// run the eval with AI_BENCH_URL=<worker url> AI_BENCH_KEY=<the key>.
+{ "name": "vlist-ai-bench", "main": "index.js", "compatibility_date": "2026-09-01", "ai": { "binding": "AI" }, "workers_dev": true }

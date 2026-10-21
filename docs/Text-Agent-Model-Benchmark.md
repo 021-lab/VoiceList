@@ -68,3 +68,31 @@
       node scripts/eval-text-agent.mjs --provider ollama --model $m --concurrency 1 \
         --params '{"store":null,"reasoning_effort":null,"temperature":0,"seed":1}' --quiet
     done
+
+## Модели на Cloudflare Workers AI (2026-10-21)
+
+Запросы идут через тестовый воркер `vlist-ai-bench` (`scripts/ai-bench-worker/`): он
+принимает тот же запрос, что прод шлёт в OpenAI, вызывает `env.AI.run` и отдаёт время
+вывода внутри Cloudflare (**В Cloudflare**). **Полное** — от облачного контейнера и обратно.
+Всем моделям: temperature 0, seed 1, рассуждения выключены там, где модель это принимает.
+По одному прогону корпуса: дневной лимит бесплатного тарифа (10 000 нейронов) кончился на
+девятой модели.
+
+| Модель | Рассуждения | Верно из 45 | Ошибок API | В Cloudflare, медиана мс | В Cloudflare, p90 мс | Полное, медиана мс | Цена $/1M | Примечание |
+|---|---|---|---|---|---|---|---|---|
+| @cf/google/gemma-4-26b-a4b-it | none, enable_thinking=false | 42 | 1 | 775 | 4365 | 1098 | 0.10 / 0.30 |  |
+| @cf/qwen/qwen3.8-27b | none, enable_thinking=false | 38 | 5 | 1508 | 14468 | 1603 | 0.45 / 3.20 | 5 ошибок 502 — кончился дневной лимит |
+| @cf/meta/llama-3.3-70b-instruct-fp8-fast | — | 34 | 0 | 1652 | 2607 | 1865 | 0.29 / 2.25 |  |
+| @cf/mistralai/mistral-small-3.1-24b-instruct | — | 32 | 0 | 1289 | 2439 | 1414 | 0.35 / 0.56 |  |
+| @cf/zai-org/glm-4.7-flash | —, enable_thinking=false | 32 | 3 | 995 | 9923 | 1170 | 0.06 / 0.40 |  |
+| @cf/meta/llama-4-scout-17b-16e-instruct | — | 20 | 0 | 3559 | 4689 | 3783 | 0.27 / 0.85 |  |
+| @cf/openai/gpt-oss-20b | low | 3 | 0 | 1225 | 1861 | 1615 | 0.20 / 0.30 | вызовы пишет текстом в content, без tool_calls; рассуждения не выключаются (минимум low) |
+| @cf/qwen/qwen3-30b-a3b-fp8 | none, enable_thinking=false | 1 | 0 | 673 | 897 | 966 | 0.05 / 0.34 | вызов приходит текстом в reasoning (ошибка разбора Cloudflare при выключенных рассуждениях); после разбора — дубли и пустые ответы |
+| @cf/ibm-granite/granite-4.0-h-micro | — | 0 | 43 | 1718 | 2108 | 5513 | 0.02 / 0.11 | вызовы без обязательных полей |
+
+- Лучшая на Cloudflare — **gemma-4-26b-a4b-it**: 42 из 45, 0,8 с медиана внутри Cloudflare,
+  но p90 4,4 с. Для сравнения, gemini-3.8-flash на проде: 45 из 45, 1,5–1,7 с.
+- qwen3.8-27b в первом прогоне дала 40 из 45 без ошибок; во втором кончился лимит.
+- Только на платном тарифе Workers: glm-5.3-flash, deepseek-v4-flash, deepseek-v4.1-flash.
+- Хвост задержки (p90) у моделей Cloudflare заметно длиннее медианы: 4–14 с у gemma,
+  qwen3.8 и glm-4.7.

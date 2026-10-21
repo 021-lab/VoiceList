@@ -22,17 +22,24 @@ const PROVIDERS = {
   openai: { url: 'https://api.openai.com/v1/chat/completions', key: process.env.OPENAI_API_KEY },
   gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: process.env.GEMINI_API_KEY },
   openrouter: { url: 'https://openrouter.ai/api/v1/chat/completions', key: process.env.Openrouter_api_key || process.env.OPENROUTER_API_KEY },
-  ollama: { url: `${(process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/$/, '')}/v1/chat/completions`, key: 'ollama' }
+  ollama: { url: `${(process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/$/, '')}/v1/chat/completions`, key: 'ollama' },
+  // A worker with the AI binding that takes this request and runs it on Workers AI (AI_BENCH_URL,
+  // AI_BENCH_KEY). It reports the time spent inside env.AI.run as x-infer-ms.
+  'workers-ai': { url: process.env.AI_BENCH_URL, key: process.env.AI_BENCH_KEY }
 };
 const provider = PROVIDERS[opt.provider];
 if (!provider?.key) { console.error(`Нет ключа или провайдера: ${opt.provider}`); process.exit(2); }
 const params = JSON.parse(opt.params);
 const corpus = JSON.parse(readFileSync(new URL('../docs/text-agent-corpus.json', import.meta.url), 'utf8'));
 
-const fetchImpl = (url, options) => {
+const fetchFor = (timing) => async (url, options) => {
   const body = { ...JSON.parse(options.body), ...params };
   for (const [key, value] of Object.entries(body)) if (value === null) delete body[key];
-  return fetch(provider.url, { ...options, signal: AbortSignal.timeout(120000), headers: { ...options.headers, Authorization: 'Bearer ' + provider.key }, body: JSON.stringify(body) });
+  const response = await fetch(provider.url, { ...options, signal: AbortSignal.timeout(120000), headers: { ...options.headers, Authorization: 'Bearer ' + provider.key }, body: JSON.stringify(body) });
+  const server = response.headers.get('x-infer-ms');
+  if (server) timing.serverMs = Number(server);
+  if (!response.ok) { const text = await response.text(); return { ok: false, status: response.status, body: { cancel: async () => {} }, text }; }
+  return response;
 };
 
 const norm = (text) => String(text).toLowerCase().replace(/ё/g, 'е').replace(/[«»"'.,!?:;\s]+$/u, '').replace(/^[«»"'\s]+/u, '').replace(/\s+/g, ' ').trim();
@@ -63,9 +70,10 @@ async function runCase(item) {
     tasks: corpus.tasks.map(task => ({ ...task, tags: [] })), today: corpus.today
   };
   const started = performance.now();
+  const timing = {};
   let answer = ''; let got = []; let error = null;
   try {
-    const raw = JSON.parse(await resolveOpenAI({ apiKey: provider.key, geminiApiKey: provider.key, model: opt.model, modelContext, fetchImpl }));
+    const raw = JSON.parse(await resolveOpenAI({ apiKey: provider.key, geminiApiKey: provider.key, model: opt.model, modelContext, fetchImpl: fetchFor(timing) }));
     answer = raw.answer; got = raw.commands.map(notation);
   } catch (caught) { error = caught.message; }
   const ms = Math.round(performance.now() - started);
@@ -76,7 +84,7 @@ async function runCase(item) {
   // What the run did, for comparing runs: the calls in order and whether anything was left
   // undone. The wording of a question or of «Не выполнено» is not compared — only its presence.
   const signature = error ? `ERROR ${error}` : `${got.join('; ')} | ${answer.trim() ? (got.length ? 'notDone' : 'text') : '-'}`;
-  return { id: item.id, ok, got, answer, error, ms, signature };
+  return { id: item.id, ok, got, answer, error, ms, serverMs: timing.serverMs, signature };
 }
 
 async function runCorpus() {
@@ -101,6 +109,7 @@ const summary = {
   errors: runs.flat().filter(result => result.error).length,
   identical: unstable.length === 0, unstable,
   medianMs: percentile(times, 0.5), p90Ms: percentile(times, 0.9),
+  ...(runs.flat().some(result => result.serverMs) ? { serverMedianMs: percentile(runs.flat().filter(result => result.serverMs).map(result => result.serverMs), 0.5), serverP90Ms: percentile(runs.flat().filter(result => result.serverMs).map(result => result.serverMs), 0.9) } : {}),
   failed: [...new Set(runs.flatMap(run => run.filter(result => !result.ok).map(result => result.id)))]
 };
 if (!opt.quiet) {
