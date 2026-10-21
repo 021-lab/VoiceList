@@ -188,6 +188,19 @@ describe('tool calls', () => {
     expect(append.delegation_id).toBeNull();
   });
 
+  it('hands the backend the whole updated table before it resumes', async () => {
+    const context = harness();
+    await context.host.start({ sdp: 'offer-sdp' });
+    context.setItems([task('rs', null, 'Open', 'Яблоки'), task('rt', 'rs', 'Focus', 'Голден')]);
+    context.socket.deliver(functionCall('setStatus', { taskId: 'rt', status: 'Focus' }));
+    await settle();
+
+    const types = context.socket.sent.map(message => message.type);
+    const update = context.socket.sent.find(message => message.type === 'session.update');
+    expect(update.session.delegation.responses.instructions).toContain('rt\trs\tF\tГолден');
+    expect(types.indexOf('session.update')).toBeLessThan(types.indexOf('response.create'));
+  });
+
   it('reports a rejected command back to the model instead of claiming success', async () => {
     const context = harness({ applyAck: { status: 'rejected', reason: 'Задача не найдена' } });
     await context.host.start({ sdp: 'offer-sdp' });
@@ -246,7 +259,8 @@ describe('prompt edits by the model', () => {
     await settle();
 
     const update = context.socket.sent.find(message => message.type === 'session.update');
-    expect(update.session.delegation.responses.instructions).toBe('Новый бэкенд-промпт.');
+    expect(update.session.delegation.responses.instructions.startsWith('Новый бэкенд-промпт.')).toBe(true);
+    expect(update.session.delegation.responses.instructions).toContain('rt\trs\tO\tГолден');
   });
 
   it('lets the model read a prompt before replacing it', async () => {
@@ -329,7 +343,7 @@ describe('replaying a dialogue against the voice layer', () => {
 
     expect(sent[0].url).toContain('/responses');
     expect(sent[0].body.instructions).toContain('rt\trs\tO\tГолден');
-    expect(sent[0].body.instructions).toContain('Выбор задачи');
+    expect(sent[0].body.instructions).toContain('Идентификаторы задач вслух не произноси');
     // The voice layer holds no tools of its own, so none are offered here either.
     expect(sent[0].body.tools).toBeUndefined();
     expect(sent[0].body.store).toBe(false);

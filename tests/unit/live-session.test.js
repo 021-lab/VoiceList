@@ -79,7 +79,13 @@ describe('session config', () => {
     expect(config.model).toBe(LIVE_MODEL);
     expect(config.delegation.type).toBe('responses');
     expect(config.delegation.responses.model).toBe('gpt-5.6-terra');
-    expect(config.delegation.responses.instructions).toBe('Бэкенд.');
+    expect(config.delegation.responses.instructions.startsWith('Бэкенд.')).toBe(true);
+  });
+
+  it('gives the backend its own task table and today, so titles resolve without spoken ids', () => {
+    const withDate = buildLiveSessionConfig({ items: sample, backendPrompt: 'Бэкенд.', today: '2026-10-21' });
+    expect(withDate.delegation.responses.instructions).toContain('Сегодня 2026-10-21.');
+    expect(withDate.delegation.responses.instructions).toContain('rt\trs\tO\tГолден');
   });
 
   it('puts the tools on the backend, not on the session', () => {
@@ -132,12 +138,11 @@ describe('loggable events', () => {
 });
 
 describe('the voice prompt', () => {
-  it('makes the choice between several matching tasks a dialogue that precedes delegation', () => {
-    expect(DEFAULT_VOICE_PROMPT).toContain('Подошло несколько');
-    expect(DEFAULT_VOICE_PROMPT).toContain('Дождись ответа');
-    expect(DEFAULT_VOICE_PROMPT).toContain('к бэкенду не обращайся');
-    expect(DEFAULT_VOICE_PROMPT).toContain('обязательно содержит идентификатор выбранной');
+  it('answers at once and keeps identifiers out of speech', () => {
+    expect(DEFAULT_VOICE_PROMPT).toContain('Идентификаторы задач вслух не произноси');
+    expect(DEFAULT_VOICE_PROMPT).toContain('Перебили — замолчи');
     // A single match must still go through without a question, or every change costs a turn.
-    expect(DEFAULT_VOICE_PROMPT).toContain('Подошла ровно одна — не переспрашивай');
+    expect(DEFAULT_VOICE_PROMPT).toContain('Подошла одна — не переспрашивай');
+    expect(DEFAULT_VOICE_PROMPT).toContain('Пока человек\nне выбрал, ничего не меняй');
   });
 });

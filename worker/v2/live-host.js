@@ -1,7 +1,7 @@
 import {
   DEFAULT_BACKEND_MODEL, LIVE_TOOLS, buildLiveSessionConfig, chunkDeltaLines, diffSnapshotRows,
-  isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand, buildSimulatedInput,
-  buildSimulatedVoiceInput, composeVoiceInstructions, formatTaskSnapshot, DEFAULT_VOICE_PROMPT
+  isLoggableEvent, readFunctionCall, snapshotRows, formatSnapshotTable, toTaskCommand, buildSimulatedInput,
+  buildSimulatedVoiceInput, composeVoiceInstructions, composeBackendInstructions, formatTaskSnapshot, DEFAULT_VOICE_PROMPT
 } from '../../src/v2/domain/live-session.js';
 import { promptVersion } from '../../src/v2/domain/live-settings.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
@@ -41,6 +41,7 @@ export class LiveHost {
   get sessionId() { return this.session?.id || ''; }
 
   stamp() { return this.now().toISOString(); }
+  today() { return this.stamp().slice(0, 10); }
 
   /** The session id is passed explicitly where the handler outlives the session, so a
    *  closing event is still attributed rather than landing under an empty id. */
@@ -66,7 +67,7 @@ export class LiveHost {
     const [voicePrompt, backendPrompt, backendModel, reasoningEffort] = await Promise.all([
       this.settings.prompt('voice'), this.settings.prompt('backend'), this.settings.backendModel(), this.settings.reasoningEffort()
     ]);
-    const config = buildLiveSessionConfig({ items, voicePrompt, backendPrompt, backendModel, reasoningEffort, store: this.store });
+    const config = buildLiveSessionConfig({ items, voicePrompt, backendPrompt, backendModel, reasoningEffort, store: this.store, today: this.today() });
 
     // Every attempt leaves a trace, including one that never reaches OpenAI: an attempt
     // missing from the log would be indistinguishable from one that was never made.
@@ -252,7 +253,7 @@ export class LiveHost {
     ]);
     const body = {
       model: backendModel || DEFAULT_BACKEND_MODEL,
-      instructions: backendPrompt,
+      instructions: composeBackendInstructions(backendPrompt, formatTaskSnapshot(items), this.today()),
       input: buildSimulatedInput(turns),
       tools: LIVE_TOOLS_FOR_RESPONSES,
       tool_choice: 'auto',
@@ -387,7 +388,7 @@ export class LiveHost {
    *  startup and can only be appended to; the backend's are updatable in place. */
   async applyPromptChange(target, prompt, args) {
     if (target === 'backend') {
-      this.send({ type: 'session.update', session: { delegation: { type: 'responses', responses: { instructions: prompt } } } });
+      this.updateBackend(prompt, snapshotRows(await this.services.readItems()));
       return;
     }
     const note = args?.mode === 'append' ? String(args.text || '').trim() : prompt;
@@ -406,7 +407,15 @@ export class LiveHost {
     for (const chunk of chunkDeltaLines(lines)) {
       this.send({ type: 'session.instructions.append', delegation_id: null, content: `Изменения в задачах:\n${chunk}` });
     }
+    // The backend's instructions are replaceable in place, so it gets the whole table again
+    // rather than a growing tail of deltas.
+    if (lines.length) this.updateBackend(await this.settings.prompt('backend'), rows);
     return lines;
+  }
+
+  updateBackend(prompt, rows) {
+    const instructions = composeBackendInstructions(prompt, formatSnapshotTable(rows), this.today());
+    this.send({ type: 'session.update', session: { delegation: { type: 'responses', responses: { instructions } } } });
   }
 
   async stop(reason = 'client') {
