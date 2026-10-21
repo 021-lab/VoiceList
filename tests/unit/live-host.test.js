@@ -60,7 +60,7 @@ describe('starting a session', () => {
     const created = rows.find(row => row.event.type === 'vl.session.created');
     expect(created.event.requested.store).toBe(true);
     expect(created.event.requested.voicePromptVersion).toBeTruthy();
-    expect(created.event.requested.backendModel).toBe('gpt-5.6-luna');
+    expect(created.event.requested.backendModel).toBe('gpt-6.1-sol');
   });
 
   it('fails when the sideband cannot attach, rather than leaving a voice that cannot act', async () => {

@@ -3,7 +3,7 @@
 import { fail } from './contracts.js';
 
 export const LIVE_MODEL = 'gpt-live-1';
-export const DEFAULT_BACKEND_MODEL = 'gpt-5.6-luna';
+export const DEFAULT_BACKEND_MODEL = 'gpt-6.1-sol';
 export const LIVE_VOICE = 'marin';
 
 /** Done and Archive stay out of the snapshot: they are not addressable by voice and

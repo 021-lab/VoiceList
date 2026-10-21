@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-c86b15ee253d8f91">
+<meta name="preview-build-hash" content="v02-95bd62516580f88a">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1000,7 +1000,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 
 	        <label class="settings-field" style="margin-top: 18px;">
 	          <span>Бэкенд-модель</span>
-	          <input type="text" id="live-backend-model" placeholder="gpt-5.6-luna" autocomplete="off" autocapitalize="none" spellcheck="false">
+	          <input type="text" id="live-backend-model" placeholder="gpt-6.1-sol" autocomplete="off" autocapitalize="none" spellcheck="false">
 	        </label>
 	        <button id="live-backend-model-save" class="settings-primary" type="button">Сохранить</button>
 	        <div id="live-backend-model-status" class="settings-status" aria-live="polite"></div>
@@ -1104,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-c86b15ee253d8f91";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-95bd62516580f88a";
 </script>
 <script>
 (() => {
@@ -3661,7 +3661,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-c86b15ee253d8f91";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-95bd62516580f88a";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
