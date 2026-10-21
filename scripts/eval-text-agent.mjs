@@ -65,7 +65,7 @@ async function runCase(item) {
   const started = performance.now();
   let answer = ''; let got = []; let error = null;
   try {
-    const raw = JSON.parse(await resolveOpenAI({ apiKey: provider.key, model: opt.model, modelContext, fetchImpl }));
+    const raw = JSON.parse(await resolveOpenAI({ apiKey: provider.key, geminiApiKey: provider.key, model: opt.model, modelContext, fetchImpl }));
     answer = raw.answer; got = raw.commands.map(notation);
   } catch (caught) { error = caught.message; }
   const ms = Math.round(performance.now() - started);

@@ -39,6 +39,7 @@ export class ListDocumentDO extends Agent {
     const resolveModel = this.env.V02_TEST_MODEL === 'local-parser' ? undefined : async context => resolveOpenAI({
       ...context,
       apiKey: this.env.OPENAI_API_KEY || await this.getOpenAIApiKey(),
+      geminiApiKey: this.env.GEMINI_API_KEY || await this.getGeminiApiKey(),
       model: this.env.AGENT_MODEL || 'gpt-4.1-mini',
       // Correcting an action is a reading task and goes to its own model; the setting is read
       // per request, so changing it takes effect on the next correction rather than the next

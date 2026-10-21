@@ -129,6 +129,24 @@ describe('вызов модели', () => {
     expect(answer.answer).toBe('Не выполнено: включи музыку');
   });
 
+  it('модель gemini- идёт в Gemini со своим ключом, без store и с нулевой температурой', async () => {
+    let url = null; let sent = null; let auth = null;
+    await resolveOpenAI({
+      apiKey: 'openai-key', geminiApiKey: 'gemini-key', model: 'gemini-3.8-flash', modelContext: { text: 'добавь хлеб', tasks: [] },
+      fetchImpl: async (to, options) => { url = to; sent = JSON.parse(options.body); auth = options.headers.Authorization; return { ok: true, ...stubBody({ choices: [{ message: { content: '' } }] }) }; }
+    });
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+    expect(auth).toBe('Bearer gemini-key');
+    expect(sent).not.toHaveProperty('store');
+    expect(sent.temperature).toBe(0);
+    expect(sent.reasoning_effort).toBe('none');
+  });
+
+  it('без ключа Gemini просит его настроить, а не идёт в сеть', async () => {
+    const answer = JSON.parse(await resolveOpenAI({ apiKey: 'openai-key', model: 'gemini-3.8-flash', modelContext: { text: 'х', tasks: [] }, fetchImpl: async () => { throw new Error('сеть'); } }));
+    expect(answer.answer).toContain('ключ Gemini');
+  });
+
   it('текстовая модель отвечает без рассуждений, коррекция — с ними', async () => {
     expect((await call({ text: 'добавь хлеб', tasks: [] }, undefined, 'gpt-6-luna')).reasoning_effort).toBe('none');
     expect(await call(context(), undefined, 'gpt-6-luna')).not.toHaveProperty('reasoning_effort');
