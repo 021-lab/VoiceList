@@ -18,6 +18,11 @@ const SILENCE_GAP_MS = 1_500;
 const DIALOG_TURNS = 12;
 const MAX_BACKEND_PASSES = 4;
 
+/** A spoken update sent while the voice is still talking can be lost, so it waits for this
+ *  much quiet — but not longer than the cap, after which it goes anyway. */
+const QUIET_MS = 500;
+const QUIET_WAIT_CAP_MS = 6_000;
+
 /** The tail of a request can still be in transcription when the handover arrives. */
 const TRANSCRIPT_GRACE_MS = 400;
 
@@ -113,7 +118,7 @@ export class LiveHost {
 
     this.session = {
       id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false,
-      dialog: [], handedOver: 0, lastUserStartMs: -1, delegations: 0
+      dialog: [], handedOver: 0, lastUserStartMs: -1, delegations: 0, voiceAt: 0, spoken: Promise.resolve()
     };
 
     // The session record carries the prompt versions and the model name: an entry from last
@@ -168,6 +173,7 @@ export class LiveHost {
     if (speech && (speech.role !== role || silence)) this.flushSpeech();
     if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs };
     if (role === 'user' && startMs != null) this.session.lastUserStartMs = Math.max(this.session.lastUserStartMs, startMs);
+    if (role === 'assistant') this.session.voiceAt = Date.now();
     this.session.speech.text += String(event?.delta ?? '');
     if (endMs != null) this.session.speech.endMs = endMs;
   }
@@ -379,7 +385,7 @@ export class LiveHost {
 
     let reported = false;
     const thinking = setTimeout(() => {
-      if (!reported && !movedOn()) this.append('session.commentary.append', delegationId, 'Думаю.');
+      if (!reported && !movedOn()) this.speak(session, delegationId, 'Думаю.');
     }, QUICK_RESULT_MS);
     // A request can yield more than one result: the backend's writes are confirmed at once
     // and it finishes the rest of the request afterwards. Each result meets the timing rule.
@@ -390,12 +396,28 @@ export class LiveHost {
       const elapsedMs = Date.now() - startedAt;
       const delivery = deliveryFor({ elapsedMs, movedOn: movedOn(), failed: result.failed, text: result.text });
       this.record({ type: 'vl.delegation.result', delegation_id: delegationId, by: result.by || null, elapsed_ms: elapsedMs, failed: Boolean(result.failed), delivery }, 'out');
-      this.append(delivery.kind === 'thinking' ? 'session.thinking.append' : 'session.commentary.append', delegationId, delivery.content);
+      if (delivery.kind === 'thinking') this.append('session.thinking.append', delegationId, delivery.content);
+      else this.speak(session, delegationId, delivery.content);
     };
     try { await this.answer(turns, session, report); }
     catch (error) { report({ failed: true, text: `Не вышло: ${safeError(error).message}` }); }
     // Nothing to say is not success: a made-up «готово» is worse than an honest failure.
     if (!reported) report({ failed: true, text: 'Не вышло: ответа нет' });
+  }
+
+  /** Spoken updates go one at a time and each waits for the voice to fall quiet: one sent
+   *  over the voice's own speech was dropped in a live test («Думаю» was said, the result
+   *  right after it never was). */
+  speak(session, delegationId, content) {
+    const say = async () => {
+      const until = Date.now() + QUIET_WAIT_CAP_MS;
+      while (this.session === session && Date.now() - session.voiceAt < QUIET_MS && Date.now() < until) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if (this.session === session) this.append('session.commentary.append', delegationId, content);
+    };
+    session.spoken = session.spoken.then(say, say);
+    return session.spoken;
   }
 
   append(type, delegationId, content) {

@@ -317,6 +317,19 @@ describe('delegated requests', () => {
     expect(spoken(context).map(message => message.content)).toEqual(['Думаю.', 'Кстати, голден на паузе']);
   });
 
+  it('waits for the voice to fall quiet before the next spoken update', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(3_100);
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Думаю.', start_ms: 4_100, end_ms: 4_500 });
+    await vi.advanceTimersByTimeAsync(400);
+    expect(spoken(context).map(message => message.content)).toEqual(['Думаю.']);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(spoken(context).map(message => message.content)).toEqual(['Думаю.', 'Кстати, голден на паузе']);
+  });
+
   it('keeps a late result silent when the conversation has moved on', async () => {
     vi.useFakeTimers();
     const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })]], backendDelayMs: 4_000 });
