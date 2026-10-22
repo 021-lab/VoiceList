@@ -4,7 +4,7 @@ import {
   buildSimulatedVoiceInput, composeVoiceInstructions, composeBackendInstructions, formatTaskSnapshot, DEFAULT_VOICE_PROMPT
 } from '../../src/v2/domain/live-session.js';
 import { promptVersion } from '../../src/v2/domain/live-settings.js';
-import { QUICK_RESULT_MS, buildSolInput, confirmText, deliveryFor } from '../../src/v2/domain/live-delegation.js';
+import { MAX_HELD, asideFor, buildSolInput, confirmText, deliveryFor, stillUnsaid } from '../../src/v2/domain/live-delegation.js';
 import { parseCommand, toCommand } from '../../src/command-resolver.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
 
@@ -22,6 +22,10 @@ const MAX_BACKEND_PASSES = 4;
  *  much quiet — but not longer than the cap, after which it goes anyway. */
 const QUIET_MS = 500;
 const QUIET_WAIT_CAP_MS = 6_000;
+
+/** How long after the person's turn a handover may still arrive before the voice is taken to
+ *  be answering by itself. */
+const ASIDE_GRACE_MS = 1_500;
 
 /** The tail of a request can still be in transcription when the handover arrives. */
 const TRANSCRIPT_GRACE_MS = 400;
@@ -118,7 +122,7 @@ export class LiveHost {
 
     this.session = {
       id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false,
-      dialog: [], handedOver: 0, lastUserStartMs: -1, delegations: 0, voiceAt: 0, spoken: Promise.resolve()
+      dialog: [], handedOver: 0, lastUserStartMs: -1, delegations: 0, voiceAt: 0, userAt: 0, handoverMs: -1, spoken: Promise.resolve(), held: []
     };
 
     // The session record carries the prompt versions and the model name: an entry from last
@@ -174,6 +178,9 @@ export class LiveHost {
     if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs };
     if (role === 'user' && startMs != null) this.session.lastUserStartMs = Math.max(this.session.lastUserStartMs, startMs);
     if (role === 'assistant') this.session.voiceAt = Date.now();
+    // The request itself was speech too; only words after the last handover are someone
+    // talking now.
+    else if (startMs == null || startMs > this.session.handoverMs) this.session.userAt = Date.now();
     this.session.speech.text += String(event?.delta ?? '');
     if (endMs != null) this.session.speech.endMs = endMs;
   }
@@ -186,6 +193,7 @@ export class LiveHost {
     if (!text) return;
     this.record({ type: 'vl.speech', role: speech.role, text, start_ms: speech.startMs, end_ms: speech.endMs });
     this.session.dialog.push({ role: speech.role, text });
+    if (speech.role === 'user') this.offerAside(this.session);
     // The same turn goes on the bus, where the change it causes will point back at it. The
     // session log keeps its own copy with the timeline; the bus keeps the words. Turns are
     // written one after another: an answer can only be linked to the turn before it once
@@ -372,6 +380,8 @@ export class LiveHost {
     const session = this.session;
     if (!session) return;
     const order = ++session.delegations;
+    session.handoverMs = Math.max(session.handoverMs, offsetMs ?? -1);
+    session.userAt = 0;
     const startedAt = Date.now();
     if (!session.dialog.slice(session.handedOver).some(turn => turn.role === 'user')) {
       await new Promise(resolve => setTimeout(resolve, TRANSCRIPT_GRACE_MS));
@@ -384,34 +394,66 @@ export class LiveHost {
     await this.turns;
 
     let reported = false;
-    const thinking = setTimeout(() => {
-      if (!reported && !movedOn()) this.speak(session, delegationId, 'Думаю.');
-    }, QUICK_RESULT_MS);
     // A request can yield more than one result: the backend's writes are confirmed at once
     // and it finishes the rest of the request afterwards. Each result meets the timing rule.
     const report = (result) => {
       reported = true;
-      clearTimeout(thinking);
       if (this.session !== session || !result?.text) return;
       const elapsedMs = Date.now() - startedAt;
-      const delivery = deliveryFor({ elapsedMs, movedOn: movedOn(), failed: result.failed, text: result.text });
+      // The conversation going on means the person, not the voice saying our own aside.
+      const active = movedOn();
+      const delivery = deliveryFor({ elapsedMs, active, failed: result.failed, answer: result.answer, text: result.text });
       this.record({ type: 'vl.delegation.result', delegation_id: delegationId, by: result.by || null, elapsed_ms: elapsedMs, failed: Boolean(result.failed), delivery }, 'out');
-      if (delivery.kind === 'thinking') this.append('session.thinking.append', delegationId, delivery.content);
-      else this.speak(session, delegationId, delivery.content);
+      if (delivery.kind === 'speak') { this.speak(session, delegationId, delivery.content); return; }
+      if (delivery.kind === 'quiet') { this.append('session.thinking.append', delegationId, `Ответ, не озвучен: ${delivery.content}`); return; }
+      // No quiet note about it: the voice read such notes aloud by itself. It knows the new
+      // state from the table deltas, and an aside it has already covered is dropped.
+      session.held = [...session.held, { text: delivery.content, since: session.dialog.length }].slice(-MAX_HELD);
     };
-    try { await this.answer(turns, session, report); }
+    // The pause after a new question is where held confirmations of earlier requests go:
+    // «Думаю, кстати, …» while the backend works, a plain «Кстати, …» when it will not.
+    const fillPause = (thinking) => {
+      const aside = asideFor(this.unsaid(session), { thinking });
+      session.held = [];
+      if (aside) this.speak(session, delegationId, aside);
+    };
+    try { await this.answer(turns, session, report, fillPause); }
     catch (error) { report({ failed: true, text: `Не вышло: ${safeError(error).message}` }); }
     // Nothing to say is not success: a made-up «готово» is worse than an honest failure.
     if (!reported) report({ failed: true, text: 'Не вышло: ответа нет' });
   }
 
+  /** A question the voice answers by itself is never handed over, so held confirmations would
+   *  wait for nothing. If no handover follows the person's turn, they go after the voice's own
+   *  answer: speak() waits for it to fall quiet. */
+  unsaid(session) {
+    const since = Math.min(...session.held.map(item => item.since));
+    const voice = session.dialog.slice(since).filter(turn => turn.role === 'assistant').map(turn => turn.text);
+    if (session.speech?.role === 'assistant') voice.push(session.speech.text);
+    return stillUnsaid(session.held.map(item => item.text), voice);
+  }
+
+  offerAside(session) {
+    if (!session.held.length) return;
+    const handovers = session.delegations;
+    setTimeout(() => {
+      if (this.session !== session || session.delegations !== handovers || !session.held.length) return;
+      const aside = asideFor(this.unsaid(session), { thinking: false });
+      session.held = [];
+      if (!aside) return;
+      this.speak(session, null, aside);
+    }, ASIDE_GRACE_MS);
+  }
+
   /** Spoken updates go one at a time and each waits for the voice to fall quiet: one sent
-   *  over the voice's own speech was dropped in a live test («Думаю» was said, the result
-   *  right after it never was). */
+   *  over the voice's own speech was dropped in a live test (the first of two was said, the
+   *  one right after it never was). */
   speak(session, delegationId, content) {
     const say = async () => {
       const until = Date.now() + QUIET_WAIT_CAP_MS;
-      while (this.session === session && Date.now() - session.voiceAt < QUIET_MS && Date.now() < until) {
+      // Quiet means both: the voice has finished and the person is not mid-sentence.
+      const busy = () => Date.now() - Math.max(session.voiceAt, session.userAt) < QUIET_MS;
+      while (this.session === session && busy() && Date.now() < until) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       if (this.session === session) this.append('session.commentary.append', delegationId, content);
@@ -424,18 +466,20 @@ export class LiveHost {
     return this.send({ type, delegation_id: delegationId, content: String(content || '').slice(0, 1_500) });
   }
 
-  async answer(turns, session, report) {
+  async answer(turns, session, report, fillPause = () => {}) {
     if (this.session !== session) return;
     const said = turns.filter(turn => turn.role === 'user');
     const parsed = said.length === 1 ? parseCommand(said[0].text.trim(), null) : { kind: 'many' };
     const local = parsed.kind === 'one' ? toCommand(parsed.hypothesis, null) : null;
     if (local?.command === 'addChild' && !NOT_A_PLAIN_TITLE.test(local.payload?.title || '')) {
+      fillPause(false);
       const outcome = await this.apply({ ...local, source: 'gpt-live' });
       report(outcome.status === 'rejected'
         ? { by: 'parser', failed: true, text: `Не вышло: ${outcome.reason}` }
         : { by: 'parser', failed: false, text: outcome.confirm });
       return;
     }
+    fillPause(true);
     await this.askBackend(session, result => report({ by: 'backend', ...result }));
   }
 
@@ -476,7 +520,7 @@ export class LiveHost {
       const calls = output.map(readFunctionCall).filter(Boolean);
       if (!calls.length) {
         // After writes the server has spoken for them; only a question still needs the voice.
-        if (text && (!wrote || text.endsWith('?'))) report({ failed: false, text });
+        if (text && (!wrote || text.endsWith('?'))) report({ failed: false, answer: true, text });
         return;
       }
       if (this.session !== session) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { QUICK_RESULT_MS, confirmText, deliveryFor } from '../../src/v2/domain/live-delegation.js';
+import { QUICK_RESULT_MS, asideFor, confirmText, deliveryFor, stillUnsaid } from '../../src/v2/domain/live-delegation.js';
 
 const items = [{ id: 'rt', title: 'Клубника' }, { id: 'rl', title: 'Очень длинное название задачи про отпуск' }];
 
@@ -20,21 +20,36 @@ describe('when a result is spoken', () => {
   const quick = QUICK_RESULT_MS - 1;
   const late = QUICK_RESULT_MS + 1;
 
-  it('speaks a quick result at once', () => {
-    expect(deliveryFor({ elapsedMs: quick, movedOn: true, failed: false, text: 'Клубника на паузе' }))
-      .toEqual({ kind: 'commentary', content: 'Клубника на паузе' });
+  it('speaks a quick result in a quiet moment at once', () => {
+    expect(deliveryFor({ elapsedMs: quick, active: false, failed: false, text: 'Клубника на паузе' }))
+      .toEqual({ kind: 'speak', content: 'Клубника на паузе' });
   });
 
-  it('speaks a late result as an aside', () => {
-    expect(deliveryFor({ elapsedMs: late, movedOn: false, failed: false, text: 'Клубника на паузе' }))
-      .toEqual({ kind: 'commentary', content: 'Кстати, клубника на паузе' });
-  });
-
-  it('keeps a late result silent once the conversation has moved on', () => {
-    expect(deliveryFor({ elapsedMs: late, movedOn: true, failed: false, text: 'Клубника на паузе' }).kind).toBe('thinking');
+  it('holds a late result, or one that would cut into the conversation', () => {
+    expect(deliveryFor({ elapsedMs: late, active: false, failed: false, text: 'Клубника на паузе' }).kind).toBe('hold');
+    expect(deliveryFor({ elapsedMs: quick, active: true, failed: false, text: 'Клубника на паузе' }).kind).toBe('hold');
   });
 
   it('always speaks a failure', () => {
-    expect(deliveryFor({ elapsedMs: late, movedOn: true, failed: true, text: 'Не вышло: нет задачи' }).kind).toBe('commentary');
+    expect(deliveryFor({ elapsedMs: late, active: true, failed: true, text: 'Не вышло: нет задачи' }))
+      .toEqual({ kind: 'speak', content: 'Кстати, не вышло: нет задачи' });
+  });
+
+  it('speaks an answer unless the person has moved on', () => {
+    expect(deliveryFor({ elapsedMs: late, active: false, answer: true, text: 'В фокусе отчёт.' }).kind).toBe('speak');
+    expect(deliveryFor({ elapsedMs: quick, active: true, answer: true, text: 'В фокусе отчёт.' }).kind).toBe('quiet');
+  });
+
+  it('turns held confirmations into the aside for the next pause', () => {
+    expect(asideFor(['Клубника на паузе', 'Отчёт до 23.10'])).toBe('Думаю, кстати, клубника на паузе, отчёт до 23.10.');
+    expect(asideFor(['Клубника на паузе'], { thinking: false })).toBe('Кстати, клубника на паузе.');
+    expect(asideFor([])).toBeNull();
+  });
+});
+
+describe('held confirmations the voice already covered', () => {
+  it('are dropped when the voice named the task, whatever the ending', () => {
+    expect(stillUnsaid(['Голден на паузе', 'Добавил: хлеб'], ['Поставила «Голдена» на паузу.'])).toEqual(['Добавил: хлеб']);
+    expect(stillUnsaid(['Добавил: хлеб'], ['Хлеб добавлен.'])).toEqual([]);
   });
 });

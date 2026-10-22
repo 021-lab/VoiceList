@@ -307,40 +307,122 @@ describe('delegated requests', () => {
     expect(spoken(context)[0].content).toMatch(/^Не вышло/);
   });
 
-  it('says «Думаю» after three seconds and the late result as an aside', async () => {
+  it('holds a late result and says it in the pause after the next question', async () => {
     vi.useFakeTimers();
-    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })]], backendDelayMs: 4_000 });
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], [], [say('Сейчас в фокусе ничего нет.')]], backendDelayMs: 3_300 });
     await context.host.start({ sdp: 'offer-sdp' });
     await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(8_000);
+
+    expect(spoken(context)).toHaveLength(0);
+
+    await request(context, 'что в фокусе', { offset: 20_000 });
+    await vi.advanceTimersByTimeAsync(600);
+    expect(spoken(context).map(message => message.content)).toEqual(['Думаю, кстати, голден на паузе.']);
     await vi.advanceTimersByTimeAsync(5_000);
-
-    expect(spoken(context).map(message => message.content)).toEqual(['Думаю.', 'Кстати, голден на паузе']);
+    expect(spoken(context).map(message => message.content)).toEqual(['Думаю, кстати, голден на паузе.', 'Сейчас в фокусе ничего нет.']);
   });
 
-  it('waits for the voice to fall quiet before the next spoken update', async () => {
-    vi.useFakeTimers();
-    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []], backendDelayMs: 3_300 });
+  it('does not cut in with a quick result while the conversation goes on', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []] });
     await context.host.start({ sdp: 'offer-sdp' });
     await request(context, 'поставь голден на паузу');
-    await vi.advanceTimersByTimeAsync(3_100);
-    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Думаю.', start_ms: 4_100, end_ms: 4_500 });
-    await vi.advanceTimersByTimeAsync(400);
-    expect(spoken(context).map(message => message.content)).toEqual(['Думаю.']);
-    await vi.advanceTimersByTimeAsync(400);
-    expect(spoken(context).map(message => message.content)).toEqual(['Думаю.', 'Кстати, голден на паузе']);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'а погода завтра', start_ms: 1_500, end_ms: 2_500 });
+    await settle();
+
+    expect(spoken(context)).toHaveLength(0);
+    expect(context.host.session.held.map(item => item.text)).toEqual(['Голден на паузе']);
   });
 
-  it('keeps a late result silent when the conversation has moved on', async () => {
-    vi.useFakeTimers();
-    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })]], backendDelayMs: 4_000 });
+  it('says «кстати» without «думаю» when the next request needs no thinking', async () => {
+    const context = harness();
     await context.host.start({ sdp: 'offer-sdp' });
-    await request(context, 'поставь голден на паузу');
+    context.host.session.held = [{ text: 'Голден на паузе', since: 0 }];
+    await request(context, 'добавь хлеб');
+    await new Promise(resolve => setTimeout(resolve, 700));
+
+    expect(spoken(context).map(message => message.content)).toEqual(['Кстати, голден на паузе.', 'Добавил: хлеб']);
+  });
+
+  it('keeps a late answer to itself once the person has moved on', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[say('В фокусе отчёт.')]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'что в фокусе');
     context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'а погода завтра', start_ms: 1_500, end_ms: 2_500 });
     await vi.advanceTimersByTimeAsync(5_000);
 
     expect(spoken(context)).toHaveLength(0);
-    const quiet = context.socket.sent.find(message => message.type === 'session.thinking.append' && message.delegation_id === 'item_1');
-    expect(quiet.content).toContain('Голден на паузе');
+    expect(context.socket.sent.some(message => message.type === 'session.thinking.append' && message.content.includes('В фокусе отчёт.'))).toBe(true);
+  });
+
+  it('says a held confirmation after the voice\'s own answer when nothing is handed over', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(8_000);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'что в фокусе', start_ms: 12_000, end_ms: 13_000 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'В фокусе отчёт.', start_ms: 13_200, end_ms: 14_000 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(spoken(context)).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    expect(spoken(context)).toEqual([expect.objectContaining({ delegation_id: null, content: 'Кстати, голден на паузе.' })]);
+  });
+
+  it('drops a held confirmation the voice has already covered in its own words', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(8_000);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'что в фокусе', start_ms: 12_000, end_ms: 13_000 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'В фокусе отчёт, а «Голден» на паузе.', start_ms: 13_200, end_ms: 14_000 });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(spoken(context)).toHaveLength(0);
+  });
+
+  it('keeps only the latest held confirmations', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [
+      [fn('setStatus', { taskId: 'rt', status: 'Pause' })],
+      [fn('setStatus', { taskId: 'rs', status: 'Focus' }, 'call_2')],
+      [fn('setStatus', { taskId: 'rt', status: 'Focus' }, 'call_3')],
+      [], []
+    ], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'три изменения сразу');
+    await vi.advanceTimersByTimeAsync(15_000);
+    await request(context, 'добавь хлеб', { offset: 30_000 });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    // «Добавь хлеб» needs no thinking, so the aside drops «думаю».
+    expect(spoken(context)[0].content).toBe('Кстати, яблоки в фокусе, голден в фокусе.');
+  });
+
+  it('speaks a late answer as soon as the voice is quiet, without waiting for a question', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[say('В фокусе отчёт.')]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'что в фокусе');
+    await vi.advanceTimersByTimeAsync(4_000);
+
+    expect(spoken(context).map(message => message.content)).toEqual(['В фокусе отчёт.']);
+  });
+
+  it('speaks a late failure without waiting for a question, once the voice is quiet', async () => {
+    vi.useFakeTimers();
+    const context = harness({ applyAck: { status: 'rejected', reason: 'нет такой задачи' }, backend: [[fn('editItem', { taskId: 'нет', title: 'Новое' })]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'переименуй её');
+    await vi.advanceTimersByTimeAsync(3_200);
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Ща.', start_ms: 4_100, end_ms: 4_300 });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(spoken(context)).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(spoken(context).map(message => message.content)).toEqual(['Кстати, не вышло: нет такой задачи']);
   });
 
   it('keeps the voice\'s table current as quiet context', async () => {
