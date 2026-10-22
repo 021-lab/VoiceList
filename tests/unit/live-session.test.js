@@ -140,7 +140,7 @@ describe('loggable events', () => {
 describe('the voice prompt', () => {
   it('hands requests over in silence by the GPT-Live delegation marker', () => {
     expect(DEFAULT_VOICE_PROMPT).toContain('Generate <|SpawnThinking|> when:');
-    expect(DEFAULT_VOICE_PROMPT).toContain('Отправив просьбу, молчи');
+    expect(DEFAULT_VOICE_PROMPT).toContain('that is your entire turn');
     expect(DEFAULT_VOICE_PROMPT).toContain('Неудачу называй всегда');
   });
 });
