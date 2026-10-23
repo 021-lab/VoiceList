@@ -131,7 +131,8 @@ export class ListDocumentDO extends Agent {
         readItems: async () => this.runtime.graph.read().items,
         readFrontier: async () => this.getTaskFrontier(),
         applyCommand: async (command, message, corrects) => this.port.applyCommand(command, {message, corrects}),
-        recordSpeech: (speech) => this.runtime.recordSpeech(speech)
+        recordSpeech: (speech) => this.runtime.recordSpeech(speech),
+        changed: () => this.broadcastState()
       }
     });
     return this.live;

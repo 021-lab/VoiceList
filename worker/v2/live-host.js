@@ -558,6 +558,9 @@ export class LiveHost {
       command, { clientKey: `gpt-live:${this.sessionId}`, seq: ++this.session.seq }, this.session?.utterance || null
     );
     if (ack?.status === 'rejected') return { status: 'rejected', reason: ack.reason || 'Операция отклонена' };
+    // Open pages learn of a change only from this signal: without it a task added by voice
+    // stayed off the list until the page was reloaded.
+    this.services.changed?.();
     const items = await this.services.readItems();
     await this.syncSnapshot(items);
     return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId, confirm: confirmText(command, items) };

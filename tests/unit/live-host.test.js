@@ -36,6 +36,7 @@ function harness({ createOk = true, attachOk = true, applyAck = { status: 'appli
     return { ok: true, status: 201, json: async () => ({ session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer-sdp' } }) };
   };
   const applied = [];
+  const signals = [];
   const host = new LiveHost({
     log: { append: (event, options) => { rows.push({ ...options, event }); } },
     settings: new LiveSettings(memory()),
@@ -44,10 +45,11 @@ function harness({ createOk = true, attachOk = true, applyAck = { status: 'appli
     services: {
       readItems: async () => items,
       readFrontier: async () => [{ taskId: 'rt', taskTitle: 'Голден' }],
-      applyCommand: async (command, meta) => { applied.push({ command, meta }); return applyAck; }
+      applyCommand: async (command, meta) => { applied.push({ command, meta }); return applyAck; },
+      changed: () => { signals.push(applied.length); }
     }
   });
-  return { host, socket, rows, applied, calls, setItems: next => { items = next; } };
+  return { host, socket, rows, applied, calls, signals, setItems: next => { items = next; } };
 }
 
 describe('starting a session', () => {
@@ -295,6 +297,15 @@ describe('delegated requests', () => {
     await settle();
 
     expect(spoken(context).map(message => message.content)).toEqual(['Не вышло: Задача не найдена']);
+  });
+
+  it('tells open pages the list changed after each applied change, and only then', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], [say('Голден в Яблоках или в Саду?')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await settle();
+
+    expect(context.signals).toEqual([1]);
   });
 
   it('refuses an unsupported operation without touching the document', async () => {
