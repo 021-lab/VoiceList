@@ -1,0 +1,2390 @@
+[
+ {
+  "provider": "workers-ai",
+  "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+  "params": {
+   "gateway": "cf-gateway-pay-as-you-go",
+   "store": null,
+   "temperature": 0,
+   "seed": 1,
+   "reasoning_effort": "none",
+   "extra": {
+    "chat_template_kwargs": {
+     "enable_thinking": false
+    }
+   }
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   40
+  ],
+  "errors": 5,
+  "identical": true,
+  "unstable": [],
+  "medianMs": 2393,
+  "p90Ms": 3368,
+  "serverMedianMs": 2263,
+  "serverP90Ms": 3272,
+  "failed": [
+   "add-1",
+   "add-2",
+   "add-3",
+   "add-4",
+   "add-5"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "ERROR Модель временно недоступна (502)"
+   ],
+   "add-2": [
+    "ERROR Модель временно недоступна (502)"
+   ],
+   "add-3": [
+    "ERROR Модель временно недоступна (502)"
+   ],
+   "add-4": [
+    "ERROR Модель временно недоступна (502)"
+   ],
+   "add-5": [
+    "ERROR Модель временно недоступна (502)"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text"
+   ],
+   "ask-4": [
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "workers-ai",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "params": {
+   "gateway": "cf-gateway-pay-as-you-go",
+   "store": null,
+   "temperature": 0,
+   "seed": 1,
+   "reasoning_effort": "none",
+   "extra": {
+    "chat_template_kwargs": {
+     "enable_thinking": false
+    }
+   }
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   41
+  ],
+  "errors": 0,
+  "identical": true,
+  "unstable": [],
+  "medianMs": 1016,
+  "p90Ms": 1488,
+  "serverMedianMs": 914,
+  "serverP90Ms": 1391,
+  "failed": [
+   "add-3",
+   "add-5",
+   "add-10",
+   "ren-7"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(s2, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб) | notDone"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r2, купить грунт); addChild(r2, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину) | notDone"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text"
+   ],
+   "ask-4": [
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "gemini",
+  "model": "gemini-3.1-flash-lite",
+  "params": {
+   "store": null,
+   "reasoning_effort": "none",
+   "temperature": 0
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   44,
+   44,
+   44
+  ],
+  "errors": 0,
+  "identical": true,
+  "unstable": [],
+  "medianMs": 611,
+  "p90Ms": 739,
+  "failed": [
+   "add-3"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "params": {
+   "store": null,
+   "reasoning_effort": "low",
+   "temperature": 0
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   43,
+   43,
+   43
+  ],
+  "errors": 0,
+  "identical": true,
+  "unstable": [],
+  "medianMs": 526,
+  "p90Ms": 632,
+  "failed": [
+   "add-3",
+   "add-8"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r1, выбрать цвет) | -",
+    "addChild(r1, выбрать цвет) | -",
+    "addChild(r1, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "gemini",
+  "model": "gemini-3.8-flash",
+  "params": {},
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   45,
+   45,
+   45
+  ],
+  "errors": 0,
+  "identical": true,
+  "unstable": [],
+  "medianMs": 1650,
+  "p90Ms": 2912,
+  "failed": [],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "params": {
+   "seed": 1
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   40,
+   41,
+   41
+  ],
+  "errors": 0,
+  "identical": false,
+  "unstable": [
+   "add-2"
+  ],
+  "medianMs": 697,
+  "p90Ms": 914,
+  "failed": [
+   "add-1",
+   "add-2",
+   "add-3",
+   "add-11",
+   "ask-4"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addItem(купить молоко) | -",
+    "addItem(купить молоко) | -",
+    "addItem(купить молоко) | -"
+   ],
+   "add-2": [
+    "addItem(позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(проект звукоизоляция комнаты) | -",
+    "addItem(проект звукоизоляция комнаты) | -",
+    "addItem(проект звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    "setStatus(r1, done) | -",
+    "setStatus(r1, done) | -",
+    "setStatus(r1, done) | -"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "params": {
+   "temperature": 0,
+   "seed": 1
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   41,
+   39,
+   40
+  ],
+  "errors": 0,
+  "identical": false,
+  "unstable": [
+   "dl-4",
+   "ask-2"
+  ],
+  "medianMs": 1013,
+  "p90Ms": 1278,
+  "failed": [
+   "add-2",
+   "ren-7",
+   "rest-1",
+   "rest-2",
+   "dl-4",
+   "ask-2"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addItem(позвонить маме) | -",
+    "addItem(позвонить маме) | -",
+    "addItem(позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину) | -",
+    "editItem(w1, помыть машину) | -",
+    "editItem(w1, помыть машину) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "addChild(inbox, звонку электрику) | notDone",
+    "addChild(inbox, звонку электрику) | notDone"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    " | text",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "params": {
+   "temperature": 0,
+   "seed": 1
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   39,
+   41,
+   41
+  ],
+  "errors": 0,
+  "identical": false,
+  "unstable": [
+   "ask-2",
+   "rest-2"
+  ],
+  "medianMs": 1011,
+  "p90Ms": 1263,
+  "failed": [
+   "add-10",
+   "ren-7",
+   "ask-2",
+   "rest-1",
+   "rest-2",
+   "mix-1"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r2, купить грунт) | -",
+    "addChild(r2, купить грунт) | -",
+    "addChild(r2, купить грунт) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину во вторник) | -",
+    "editItem(w1, помыть машину во вторник) | -",
+    "editItem(w1, помыть машину во вторник) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    " | text",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ]
+  }
+ },
+ {
+  "provider": "openrouter",
+  "model": "google/gemma-4-26b-a4b-it",
+  "params": {
+   "store": null,
+   "reasoning_effort": null,
+   "temperature": 0,
+   "seed": 1
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   41,
+   40,
+   42
+  ],
+  "errors": 1,
+  "identical": false,
+  "unstable": [
+   "add-3",
+   "ren-2",
+   "mix-1"
+  ],
+  "medianMs": 660,
+  "p90Ms": 1238,
+  "failed": [
+   "add-3",
+   "add-10",
+   "ren-2",
+   "ren-7",
+   "mix-1"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(s1, купить кабель для сауны) | -",
+    "addChild(s1, купить кабель для сауны) | -",
+    "ERROR Не указано поле parentId"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r2, купить грунт); addChild(r2, купить валик) | -",
+    "addChild(r2, купить грунт); addChild(r2, купить валик) | -",
+    "addChild(r2, купить грунт); addChild(r2, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, 25) | -",
+    "editItem(w1, 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину) | notDone",
+    "editItem(w1, помыть машину) | notDone",
+    "editItem(w1, помыть машину) | notDone"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -",
+    "setDeadline(r3, 2026-10-27) | -"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done); setDeadline(r3, 2026-10-21) | -"
+   ]
+  }
+ },
+ {
+  "provider": "openrouter",
+  "model": "anthropic/claude-haiku-5.5",
+  "params": {
+   "store": null,
+   "reasoning_effort": null,
+   "temperature": 0,
+   "seed": 1
+  },
+  "instruction": "current",
+  "cases": 45,
+  "correct": [
+   43,
+   43,
+   43
+  ],
+  "errors": 0,
+  "identical": false,
+  "unstable": [
+   "dl-4",
+   "mix-1"
+  ],
+  "medianMs": 1841,
+  "p90Ms": 3167,
+  "failed": [
+   "dl-4",
+   "mix-1"
+  ],
+  "batch": "v2",
+  "perCase": {
+   "add-1": [
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -",
+    "addChild(inbox, купить молоко) | -"
+   ],
+   "add-2": [
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -",
+    "addChild(inbox, позвонить маме) | -"
+   ],
+   "add-3": [
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -",
+    "addChild(inbox, купить кабель для сауны) | -"
+   ],
+   "add-4": [
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -",
+    "addChild(inbox, записаться в консульство россии на оформление доверенности (на меня и тимура)) | -"
+   ],
+   "add-5": [
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -",
+    "addChild(inbox, купить хлеб); addChild(inbox, вызвать сантехника) | -"
+   ],
+   "add-6": [
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -",
+    "addChild(r1, телевизор) | -"
+   ],
+   "add-7": [
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -",
+    "addChild(r1, заказать плитку) | -"
+   ],
+   "add-8": [
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -",
+    "addChild(r2, выбрать цвет) | -"
+   ],
+   "add-9": [
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -",
+    "addChild(r1, купить кисти) | -"
+   ],
+   "add-10": [
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -",
+    "addChild(r1, купить грунт); addChild(r1, купить валик) | -"
+   ],
+   "add-11": [
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -",
+    "addItem(звукоизоляция комнаты) | -"
+   ],
+   "add-12": [
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -",
+    "addInfo(r1, размер окна 120 на 80) | -"
+   ],
+   "ren-1": [
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -",
+    "editItem(w1, карандаш линейка) | -"
+   ],
+   "ren-2": [
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -",
+    "editItem(w1, переименуй 25) | -"
+   ],
+   "ren-3": [
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -",
+    "editItem(r3, сделать установку) | -"
+   ],
+   "ren-4": [
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -",
+    "editItem(r3, позвонить электрику сергею) | -"
+   ],
+   "ren-5": [
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -",
+    "editItem(r2, купить белую краску) | -"
+   ],
+   "ren-6": [
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -",
+    "editItem(v1, отчет для бухгалтера за сентябрь) | -"
+   ],
+   "ren-7": [
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -",
+    "editItem(w1, помыть машину); setDeadline(w1, 2026-10-27) | -"
+   ],
+   "st-1": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-2": [
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -",
+    "setStatus(r3, done) | -"
+   ],
+   "st-3": [
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -",
+    "setStatus(w1, archive) | -"
+   ],
+   "st-4": [
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -",
+    "setStatus(s2, archive) | -"
+   ],
+   "st-5": [
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -",
+    "setStatus(r3, focus) | -"
+   ],
+   "st-6": [
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -",
+    "setStatus(s2, pause) | -"
+   ],
+   "st-7": [
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -",
+    "setStatus(o1, open) | -"
+   ],
+   "st-8": [
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -",
+    "setStatus(r3, info) | -"
+   ],
+   "st-9": [
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -",
+    "setStatus(r2, done) | -"
+   ],
+   "st-10": [
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -",
+    "setStatus(v1, done) | -"
+   ],
+   "dl-1": [
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -",
+    "setDeadline(r3, 2026-10-21) | -"
+   ],
+   "dl-2": [
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -",
+    "setDeadline(r2, 2026-10-23) | -"
+   ],
+   "dl-3": [
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -",
+    "setDeadline(s2, 2026-10-31) | -"
+   ],
+   "dl-4": [
+    " | text",
+    "addChild(inbox, звонку электрику) | notDone",
+    " | text"
+   ],
+   "dl-5": [
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -",
+    "setDeadline(v1, 2026-10-20) | -"
+   ],
+   "mv-1": [
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -",
+    "setParent(r3, s1) | -"
+   ],
+   "mv-2": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-3": [
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -",
+    "setParent(s2, r1) | -"
+   ],
+   "mv-4": [
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -",
+    "setParent(r2, null) | -"
+   ],
+   "ask-1": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-2": [
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -",
+    "setStatus(k1, pause) | -"
+   ],
+   "ask-3": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "ask-4": [
+    " | text",
+    " | text",
+    " | text"
+   ],
+   "rest-1": [
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone",
+    "addChild(inbox, купить молоко) | notDone"
+   ],
+   "rest-2": [
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone",
+    "setStatus(r2, done) | notDone"
+   ],
+   "mix-1": [
+    "setStatus(r2, done); addChild(inbox, электрику позвонить) | notDone",
+    "setStatus(r2, done); addChild(inbox, электрику позвонить) | notDone",
+    " | -"
+   ]
+  }
+ }
+]

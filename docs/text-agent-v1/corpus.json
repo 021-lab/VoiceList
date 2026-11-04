@@ -1,0 +1,446 @@
+{
+  "about": "Проверочный корпус текстовой модели: реплика → ожидаемые вызовы инструментов. Прогон: node scripts/eval-text-agent.mjs [модель]. target — задача в руке (id) или null. expect — вызовы в нотации инструкции; названия сравниваются без регистра, ё/е и концевой пунктуации; порядок не важен. alt — другой допустимый набор. ask — вызовов быть не должно, ответ — вопрос или текст. rest — слово, которое ответ должен назвать как невыполненное.",
+  "today": "2026-10-20",
+  "tasks": [
+    {
+      "id": "inbox",
+      "parentId": null,
+      "status": "Open",
+      "title": "Входящие"
+    },
+    {
+      "id": "r1",
+      "parentId": null,
+      "status": "Open",
+      "title": "Ремонт квартиры"
+    },
+    {
+      "id": "r2",
+      "parentId": "r1",
+      "status": "Open",
+      "title": "Купить краску"
+    },
+    {
+      "id": "r3",
+      "parentId": "r1",
+      "status": "Open",
+      "title": "Позвонить электрику"
+    },
+    {
+      "id": "w1",
+      "parentId": "r1",
+      "status": "Open",
+      "title": "Сделать установку"
+    },
+    {
+      "id": "s1",
+      "parentId": null,
+      "status": "Open",
+      "title": "Сауна"
+    },
+    {
+      "id": "s2",
+      "parentId": "s1",
+      "status": "Open",
+      "title": "Кабель для сауны"
+    },
+    {
+      "id": "d1",
+      "parentId": null,
+      "status": "Open",
+      "title": "Дача"
+    },
+    {
+      "id": "k1",
+      "parentId": "d1",
+      "status": "Open",
+      "title": "Клубника"
+    },
+    {
+      "id": "m1",
+      "parentId": null,
+      "status": "Open",
+      "title": "Магазин"
+    },
+    {
+      "id": "k2",
+      "parentId": "m1",
+      "status": "Open",
+      "title": "Клубника"
+    },
+    {
+      "id": "v1",
+      "parentId": null,
+      "status": "Focus",
+      "title": "Отчёт для бухгалтера"
+    },
+    {
+      "id": "o1",
+      "parentId": null,
+      "status": "Done",
+      "title": "Старый проект"
+    }
+  ],
+  "cases": [
+    {
+      "id": "add-1",
+      "text": "Добавь задачу купить молоко",
+      "target": null,
+      "expect": [
+        "addChild(inbox, купить молоко)"
+      ]
+    },
+    {
+      "id": "add-2",
+      "text": "Новая задача позвонить маме",
+      "target": null,
+      "expect": [
+        "addChild(inbox, позвонить маме)"
+      ]
+    },
+    {
+      "id": "add-3",
+      "text": "Купить кабель для сауны",
+      "target": null,
+      "expect": [
+        "addChild(inbox, Купить кабель для сауны)"
+      ]
+    },
+    {
+      "id": "add-4",
+      "text": "Записаться в консульство России на оформление доверенности (на меня и Тимура).",
+      "target": null,
+      "expect": [
+        "addChild(inbox, Записаться в консульство России на оформление доверенности (на меня и Тимура))"
+      ]
+    },
+    {
+      "id": "add-5",
+      "text": "Добавь купить хлеб и вызвать сантехника",
+      "target": null,
+      "expect": [
+        "addChild(inbox, купить хлеб)",
+        "addChild(inbox, вызвать сантехника)"
+      ]
+    },
+    {
+      "id": "add-6",
+      "text": "телевизор",
+      "target": "r1",
+      "expect": [
+        "addChild(r1, телевизор)"
+      ]
+    },
+    {
+      "id": "add-7",
+      "text": "Добавь подзадачу заказать плитку",
+      "target": "r1",
+      "expect": [
+        "addChild(r1, заказать плитку)"
+      ]
+    },
+    {
+      "id": "add-8",
+      "text": "Сначала надо выбрать цвет",
+      "target": "r2",
+      "expect": [
+        "addChild(r2, выбрать цвет)"
+      ]
+    },
+    {
+      "id": "add-9",
+      "text": "Рядом ещё задача: купить кисти",
+      "target": "r2",
+      "expect": [
+        "addChild(r1, купить кисти)"
+      ]
+    },
+    {
+      "id": "add-10",
+      "text": "Раздели на купить грунт и купить валик",
+      "target": "r2",
+      "expect": [
+        "addChild(r1, купить грунт)",
+        "addChild(r1, купить валик)"
+      ]
+    },
+    {
+      "id": "add-11",
+      "text": "Создай в корне проект звукоизоляция комнаты",
+      "target": null,
+      "expect": [
+        "addItem(звукоизоляция комнаты)"
+      ]
+    },
+    {
+      "id": "add-12",
+      "text": "Заметка: размер окна 120 на 80",
+      "target": "r1",
+      "expect": [
+        "addInfo(r1, размер окна 120 на 80)"
+      ]
+    },
+    {
+      "id": "ren-1",
+      "text": "Переименуй в карандаш линейка",
+      "target": "w1",
+      "expect": [
+        "editItem(w1, карандаш линейка)"
+      ]
+    },
+    {
+      "id": "ren-2",
+      "text": "Переименуй в переименуй 25",
+      "target": "w1",
+      "expect": [
+        "editItem(w1, переименуй 25)"
+      ]
+    },
+    {
+      "id": "ren-3",
+      "text": "Изменить на сделать установку",
+      "target": "r3",
+      "expect": [
+        "editItem(r3, сделать установку)"
+      ]
+    },
+    {
+      "id": "ren-4",
+      "text": "Назови её позвонить электрику Сергею",
+      "target": "r3",
+      "expect": [
+        "editItem(r3, позвонить электрику Сергею)"
+      ]
+    },
+    {
+      "id": "ren-5",
+      "text": "Переименуй купить краску в купить белую краску",
+      "target": null,
+      "expect": [
+        "editItem(r2, купить белую краску)"
+      ]
+    },
+    {
+      "id": "ren-6",
+      "text": "Исправь на отчёт для бухгалтера за сентябрь",
+      "target": "v1",
+      "expect": [
+        "editItem(v1, отчёт для бухгалтера за сентябрь)"
+      ]
+    },
+    {
+      "id": "ren-7",
+      "text": "Измени на помыть машину во вторник",
+      "target": "w1",
+      "expect": [
+        "editItem(w1, помыть машину)",
+        "setDeadline(w1, 2026-10-27)"
+      ]
+    },
+    {
+      "id": "st-1",
+      "text": "Готово",
+      "target": "r2",
+      "expect": [
+        "setStatus(r2, Done)"
+      ]
+    },
+    {
+      "id": "st-2",
+      "text": "Сделано",
+      "target": "r3",
+      "expect": [
+        "setStatus(r3, Done)"
+      ]
+    },
+    {
+      "id": "st-3",
+      "text": "Это удали",
+      "target": "w1",
+      "expect": [
+        "setStatus(w1, Archive)"
+      ]
+    },
+    {
+      "id": "st-4",
+      "text": "Убери в архив",
+      "target": "s2",
+      "expect": [
+        "setStatus(s2, Archive)"
+      ]
+    },
+    {
+      "id": "st-5",
+      "text": "Поставь в фокус",
+      "target": "r3",
+      "expect": [
+        "setStatus(r3, Focus)"
+      ]
+    },
+    {
+      "id": "st-6",
+      "text": "Отложи",
+      "target": "s2",
+      "expect": [
+        "setStatus(s2, Pause)"
+      ]
+    },
+    {
+      "id": "st-7",
+      "text": "Верни в работу старый проект",
+      "target": null,
+      "expect": [
+        "setStatus(o1, Open)"
+      ]
+    },
+    {
+      "id": "st-8",
+      "text": "Сделай заметкой",
+      "target": "r3",
+      "expect": [
+        "setStatus(r3, Info)"
+      ]
+    },
+    {
+      "id": "st-9",
+      "text": "Краску купил",
+      "target": null,
+      "expect": [
+        "setStatus(r2, Done)"
+      ]
+    },
+    {
+      "id": "st-10",
+      "text": "Отчёт для бухгалтера готов",
+      "target": null,
+      "expect": [
+        "setStatus(v1, Done)"
+      ]
+    },
+    {
+      "id": "dl-1",
+      "text": "Срок завтра",
+      "target": "r3",
+      "expect": [
+        "setDeadline(r3, 2026-10-21)"
+      ]
+    },
+    {
+      "id": "dl-2",
+      "text": "До пятницы",
+      "target": "r2",
+      "expect": [
+        "setDeadline(r2, 2026-10-23)"
+      ]
+    },
+    {
+      "id": "dl-3",
+      "text": "Дедлайн к концу месяца",
+      "target": "s2",
+      "expect": [
+        "setDeadline(s2, 2026-10-31)"
+      ]
+    },
+    {
+      "id": "dl-4",
+      "text": "Звонку электрику срок через неделю",
+      "target": null,
+      "expect": [
+        "setDeadline(r3, 2026-10-27)"
+      ]
+    },
+    {
+      "id": "dl-5",
+      "text": "Срок сегодня",
+      "target": "v1",
+      "expect": [
+        "setDeadline(v1, 2026-10-20)"
+      ]
+    },
+    {
+      "id": "mv-1",
+      "text": "Перенеси в сауну",
+      "target": "r3",
+      "expect": [
+        "setParent(r3, s1)"
+      ]
+    },
+    {
+      "id": "mv-2",
+      "text": "Это в ремонт квартиры",
+      "target": "s2",
+      "expect": [
+        "setParent(s2, r1)"
+      ]
+    },
+    {
+      "id": "mv-3",
+      "text": "Перенеси кабель для сауны в ремонт",
+      "target": null,
+      "expect": [
+        "setParent(s2, r1)"
+      ]
+    },
+    {
+      "id": "mv-4",
+      "text": "Вынеси в корень",
+      "target": "r2",
+      "expect": [
+        "setParent(r2, null)"
+      ]
+    },
+    {
+      "id": "ask-1",
+      "text": "Клубнику на паузу",
+      "target": null,
+      "ask": true
+    },
+    {
+      "id": "ask-2",
+      "text": "Клубнику с дачи на паузу",
+      "target": null,
+      "expect": [
+        "setStatus(k1, Pause)"
+      ]
+    },
+    {
+      "id": "ask-3",
+      "text": "Какие задачи в фокусе?",
+      "target": null,
+      "ask": true
+    },
+    {
+      "id": "ask-4",
+      "text": "Отметь готовой задачу про ракету",
+      "target": null,
+      "ask": true
+    },
+    {
+      "id": "rest-1",
+      "text": "Добавь купить молоко на завтра",
+      "target": null,
+      "expect": [
+        "addChild(inbox, купить молоко)"
+      ],
+      "rest": "завтра"
+    },
+    {
+      "id": "rest-2",
+      "text": "Готово и включи музыку",
+      "target": "r2",
+      "expect": [
+        "setStatus(r2, Done)"
+      ],
+      "rest": "музык"
+    },
+    {
+      "id": "mix-1",
+      "text": "Краску купил, электрику позвонить завтра",
+      "target": null,
+      "expect": [
+        "setStatus(r2, Done)",
+        "setDeadline(r3, 2026-10-21)"
+      ]
+    }
+  ]
+}
