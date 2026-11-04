@@ -11,12 +11,21 @@
 // the production request — store and reasoning_effort are OpenAI's and others may refuse them.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { resolveOpenAI } from '../worker/v2/model.js';
+import { resolveDecision } from './decision-agent.mjs';
 
 const { values: opt } = parseArgs({ options: {
   provider: { type: 'string', default: 'openai' }, model: { type: 'string', default: 'gpt-6-luna' },
   params: { type: 'string', default: '{}' }, runs: { type: 'string', default: '3' },
-  concurrency: { type: 'string', default: '4' }, json: { type: 'string' }, quiet: { type: 'boolean', default: false }
+  concurrency: { type: 'string', default: '4' }, json: { type: 'string' }, quiet: { type: 'boolean', default: false },
+  // At most N requests started per S seconds: --rate 5/30 for the AI Gateway, whose limit is that.
+  rate: { type: 'string' },
+  // A saved instruction (docs/text-agent-v1/instruction.txt) in place of the current one.
+  instruction: { type: 'string' },
+  // Another phrase corpus in place of docs/text-agent-corpus.json.
+  corpus: { type: 'string' }
 } });
 const PROVIDERS = {
   openai: { url: 'https://api.openai.com/v1/chat/completions', key: process.env.OPENAI_API_KEY },
@@ -25,21 +34,57 @@ const PROVIDERS = {
   ollama: { url: `${(process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/$/, '')}/v1/chat/completions`, key: 'ollama' },
   // A worker with the AI binding that takes this request and runs it on Workers AI (AI_BENCH_URL,
   // AI_BENCH_KEY). It reports the time spent inside env.AI.run as x-infer-ms.
-  'workers-ai': { url: process.env.AI_BENCH_URL, key: process.env.AI_BENCH_KEY }
+  'workers-ai': { url: process.env.AI_BENCH_URL, key: process.env.AI_BENCH_KEY },
+  // Clef + Clairic through the same worker (scripts/decision-agent.mjs); --model clef+clairic or
+  // clef-flash+clairic, --params '{"gateway":"…"}'.
+  decision: { url: process.env.AI_BENCH_URL, key: process.env.AI_BENCH_KEY }
 };
 const provider = PROVIDERS[opt.provider];
 if (!provider?.key) { console.error(`Нет ключа или провайдера: ${opt.provider}`); process.exit(2); }
 const params = JSON.parse(opt.params);
-const corpus = JSON.parse(readFileSync(new URL('../docs/text-agent-corpus.json', import.meta.url), 'utf8'));
+const instruction = opt.instruction ? readFileSync(opt.instruction, 'utf8') : null;
+const corpus = JSON.parse(readFileSync(opt.corpus || new URL('../docs/text-agent-corpus.json', import.meta.url), 'utf8'));
+
+const [rateCount, rateSeconds] = (opt.rate || '0/0').split('/').map(Number);
+if (opt.rate && !(rateCount > 0 && rateSeconds > 0)) { console.error('--rate пишется как N/S, например 5/30'); process.exit(2); }
+// The gateway counts requests, not runs: two runs started one after the other share the limit.
+// So the times of the last requests are kept in a file, and every run reads it before sending.
+const rateFile = join(tmpdir(), `eval-text-agent-rate-${rateCount}-${rateSeconds}.json`);
+const readStarts = () => { try { return JSON.parse(readFileSync(rateFile, 'utf8')); } catch { return []; } };
+async function paced() {
+  if (!rateCount) return;
+  for (;;) {
+    const now = Date.now();
+    const starts = readStarts().filter(time => now - time < rateSeconds * 1000).sort((x, y) => x - y);
+    if (starts.length < rateCount) { writeFileSync(rateFile, JSON.stringify([...starts, now])); return; }
+    await new Promise(resolve => setTimeout(resolve, starts[0] + rateSeconds * 1000 - now + 50));
+  }
+}
 
 const fetchFor = (timing) => async (url, options) => {
+  await paced();
   const body = { ...JSON.parse(options.body), ...params };
+  if (instruction && body.messages?.[0]?.role === 'system') body.messages[0] = { ...body.messages[0], content: instruction };
   for (const [key, value] of Object.entries(body)) if (value === null) delete body[key];
+  timing.sentAt ??= performance.now();
   const response = await fetch(provider.url, { ...options, signal: AbortSignal.timeout(120000), headers: { ...options.headers, Authorization: 'Bearer ' + provider.key }, body: JSON.stringify(body) });
   const server = response.headers.get('x-infer-ms');
   if (server) timing.serverMs = Number(server);
   if (!response.ok) { const text = await response.text(); return { ok: false, status: response.status, body: { cancel: async () => {} }, text }; }
   return response;
+};
+
+// A model that does not chat: its input goes to the worker as it is. Both calls of a request leave
+// together; the request's time is the slower of the two.
+const runRaw = (timing) => async (model, input) => {
+  await paced();
+  timing.sentAt ??= performance.now();
+  const response = await fetch(provider.url, { method: 'POST', signal: AbortSignal.timeout(120000), headers: { Authorization: 'Bearer ' + provider.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, raw: input, ...params }) });
+  const server = Number(response.headers.get('x-infer-ms'));
+  if (server) timing.serverMs = Math.max(timing.serverMs || 0, server);
+  const data = await response.json();
+  if (!response.ok || data.error) throw new Error(`${model}: ${data.error?.message || response.status}`.slice(0, 200));
+  return data;
 };
 
 const norm = (text) => String(text).toLowerCase().replace(/ё/g, 'е').replace(/[«»"'.,!?:;\s]+$/u, '').replace(/^[«»"'\s]+/u, '').replace(/\s+/g, ' ').trim();
@@ -73,10 +118,13 @@ async function runCase(item) {
   const timing = {};
   let answer = ''; let got = []; let error = null;
   try {
-    const raw = JSON.parse(await resolveOpenAI({ apiKey: provider.key, geminiApiKey: provider.key, model: opt.model, modelContext, fetchImpl: fetchFor(timing) }));
+    const raw = opt.provider === 'decision'
+      ? await resolveDecision(modelContext, runRaw(timing), { clefModel: opt.model.split('+')[0] })
+      : JSON.parse(await resolveOpenAI({ apiKey: provider.key, geminiApiKey: provider.key, model: opt.model, modelContext, fetchImpl: fetchFor(timing) }));
     answer = raw.answer; got = raw.commands.map(notation);
   } catch (caught) { error = caught.message; }
-  const ms = Math.round(performance.now() - started);
+  // Time from the request leaving, not from the case starting: waiting for the rate limit is not latency.
+  const ms = Math.round(performance.now() - (timing.sentAt ?? started));
   const want = (item.expect || []).map(parseExpected);
   const alt = (item.alt || []).map(parseExpected);
   let ok = !error && (item.ask ? got.length === 0 && answer.trim() !== '' : same(got, want) || (alt.length > 0 && same(got, alt)));
@@ -104,7 +152,7 @@ const percentile = (values, p) => { const sorted = [...values].sort((a, b) => a 
 const times = runs.flat().filter(result => !result.error).map(result => result.ms);
 const unstable = corpus.cases.filter((item, index) => new Set(runs.map(run => run[index].signature)).size > 1).map(item => item.id);
 const summary = {
-  provider: opt.provider, model: opt.model, params, cases: corpus.cases.length,
+  provider: opt.provider, model: opt.model, params, instruction: opt.instruction || 'current', cases: corpus.cases.length,
   correct: runs.map(run => run.filter(result => result.ok).length),
   errors: runs.flat().filter(result => result.error).length,
   identical: unstable.length === 0, unstable,

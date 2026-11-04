@@ -8,12 +8,21 @@ export default {
       try { return Response.json(await env.AI.models({ task: 'Text Generation', per_page: 200 })); } catch (error) { return Response.json({ error: String(error) }, { status: 500 }); }
     }
     const body = await request.json();
-    const { model, messages, tools, temperature, seed, max_completion_tokens, reasoning_effort, extra = {} } = body;
+    // Models that do not chat (Clef, Clairic): their input goes through as it is.
+    if (body.raw) {
+      const started = Date.now();
+      try {
+        const out = await env.AI.run(body.model, body.raw, body.gateway ? { gateway: { id: body.gateway } } : {});
+        return Response.json(out, { headers: { 'x-infer-ms': String(Date.now() - started) } });
+      } catch (error) { return Response.json({ error: { message: String(error?.message || error) } }, { status: 502 }); }
+    }
+    const { model, messages, tools, temperature, seed, max_completion_tokens, reasoning_effort, extra = {}, gateway } = body;
     const input = { messages, ...(tools ? { tools } : {}), ...(temperature != null ? { temperature } : {}), ...(seed != null ? { seed } : {}),
       max_tokens: max_completion_tokens || 1500, ...(reasoning_effort ? { reasoning_effort } : {}), ...extra };
     const started = Date.now();
     let out;
-    try { out = await env.AI.run(model, input); } catch (error) { return Response.json({ error: { message: String(error?.message || error) } }, { status: 502 }); }
+    // gateway: the AI Gateway id; paid models are billed to its prepaid credits.
+    try { out = await env.AI.run(model, input, gateway ? { gateway: { id: gateway } } : {}); } catch (error) { return Response.json({ error: { message: String(error?.message || error) } }, { status: 502 }); }
     const ms = Date.now() - started;
     const headers = { 'x-infer-ms': String(ms) };
     if (out?.choices) {
