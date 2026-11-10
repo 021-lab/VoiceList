@@ -55,6 +55,7 @@ export class Client {
     this.nodes = new Map();
     this.backStack = [];
     this.pending = new Map();
+    this.inFlight = new Set();
     try { for (const body of JSON.parse(this.readStorage('voicelist.v02.pending') || '[]')) this.pending.set(body.key.seq, body); } catch { /* ignore corrupt browser cache */ }
     this.collapsed = new Map();
     this.seenActions = new Set();
@@ -230,7 +231,7 @@ export class Client {
     return { elementId: target?.id || target?.elementId || 'menu:list', view: this.viewContext.view, revision: this.document?.revision || 0,
       ...(this.viewContext.actionId ? { actionId: this.viewContext.actionId } : {}) };
   }
-  async submit(input) {
+  async submit(input, { awaitingResult = false } = {}) {
     if (typeof input.text === 'string' && !input.text.trim()) return null;
     const body = { key: { clientKey: this.clientKey, seq: ++this.seq }, context: input.context || this.context(),
       ...(input.command ? { command: input.command } : { text: input.text.trim() }) };
@@ -238,23 +239,29 @@ export class Client {
     this.pending.set(body.key.seq, body);
     this.savePending();
     this.pollNow();
-    return this.deliver(body);
+    return this.deliver(body, { awaitingResult });
   }
   savePending() { this.writeStorage('voicelist.v02.pending', JSON.stringify([...this.pending.values()])); }
-  async deliver(body) {
+  async deliver(body, { awaitingResult = false } = {}) {
+    // A resend from flush() while the first request is still out would be the same command
+    // twice on the wire; the server dedupes it, but each copy costs a round trip.
+    if (this.inFlight.has(body.key.seq)) return null;
+    this.inFlight.add(body.key.seq);
     try {
       const receipt = await this.request('/api/v2/input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (receipt.requestId) this.requests.set(receipt.requestId, body);
       this.pending.delete(body.key.seq); this.savePending();
       if (receipt.status === 'rejected' || receipt.error) throw Object.assign(new Error(receipt.error?.message || receipt.error || 'Команда отклонена'), { status: 400 });
       this.editorDirty = false;
-      await this.loadDocument();
+      // A command still being worked on shows nothing new yet; whoever waits for its result
+      // loads the document once it is there.
+      if (!(awaitingResult && receipt.status === 'accepted')) await this.loadDocument();
       return receipt;
     } catch (error) {
       if (error.status >= 400 && error.status < 500) { this.pending.delete(body.key.seq); this.savePending(); }
       this.showToast(error.message || 'Не удалось отправить. Повторим после подключения.');
       throw error;
-    }
+    } finally { this.inFlight.delete(body.key.seq); }
   }
   async flush() { for (const body of this.pending.values()) await this.deliver(body); }
   handleInput(input) {
@@ -262,7 +269,8 @@ export class Client {
   }
   async command(command, taskId = null, payload = {}, target = null) {
     try {
-      const receipt = await this.submit({ context: this.context(target || (taskId ? { id: `task:${taskId}` } : null)), command: { command, actId: taskId, actType: taskId ? 'task' : 'list', payload } });
+      const receipt = await this.submit({ context: this.context(target || (taskId ? { id: `task:${taskId}` } : null)), command: { command, actId: taskId, actType: taskId ? 'task' : 'list', payload } }, { awaitingResult: true });
+      if (!receipt) return null;
       return receipt.status === 'accepted' ? await this.waitForCompletion(receipt.requestId) : receipt;
     } catch (error) { this.showToast(error.message); return null; }
   }
