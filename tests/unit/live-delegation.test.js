@@ -51,5 +51,10 @@ describe('held confirmations the voice already covered', () => {
   it('are dropped when the voice named the task, whatever the ending', () => {
     expect(stillUnsaid(['Голден на паузе', 'Добавил: хлеб'], ['Поставила «Голдена» на паузу.'])).toEqual(['Добавил: хлеб']);
     expect(stillUnsaid(['Добавил: хлеб'], ['Хлеб добавлен.'])).toEqual([]);
+    expect(stillUnsaid(['Купить бангкокэйр авиабилеты жене готово'], ['Отметил: авиабилеты жене куплены.'])).toEqual([]);
+    expect(stillUnsaid(['Добавил: купить молоко'], ['Молоко добавила.'])).toEqual([]);
+    expect(stillUnsaid(['Заметка добавлена'], ['Заметку добавила.'])).toEqual([]);
+    expect(stillUnsaid(['Добавил: кот'], ['Который из них?'])).toEqual(['Добавил: кот']);
+    expect(stillUnsaid(['Купить бангкокэйр авиабилеты жене готово'], ['В фокусе отчёт.'])).toEqual(['Купить бангкокэйр авиабилеты жене готово']);
   });
 });

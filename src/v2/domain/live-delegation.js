@@ -50,21 +50,27 @@ export function deliveryFor({ elapsedMs, active, failed, answer = false, text })
   return { kind: 'hold', content: text };
 }
 
-const LEAD_WORDS = new Set(['добавил', 'теперь', 'заметка', 'срок', 'промпт', 'перенёс', 'сделал', 'готово']);
+const SERVICE_WORDS = new Set(['добавил', 'теперь', 'заметка', 'добавлена', 'срок', 'стоит', 'промпт', 'изменён', 'перенёс',
+  'перенесена', 'сделал', 'готово', 'открыта', 'фокусе', 'паузе', 'архиве', 'января', 'февраля', 'марта', 'апреля',
+  'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']);
 
-/** The task a confirmation is about, as a stem that survives Russian endings: «Голден на
- *  паузе» → «голде», matched in «Голден», «Голдена». */
-function subjectStem(text) {
-  const words = String(text || '').toLowerCase().replace(/[«»"':,.…]/g, ' ').split(/\s+/).filter(Boolean);
-  const word = words.find(item => !LEAD_WORDS.has(item) && item.length >= 3);
-  return word ? word.slice(0, 5) : null;
+/** The words of a confirmation as stems that survive most Russian endings: «Голден на паузе»
+ *  → «голд». Words under four letters are left out: «кот» is inside «который». */
+function stems(text, { service = false } = {}) {
+  return String(text || '').toLowerCase().replace(/[«»"':,.…—-]/g, ' ').split(/\s+/)
+    .filter(word => word.length >= 4 && (service || !SERVICE_WORDS.has(word))).map(word => word.slice(0, 4));
 }
 
 /** Held confirmations the voice has not already covered in its own words. A newer message
- *  that names the task makes the aside a repeat, and the owner allows dropping it. */
+ *  that names the task makes the aside a repeat, and the owner allows dropping it. One word
+ *  of the title is enough; a confirmation with no title («Заметка добавлена») is matched by
+ *  its own words. */
 export function stillUnsaid(held = [], voiceSince = []) {
-  const said = voiceSince.join(' ').toLowerCase();
-  return held.filter(text => { const stem = subjectStem(text); return !stem || !said.includes(stem); });
+  const said = new Set(stems(voiceSince.join(' '), { service: true }));
+  return held.filter(text => {
+    const title = stems(text);
+    return !(title.length ? title : stems(text, { service: true })).some(stem => said.has(stem));
+  });
 }
 
 /** Held confirmations fill the gap after the next question: «Думаю, кстати, клубника на паузе»
