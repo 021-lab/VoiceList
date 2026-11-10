@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_BACKEND_MODEL, DEFAULT_VOICE_PROMPT, LIVE_MODEL, LIVE_TOOL_NAMES, SNAPSHOT_HEADER,
-  buildLiveSessionConfig, formatSnapshotDeltas, formatTaskSnapshot, isLoggableEvent, readFunctionCall
+  DEFAULT_VOICE_PROMPT, LIVE_MODEL, LIVE_TOOL_NAMES, SNAPSHOT_HEADER,
+  buildLiveSessionConfig, composeBackendInstructions, composeToolGuide, formatSnapshotDeltas, formatTaskSnapshot, isLoggableEvent, readFunctionCall
 } from '../../src/v2/domain/live-session.js';
 
 const task = (id, parentId, status, title, extra = {}) => ({ id, parentId, order: 10, status, title, collapsed: false, tags: [], ...extra });
@@ -73,27 +73,33 @@ describe('snapshot deltas', () => {
 });
 
 describe('session config', () => {
-  const config = buildLiveSessionConfig({ items: sample, voicePrompt: 'Голос.', backendPrompt: 'Бэкенд.', backendModel: 'gpt-5.6-terra' });
+  const config = buildLiveSessionConfig({ items: sample, voicePrompt: 'Голос.' });
 
-  it('runs gpt-live-1 with responses delegation', () => {
+  it('runs gpt-live-1 with client delegation, so the server answers every handover', () => {
     expect(config.model).toBe(LIVE_MODEL);
-    expect(config.delegation.type).toBe('responses');
-    expect(config.delegation.responses.model).toBe('gpt-5.6-terra');
-    expect(config.delegation.responses.instructions).toBe('Бэкенд.');
-  });
-
-  it('puts the tools on the backend, not on the session', () => {
+    expect(config.delegation).toEqual({ type: 'client' });
     expect(config.tools).toBeUndefined();
-    expect(config.delegation.responses.tools.map(tool => tool.name)).toEqual(LIVE_TOOL_NAMES);
   });
 
-  it('carries the task snapshot in the voice instructions', () => {
+  it('carries the prompt, the shared tool guide and the task snapshot in the voice instructions', () => {
     expect(config.instructions).toContain('Голос.');
+    expect(config.instructions).toContain('Инструменты:');
     expect(config.instructions).toContain('rt\trs\tO\tГолден');
   });
+});
 
-  it('falls back to the default backend model', () => {
-    expect(buildLiveSessionConfig({}).delegation.responses.model).toBe(DEFAULT_BACKEND_MODEL);
+describe('backend instructions', () => {
+  const text = composeBackendInstructions('Бэкенд.', formatTaskSnapshot(sample), '2026-10-21');
+
+  it('start with the prompt and carry the same tool guide as the voice, the date and the table', () => {
+    expect(text.startsWith('Бэкенд.')).toBe(true);
+    expect(text).toContain(composeToolGuide());
+    expect(text).toContain('Сегодня 2026-10-21.');
+    expect(text).toContain('rt\trs\tO\tГолден');
+  });
+
+  it('list every tool in the shared guide', () => {
+    for (const name of LIVE_TOOL_NAMES) expect(composeToolGuide()).toContain(`${name}(`);
   });
 });
 
@@ -132,12 +138,9 @@ describe('loggable events', () => {
 });
 
 describe('the voice prompt', () => {
-  it('makes the choice between several matching tasks a dialogue that precedes delegation', () => {
-    expect(DEFAULT_VOICE_PROMPT).toContain('Подошло несколько');
-    expect(DEFAULT_VOICE_PROMPT).toContain('Дождись ответа');
-    expect(DEFAULT_VOICE_PROMPT).toContain('к бэкенду не обращайся');
-    expect(DEFAULT_VOICE_PROMPT).toContain('обязательно содержит идентификатор выбранной');
-    // A single match must still go through without a question, or every change costs a turn.
-    expect(DEFAULT_VOICE_PROMPT).toContain('Подошла ровно одна — не переспрашивай');
+  it('hands requests over in silence by the GPT-Live delegation marker', () => {
+    expect(DEFAULT_VOICE_PROMPT).toContain('Generate <|SpawnThinking|> when:');
+    expect(DEFAULT_VOICE_PROMPT).toContain('that is your entire turn');
+    expect(DEFAULT_VOICE_PROMPT).toContain('Неудачу называй всегда');
   });
 });

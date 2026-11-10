@@ -1,9 +1,11 @@
 import {
   DEFAULT_BACKEND_MODEL, LIVE_TOOLS, buildLiveSessionConfig, chunkDeltaLines, diffSnapshotRows,
   isLoggableEvent, readFunctionCall, snapshotRows, toTaskCommand, buildSimulatedInput,
-  buildSimulatedVoiceInput, composeVoiceInstructions, formatTaskSnapshot, DEFAULT_VOICE_PROMPT
+  buildSimulatedVoiceInput, composeVoiceInstructions, composeBackendInstructions, formatTaskSnapshot, DEFAULT_VOICE_PROMPT
 } from '../../src/v2/domain/live-session.js';
 import { promptVersion } from '../../src/v2/domain/live-settings.js';
+import { QUICK_RESULT_MS, buildSolInput, confirmText, deliveryFor } from '../../src/v2/domain/live-delegation.js';
+import { parseCommand, toCommand } from '../../src/command-resolver.js';
 import { fail, safeError } from '../../src/v2/domain/contracts.js';
 
 export const OPENAI_LIVE_SESSIONS_URL = 'https://api.openai.com/v1/live/sessions';
@@ -12,8 +14,23 @@ export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 /** Two utterances by the same speaker are separated by a pause, not by an event. */
 const SILENCE_GAP_MS = 1_500;
 
-/** The Responses API takes the same function schemas the delegation config carries. */
-const LIVE_TOOLS_FOR_RESPONSES = LIVE_TOOLS;
+/** How much of the conversation the backend reads, and how many passes it may take. */
+const DIALOG_TURNS = 12;
+const MAX_BACKEND_PASSES = 4;
+
+/** A spoken update sent while the voice is still talking can be lost, so it waits for this
+ *  much quiet — but not longer than the cap, after which it goes anyway. */
+const QUIET_MS = 500;
+const QUIET_WAIT_CAP_MS = 6_000;
+
+/** The tail of a request can still be in transcription when the handover arrives. */
+const TRANSCRIPT_GRACE_MS = 400;
+
+/** The local parser reads «добавь X» and takes everything after the verb as the title, so it
+ *  is trusted only with a plain title: a place, a date or a second request in the same breath
+ *  would end up inside the title. Those go to the backend. */
+const NOT_A_PLAIN_TITLE = /(^|\s)(в|во|на|под|к|ко|до|за|и|а|потом|ещё|еще|через|завтра|сегодня|послезавтра|срок|дедлайн)(\s|$)/i;
+
 
 const PROMPT_TOOLS = new Set(['getVoicePrompt', 'getBackendPrompt', 'setVoicePrompt', 'setBackendPrompt']);
 
@@ -41,6 +58,7 @@ export class LiveHost {
   get sessionId() { return this.session?.id || ''; }
 
   stamp() { return this.now().toISOString(); }
+  today() { return this.stamp().slice(0, 10); }
 
   /** The session id is passed explicitly where the handler outlives the session, so a
    *  closing event is still attributed rather than landing under an empty id. */
@@ -63,10 +81,10 @@ export class LiveHost {
     if (this.active) await this.stop('replaced');
 
     const items = await this.services.readItems();
-    const [voicePrompt, backendPrompt, backendModel, reasoningEffort] = await Promise.all([
-      this.settings.prompt('voice'), this.settings.prompt('backend'), this.settings.backendModel(), this.settings.reasoningEffort()
+    const [voicePrompt, backendPrompt, backendModel] = await Promise.all([
+      this.settings.prompt('voice'), this.settings.prompt('backend'), this.settings.backendModel()
     ]);
-    const config = buildLiveSessionConfig({ items, voicePrompt, backendPrompt, backendModel, reasoningEffort, store: this.store });
+    const config = buildLiveSessionConfig({ items, voicePrompt, store: this.store });
 
     // Every attempt leaves a trace, including one that never reaches OpenAI: an attempt
     // missing from the log would be indistinguishable from one that was never made.
@@ -98,7 +116,10 @@ export class LiveHost {
     const answer = String(payload?.transport?.sdp || '');
     if (!id || !answer) fail('MODEL_UNAVAILABLE', 'GPT-Live не вернул идентификатор сессии');
 
-    this.session = { id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false };
+    this.session = {
+      id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false,
+      dialog: [], handedOver: 0, lastUserStartMs: -1, delegations: 0, voiceAt: 0, spoken: Promise.resolve()
+    };
 
     // The session record carries the prompt versions and the model name: an entry from last
     // week cannot be read without knowing which text drove the model then. The response is
@@ -151,6 +172,8 @@ export class LiveHost {
     const silence = speech && startMs != null && speech.endMs != null && startMs - speech.endMs > SILENCE_GAP_MS;
     if (speech && (speech.role !== role || silence)) this.flushSpeech();
     if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs };
+    if (role === 'user' && startMs != null) this.session.lastUserStartMs = Math.max(this.session.lastUserStartMs, startMs);
+    if (role === 'assistant') this.session.voiceAt = Date.now();
     this.session.speech.text += String(event?.delta ?? '');
     if (endMs != null) this.session.speech.endMs = endMs;
   }
@@ -162,6 +185,7 @@ export class LiveHost {
     const text = speech.text.trim();
     if (!text) return;
     this.record({ type: 'vl.speech', role: speech.role, text, start_ms: speech.startMs, end_ms: speech.endMs });
+    this.session.dialog.push({ role: speech.role, text });
     // The same turn goes on the bus, where the change it causes will point back at it. The
     // session log keeps its own copy with the timeline; the bus keeps the words. Turns are
     // written one after another: an answer can only be linked to the turn before it once
@@ -252,9 +276,9 @@ export class LiveHost {
     ]);
     const body = {
       model: backendModel || DEFAULT_BACKEND_MODEL,
-      instructions: backendPrompt,
+      instructions: composeBackendInstructions(backendPrompt, formatTaskSnapshot(items), this.today()),
       input: buildSimulatedInput(turns),
-      tools: LIVE_TOOLS_FOR_RESPONSES,
+      tools: LIVE_TOOLS,
       tool_choice: 'auto',
       store: false,
       ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {})
@@ -327,6 +351,7 @@ export class LiveHost {
     else if (event?.type === 'session.delegation.created') {
       this.flushSpeech();
       this.record({ type: 'vl.delegation', delegation: event.delegation, offset_ms: event.offset_ms, raw: event });
+      if (event.delegation?.id) this.handleDelegation(event.delegation.id, event.offset_ms).catch(error => this.record({ type: 'vl.delegation.failed', error: safeError(error) }, 'out'));
     }
     else {
       // Delegation events arrive wrapped in response.event, so the skip list has to be applied
@@ -338,40 +363,160 @@ export class LiveHost {
         this.fetchBackendInput(event?.delegation_id || null, inner.response, this.sessionId).catch(() => {});
       }
     }
-    this.dispatch(event).catch(error => this.record({ type: 'vl.dispatch.failed', error: safeError(error) }, 'out'));
+    if (event?.type === 'session.closed') { this.flushSpeech(); this.session = null; }
   }
 
-  async dispatch(event) {
-    if (event?.type === 'session.closed') { this.flushSpeech(); this.session = null; return; }
-    if (event?.type !== 'response.event') return;
-    const inner = event.event;
-    if (inner?.type !== 'response.output_item.done') return;
-    const call = readFunctionCall(inner);
-    if (!call) return;
-    // Close the turn before the change is made, so the change has an utterance to point at.
-    this.flushSpeech();
+  /** A request the voice handed over. Answered by the local parser when it is sure, otherwise
+   *  by the backend model; the result reaches the voice by the owner's timing rule. */
+  async handleDelegation(delegationId, offsetMs) {
+    const session = this.session;
+    if (!session) return;
+    const order = ++session.delegations;
+    const startedAt = Date.now();
+    if (!session.dialog.slice(session.handedOver).some(turn => turn.role === 'user')) {
+      await new Promise(resolve => setTimeout(resolve, TRANSCRIPT_GRACE_MS));
+      if (this.session === session) this.flushSpeech();
+    }
+    const turns = session.dialog.slice(session.handedOver);
+    session.handedOver = session.dialog.length;
+    const movedOn = () => this.session !== session || session.delegations > order || session.lastUserStartMs > (offsetMs ?? Infinity);
+    // Turns are written to the journal one after another; the change has to point at this one.
+    await this.turns;
 
-    let output;
-    try { output = await this.invoke(call); }
-    catch (error) { output = { status: 'rejected', reason: safeError(error).message }; }
+    let reported = false;
+    const thinking = setTimeout(() => {
+      if (!reported && !movedOn()) this.speak(session, delegationId, 'Думаю.');
+    }, QUICK_RESULT_MS);
+    // A request can yield more than one result: the backend's writes are confirmed at once
+    // and it finishes the rest of the request afterwards. Each result meets the timing rule.
+    const report = (result) => {
+      reported = true;
+      clearTimeout(thinking);
+      if (this.session !== session || !result?.text) return;
+      const elapsedMs = Date.now() - startedAt;
+      const delivery = deliveryFor({ elapsedMs, movedOn: movedOn(), failed: result.failed, text: result.text });
+      this.record({ type: 'vl.delegation.result', delegation_id: delegationId, by: result.by || null, elapsed_ms: elapsedMs, failed: Boolean(result.failed), delivery }, 'out');
+      if (delivery.kind === 'thinking') this.append('session.thinking.append', delegationId, delivery.content);
+      else this.speak(session, delegationId, delivery.content);
+    };
+    try { await this.answer(turns, session, report); }
+    catch (error) { report({ failed: true, text: `Не вышло: ${safeError(error).message}` }); }
+    // Nothing to say is not success: a made-up «готово» is worse than an honest failure.
+    if (!reported) report({ failed: true, text: 'Не вышло: ответа нет' });
+  }
 
-    this.send({ type: 'response.item.create', item: { type: 'function_call_output', call_id: call.callId, output: JSON.stringify(output) } });
-    // parallel_tool_calls is off, so a response carries one call at a time and resuming here
-    // never strands a second pending result.
-    this.send({ type: 'response.create' });
+  /** Spoken updates go one at a time and each waits for the voice to fall quiet: one sent
+   *  over the voice's own speech was dropped in a live test («Думаю» was said, the result
+   *  right after it never was). */
+  speak(session, delegationId, content) {
+    const say = async () => {
+      const until = Date.now() + QUIET_WAIT_CAP_MS;
+      while (this.session === session && Date.now() - session.voiceAt < QUIET_MS && Date.now() < until) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if (this.session === session) this.append('session.commentary.append', delegationId, content);
+    };
+    session.spoken = session.spoken.then(say, say);
+    return session.spoken;
+  }
+
+  append(type, delegationId, content) {
+    return this.send({ type, delegation_id: delegationId, content: String(content || '').slice(0, 1_500) });
+  }
+
+  async answer(turns, session, report) {
+    if (this.session !== session) return;
+    const said = turns.filter(turn => turn.role === 'user');
+    const parsed = said.length === 1 ? parseCommand(said[0].text.trim(), null) : { kind: 'many' };
+    const local = parsed.kind === 'one' ? toCommand(parsed.hypothesis, null) : null;
+    if (local?.command === 'addChild' && !NOT_A_PLAIN_TITLE.test(local.payload?.title || '')) {
+      const outcome = await this.apply({ ...local, source: 'gpt-live' });
+      report(outcome.status === 'rejected'
+        ? { by: 'parser', failed: true, text: `Не вышло: ${outcome.reason}` }
+        : { by: 'parser', failed: false, text: outcome.confirm });
+      return;
+    }
+    await this.askBackend(session, result => report({ by: 'backend', ...result }));
+  }
+
+  /** Writes run here and are confirmed by the server in a few words the moment they land; the
+   *  backend's own pass after them only continues a request that holds more than one change.
+   *  Its closing words after writes are dropped: the server has already said them. */
+  async askBackend(session, report) {
+    if (!this.apiKey) fail('MODEL_UNAVAILABLE', 'Ключ OpenAI не настроен');
+    const [backendPrompt, backendModel, reasoningEffort, items] = await Promise.all([
+      this.settings.prompt('backend'), this.settings.backendModel(), this.settings.reasoningEffort(), this.services.readItems()
+    ]);
+    const base = {
+      model: backendModel || DEFAULT_BACKEND_MODEL,
+      instructions: composeBackendInstructions(backendPrompt, formatTaskSnapshot(items), this.today()),
+      tools: LIVE_TOOLS,
+      tool_choice: 'auto',
+      parallel_tool_calls: true,
+      store: this.store,
+      ...(this.store ? {} : { include: ['reasoning.encrypted_content'] }),
+      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {})
+    };
+    let input = buildSolInput(session.dialog.slice(-DIALOG_TURNS));
+    let previous = null;
+    let wrote = false;
+    for (let pass = 0; pass < MAX_BACKEND_PASSES; pass++) {
+      const body = { ...base, input, ...(previous ? { previous_response_id: previous } : {}) };
+      const reply = await this.fetchImpl(this.responsesUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const raw = await reply.text();
+      if (!reply.ok) fail('MODEL_UNAVAILABLE', `Sol не ответил (${reply.status})`);
+      const payload = JSON.parse(raw);
+      const output = payload.output || [];
+      this.record({ type: 'vl.backend.response', response_id: payload.id, model: payload.model, pass, output, usage: payload.usage || null }, 'in');
+      const text = output.filter(item => item.type === 'message').flatMap(item => (item.content || []).map(part => part.text)).filter(Boolean).join(' ').trim();
+      const calls = output.map(readFunctionCall).filter(Boolean);
+      if (!calls.length) {
+        // After writes the server has spoken for them; only a question still needs the voice.
+        if (text && (!wrote || text.endsWith('?'))) report({ failed: false, text });
+        return;
+      }
+      if (this.session !== session) return;
+
+      const results = [];
+      const confirmations = [];
+      const failures = [];
+      for (const call of calls) {
+        let outcome;
+        try { outcome = await this.invoke(call); }
+        catch (error) { outcome = { status: 'rejected', reason: safeError(error).message }; }
+        if (outcome.status === 'rejected') failures.push(outcome.reason);
+        else if (outcome.confirm) confirmations.push(outcome.confirm);
+        const { confirm, ...visible } = outcome;
+        results.push({ type: 'function_call_output', call_id: call.callId, output: JSON.stringify(visible) });
+      }
+      if (failures.length) {
+        report({ failed: true, text: [...confirmations, `не вышло: ${failures.join('; ')}`].join(', ').replace(/^н/, 'Н') });
+        return;
+      }
+      if (confirmations.length) { wrote = true; report({ failed: false, text: confirmations.join(', ') }); }
+      previous = this.store ? payload.id : null;
+      input = this.store ? results : [...input, ...output, ...results];
+    }
   }
 
   async invoke(call) {
     if (call.name === 'getFrontier') return { status: 'ok', frontier: await this.services.readFrontier() };
     if (PROMPT_TOOLS.has(call.name)) return this.invokePrompt(call);
+    return this.apply(toTaskCommand(call.name, call.arguments));
+  }
 
-    const command = toTaskCommand(call.name, call.arguments);
+  async apply(command) {
     const ack = await this.services.applyCommand(
       command, { clientKey: `gpt-live:${this.sessionId}`, seq: ++this.session.seq }, this.session?.utterance || null
     );
     if (ack?.status === 'rejected') return { status: 'rejected', reason: ack.reason || 'Операция отклонена' };
-    await this.syncSnapshot();
-    return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId };
+    const items = await this.services.readItems();
+    await this.syncSnapshot(items);
+    return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId, confirm: confirmText(command, items) };
   }
 
   async invokePrompt(call) {
@@ -379,17 +524,14 @@ export class LiveHost {
     if (call.name.startsWith('get')) return { status: 'ok', target, prompt: await this.settings.prompt(target) };
     const result = await this.settings.writePrompt(target, { mode: call.arguments.mode, text: call.arguments.text, source: 'model' });
     if (result.changed) await this.applyPromptChange(target, result.prompt, call.arguments);
-    return { status: result.changed ? 'applied' : 'unchanged', target, chars: result.prompt.length };
+    return { status: result.changed ? 'applied' : 'unchanged', target, chars: result.prompt.length, confirm: result.changed ? 'Промпт изменён' : 'Промпт уже такой' };
   }
 
   /** Prompts are fixed at session creation, so a saved edit alone would look ignored in the
    *  conversation that asked for it. The voice layer's instructions are immutable after
-   *  startup and can only be appended to; the backend's are updatable in place. */
+   *  startup and can only be appended to; the backend's prompt is read on every request. */
   async applyPromptChange(target, prompt, args) {
-    if (target === 'backend') {
-      this.send({ type: 'session.update', session: { delegation: { type: 'responses', responses: { instructions: prompt } } } });
-      return;
-    }
+    if (target === 'backend') return;
     const note = args?.mode === 'append' ? String(args.text || '').trim() : prompt;
     for (const chunk of chunkDeltaLines(note.split('\n').filter(Boolean))) {
       this.send({ type: 'session.instructions.append', delegation_id: null, content: chunk });
@@ -398,13 +540,15 @@ export class LiveHost {
 
   /** Keeps the voice layer's table current after any change, including one made by hand in
    *  the interface, by diffing the rendered rows rather than the graph's own change list. */
-  async syncSnapshot() {
+  async syncSnapshot(items = null) {
     if (!this.active) return [];
-    const rows = snapshotRows(await this.services.readItems());
+    const rows = snapshotRows(items || await this.services.readItems());
     const lines = diffSnapshotRows(this.session.rows, rows);
     this.session.rows = rows;
+    // Background context, not an instruction: an instruction append can cut the voice off
+    // mid-sentence. The backend reads the whole table afresh on every request.
     for (const chunk of chunkDeltaLines(lines)) {
-      this.send({ type: 'session.instructions.append', delegation_id: null, content: `Изменения в задачах:\n${chunk}` });
+      this.send({ type: 'session.thinking.append', delegation_id: null, content: `Изменения в задачах:\n${chunk}` });
     }
     return lines;
   }
