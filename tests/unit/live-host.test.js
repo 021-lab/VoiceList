@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveHost } from '../../worker/v2/live-host.js';
 import { LiveSettings } from '../../src/v2/domain/live-settings.js';
 import { DEFAULT_VOICE_PROMPT } from '../../src/v2/domain/live-session.js';
@@ -17,18 +17,26 @@ const memory = () => { const map = new Map(); return { map, async get(k) { retur
 
 const task = (id, parentId, status, title) => ({ id, parentId, order: 10, status, title, collapsed: false, tags: [] });
 
-function harness({ createOk = true, attachOk = true, applyAck = { status: 'applied', newTarget: 'rs' } } = {}) {
+function harness({ createOk = true, attachOk = true, applyAck = { status: 'applied', newTarget: 'rs' }, backend = [], backendDelayMs = 0 } = {}) {
   const socket = new FakeSocket();
   const rows = [];
   let items = [task('rs', null, 'Open', 'Яблоки'), task('rt', 'rs', 'Open', 'Голден')];
   const calls = [];
+  const replies = [...backend];
   const fetchImpl = async (url, options) => {
     if (String(url).endsWith('/attach')) return attachOk ? { status: 101, webSocket: socket } : { status: 403, webSocket: null };
     calls.push({ url, body: JSON.parse(options.body) });
+    if (String(url).endsWith('/responses')) {
+      if (backendDelayMs) await new Promise(resolve => setTimeout(resolve, backendDelayMs));
+      const output = replies.shift() || [];
+      const id = `resp_${calls.filter(call => String(call.url).endsWith('/responses')).length}`;
+      return { ok: true, status: 200, text: async () => JSON.stringify({ id, model: 'gpt-6.1-sol', output }) };
+    }
     if (!createOk) return { ok: false, status: 400, text: async () => 'nope' };
     return { ok: true, status: 201, json: async () => ({ session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer-sdp' } }) };
   };
   const applied = [];
+  const signals = [];
   const host = new LiveHost({
     log: { append: (event, options) => { rows.push({ ...options, event }); } },
     settings: new LiveSettings(memory()),
@@ -37,10 +45,11 @@ function harness({ createOk = true, attachOk = true, applyAck = { status: 'appli
     services: {
       readItems: async () => items,
       readFrontier: async () => [{ taskId: 'rt', taskTitle: 'Голден' }],
-      applyCommand: async (command, meta) => { applied.push({ command, meta }); return applyAck; }
+      applyCommand: async (command, meta) => { applied.push({ command, meta }); return applyAck; },
+      changed: () => { signals.push(applied.length); }
     }
   });
-  return { host, socket, rows, applied, calls, setItems: next => { items = next; } };
+  return { host, socket, rows, applied, calls, signals, setItems: next => { items = next; } };
 }
 
 describe('starting a session', () => {
@@ -60,7 +69,7 @@ describe('starting a session', () => {
     const created = rows.find(row => row.event.type === 'vl.session.created');
     expect(created.event.requested.store).toBe(true);
     expect(created.event.requested.voicePromptVersion).toBeTruthy();
-    expect(created.event.requested.backendModel).toBe('gpt-5.6-luna');
+    expect(created.event.requested.backendModel).toBe('gpt-6.1-sol');
   });
 
   it('fails when the sideband cannot attach, rather than leaving a voice that cannot act', async () => {
@@ -142,6 +151,12 @@ describe('logging', () => {
       .toEqual(['переименуй первый', 'а ещё добавь второй']);
   });
 
+  it('keeps the delegation marker out of the recorded words', async () => {
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: '<|SpawnThinking|> Заметка.', start_ms: 0, end_ms: 300 });
+    context.socket.deliver({ type: 'session.closed', reason: 'client' });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => row.event.text)).toEqual(['Заметка.']);
+  });
+
   it('starts a new record when the other speaker begins', async () => {
     context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'привет', start_ms: 0, end_ms: 100 });
     context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'слушаю', start_ms: 120, end_ms: 300 });
@@ -156,113 +171,397 @@ describe('logging', () => {
   });
 });
 
-describe('tool calls', () => {
-  const functionCall = (name, args, callId = 'call_1') => ({
-    type: 'response.event', delegation_id: 'item_1',
-    event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: callId, name, arguments: JSON.stringify(args) } }
-  });
-  const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+const fn = (name, args, callId = 'call_1') => ({ type: 'function_call', call_id: callId, name, arguments: JSON.stringify(args) });
+const say = (text) => ({ type: 'message', content: [{ type: 'output_text', text }] });
+const backendCalls = (context) => context.calls.filter(call => String(call.url).endsWith('/responses'));
+const spoken = (context) => context.socket.sent.filter(message => message.type === 'session.commentary.append');
 
-  it('runs a task change through the ordinary command path and answers the call', async () => {
+/** The voice hands the request over in silence; what comes back is decided here. */
+async function request(context, text, { offset = 1_000 } = {}) {
+  context.socket.deliver({ type: 'session.input_transcript.delta', delta: text, start_ms: offset - 900, end_ms: offset - 100 });
+  context.socket.deliver({ type: 'session.delegation.created', delegation: { id: 'item_1', type: 'delegation', target: 'client' }, offset_ms: offset });
+}
+
+describe('delegated requests', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('runs on client delegation, so the server answers every handover', async () => {
     const context = harness();
     await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(functionCall('setStatus', { taskId: 'rt', status: 'Focus' }));
-    await settle();
-
-    expect(context.applied[0].command).toMatchObject({ command: 'setStatus', actId: 'rt', payload: { status: 'Focus' }, source: 'gpt-live' });
-    const result = context.socket.sent.find(message => message.type === 'response.item.create');
-    expect(result.item).toMatchObject({ type: 'function_call_output', call_id: 'call_1' });
-    expect(JSON.parse(result.item.output)).toMatchObject({ status: 'applied', operation: 'setStatus' });
-    expect(context.socket.sent.some(message => message.type === 'response.create')).toBe(true);
+    expect(context.calls[0].body.session.delegation).toEqual({ type: 'client' });
   });
 
-  it('pushes the resulting change to the voice layer as a delta', async () => {
+  it('answers «добавь X» by the local parser, without the backend', async () => {
     const context = harness();
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'добавь купить молоко');
+    await settle();
+
+    expect(backendCalls(context)).toHaveLength(0);
+    expect(context.applied[0].command).toMatchObject({ command: 'addChild', actId: 'inbox', payload: { title: 'купить молоко' }, source: 'gpt-live' });
+    expect(spoken(context)).toEqual([expect.objectContaining({ delegation_id: 'item_1', content: 'Добавил: купить молоко' })]);
+  });
+
+  it('asks the backend, applies its writes and confirms them in a few words at once', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], [say('Готово, на паузе.')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await settle();
+
+    const [call] = backendCalls(context);
+    expect(call.body.model).toBe('gpt-6.1-sol');
+    expect(call.body.instructions).toContain('rt\trs\tO\tГолден');
+    expect(call.body.input[0]).toEqual({ role: 'user', content: 'поставь голден на паузу' });
+    expect(call.body.input.at(-1)).toMatchObject({ role: 'developer', content: expect.stringContaining('Выполнено сервером в этом разговоре: ничего') });
+    expect(context.applied[0].command).toMatchObject({ command: 'setStatus', actId: 'rt', payload: { status: 'Pause' } });
+    // The backend's own closing words after a write are not spoken: the server already said it.
+    expect(spoken(context).map(message => message.content)).toEqual(['Голден на паузе']);
+  });
+
+  it('lets the backend finish a request of several changes after the first is confirmed', async () => {
+    const context = harness({ backend: [
+      [fn('setStatus', { taskId: 'rt', status: 'Focus' })],
+      [fn('setStatus', { taskId: 'rs', status: 'Pause' }, 'call_2')],
+      []
+    ] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден в фокус, а яблоки на паузу');
+    await settle();
+
+    expect(context.applied.map(entry => entry.command.actId)).toEqual(['rt', 'rs']);
+    expect(spoken(context).map(message => message.content)).toEqual(['Голден в фокусе', 'Яблоки на паузе']);
+    expect(backendCalls(context)[1].body.previous_response_id).toBe('resp_1');
+  });
+
+  it('takes another pass after a read, because the answer depends on it', async () => {
+    const context = harness({ backend: [[fn('getFrontier', {})], [fn('setStatus', { taskId: 'rt', status: 'Focus' }, 'call_2')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'возьми в фокус первое из фронтира');
+    await settle();
+
+    const second = backendCalls(context)[1].body;
+    expect(second.previous_response_id).toBe('resp_1');
+    expect(second.input[0]).toMatchObject({ type: 'function_call_output', call_id: 'call_1' });
+    expect(JSON.parse(second.input[0].output).frontier[0].taskTitle).toBe('Голден');
+    expect(spoken(context).map(message => message.content)).toEqual(['Голден в фокусе']);
+  });
+
+  it('leaves «добавь X куда-то» to the backend, which knows where that is', async () => {
+    const context = harness({ backend: [[fn('addChild', { parentId: 'rs', title: 'молоко' })], []] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'добавь молоко в яблоки');
+    await settle();
+
+    expect(backendCalls(context).length).toBeGreaterThan(0);
+    expect(context.applied[0].command).toMatchObject({ command: 'addChild', actId: 'rs' });
+  });
+
+  it('still speaks a question the backend asks after a write', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], [say('Клубнику в Хлебе или на Даче?')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден на паузу и перенеси клубнику');
+    await settle();
+
+    expect(spoken(context).map(message => message.content)).toEqual(['Голден на паузе', 'Клубнику в Хлебе или на Даче?']);
+  });
+
+  it('names what landed alongside what failed', async () => {
+    let calls = 0;
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' }), fn('setParent', { taskId: 'rs', parentId: 'нет' }, 'call_2')]] });
+    const apply = context.host.services.applyCommand;
+    context.host.services.applyCommand = async (command, meta) => (++calls === 2 ? { status: 'rejected', reason: 'нет такой задачи' } : apply(command, meta));
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден на паузу, яблоки в никуда');
+    await settle();
+
+    expect(spoken(context).map(message => message.content)).toEqual(['Голден на паузе, не вышло: нет такой задачи']);
+  });
+
+  it('does not claim success when nothing came back', async () => {
+    const context = harness({ backend: [[]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'сделай что-нибудь');
+    await settle();
+
+    expect(spoken(context).map(message => message.content)).toEqual(['Не вышло: ответа нет']);
+  });
+
+  it('passes the backend\'s own question to the voice', async () => {
+    const context = harness({ backend: [[say('Голден в Яблоках или в Саду?')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден в фокус');
+    await settle();
+
+    expect(context.applied).toHaveLength(0);
+    expect(spoken(context).map(message => message.content)).toEqual(['Голден в Яблоках или в Саду?']);
+  });
+
+  it('always speaks a failure', async () => {
+    const context = harness({ applyAck: { status: 'rejected', reason: 'Задача не найдена' }, backend: [[fn('editItem', { taskId: 'нет', title: 'Новое' })]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'переименуй её');
+    await settle();
+
+    expect(spoken(context).map(message => message.content)).toEqual(['Не вышло: Задача не найдена']);
+  });
+
+  it('tells open pages the list changed after each applied change, and only then', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], [say('Голден в Яблоках или в Саду?')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await settle();
+
+    expect(context.signals).toEqual([1]);
+  });
+
+  it('does what the person said while a request was being worked on, if the voice did not hand it over', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [
+      [fn('setStatus', { taskId: 'rt', status: 'Done' })], [],
+      [fn('setStatus', { taskId: 'rs', status: 'Done' }, 'call_2')], []
+    ], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'билеты я купил');
+    await vi.advanceTimersByTimeAsync(500);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'яблоки тоже', start_ms: 1_200, end_ms: 1_800 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Да, отмечаю.', start_ms: 1_900, end_ms: 2_300 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(context.applied.map(entry => entry.command.actId)).toEqual(['rt', 'rs']);
+    const followUp = backendCalls(context)[2].body;
+    expect(followUp.input.at(-1).content).toContain('Выполнено сервером в этом разговоре: Голден готово');
+    expect(context.rows.some(row => row.event.type === 'vl.follow_up')).toBe(true);
+  });
+
+  it('takes up a request said meanwhile even when the voice does not answer it at all', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], [], [fn('setStatus', { taskId: 'rs', status: 'Done' }, 'call_2')], []], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(500);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'яблоки тоже', start_ms: 1_200, end_ms: 1_800 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(context.applied.map(entry => entry.command.actId)).toEqual(['rt', 'rs']);
+  });
+
+  it('leaves words begun after the request was done to the voice: no backend call for «спасибо»', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], []] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(200);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'спасибо', start_ms: 5_000, end_ms: 5_400 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Пожалуйста.', start_ms: 5_500, end_ms: 6_000 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(backendCalls(context)).toHaveLength(2);
+    expect(context.rows.some(row => row.event.type === 'vl.follow_up')).toBe(false);
+  });
+
+  it('asks aloud when a request taken up meanwhile needs a choice', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], [], [say('Какие яблоки — в саду или в магазине?')]], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(500);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'и яблоки тоже', start_ms: 1_200, end_ms: 1_800 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Угу.', start_ms: 1_900, end_ms: 2_100 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(spoken(context).map(message => message.content)).toContain('Какие яблоки — в саду или в магазине?');
+  });
+
+  it('leaves to a newer handover what the person said meanwhile', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], [], [say('ок')]], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(500);
+    await request(context, 'а что в фокусе', { offset: 2_000 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(context.rows.some(row => row.event.type === 'vl.follow_up')).toBe(false);
+  });
+
+  it('refuses an unsupported operation without touching the document', async () => {
+    const context = harness({ backend: [[fn('deleteItem', { taskId: 'rt' })]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'удали голден');
+    await settle();
+
+    expect(context.applied).toHaveLength(0);
+    expect(spoken(context)[0].content).toMatch(/^Не вышло/);
+  });
+
+  it('holds a late result and says it in the pause after the next question', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], [], [say('Сейчас в фокусе ничего нет.')]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(8_000);
+
+    expect(spoken(context)).toHaveLength(0);
+
+    await request(context, 'что в фокусе', { offset: 20_000 });
+    await vi.advanceTimersByTimeAsync(600);
+    expect(spoken(context).map(message => message.content)).toEqual(['Думаю, кстати, голден на паузе.']);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(spoken(context).map(message => message.content)).toEqual(['Думаю, кстати, голден на паузе.', 'Сейчас в фокусе ничего нет.']);
+  });
+
+  it('does not cut in with a quick result while the conversation goes on', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'а погода завтра', start_ms: 1_500, end_ms: 2_500 });
+    await settle();
+
+    expect(spoken(context)).toHaveLength(0);
+    expect(context.host.session.held.map(item => item.text)).toEqual(['Голден на паузе']);
+  });
+
+  it('says «кстати» without «думаю» when the next request needs no thinking', async () => {
+    const context = harness();
+    await context.host.start({ sdp: 'offer-sdp' });
+    context.host.session.held = [{ text: 'Голден на паузе', since: 0 }];
+    await request(context, 'добавь хлеб');
+    await new Promise(resolve => setTimeout(resolve, 700));
+
+    expect(spoken(context).map(message => message.content)).toEqual(['Кстати, голден на паузе.', 'Добавил: хлеб']);
+  });
+
+  it('keeps a late answer to itself once the person has moved on', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[say('В фокусе отчёт.')]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'что в фокусе');
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'а погода завтра', start_ms: 1_500, end_ms: 2_500 });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(spoken(context)).toHaveLength(0);
+    expect(context.socket.sent.some(message => message.type === 'session.thinking.append' && message.content.includes('В фокусе отчёт.'))).toBe(true);
+  });
+
+  it('says a held confirmation after the voice\'s own answer when nothing is handed over', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(8_000);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'что в фокусе', start_ms: 12_000, end_ms: 13_000 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'В фокусе отчёт.', start_ms: 13_200, end_ms: 14_000 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(spoken(context)).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    expect(spoken(context)).toEqual([expect.objectContaining({ delegation_id: null, content: 'Кстати, голден на паузе.' })]);
+  });
+
+  it('drops a held confirmation the voice has already covered in its own words', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Pause' })], []], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'поставь голден на паузу');
+    await vi.advanceTimersByTimeAsync(8_000);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'что в фокусе', start_ms: 12_000, end_ms: 13_000 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'В фокусе отчёт, а «Голден» на паузе.', start_ms: 13_200, end_ms: 14_000 });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(spoken(context)).toHaveLength(0);
+  });
+
+  it('keeps only the latest held confirmations', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [
+      [fn('setStatus', { taskId: 'rt', status: 'Pause' })],
+      [fn('setStatus', { taskId: 'rs', status: 'Focus' }, 'call_2')],
+      [fn('setStatus', { taskId: 'rt', status: 'Focus' }, 'call_3')],
+      [], []
+    ], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'три изменения сразу');
+    await vi.advanceTimersByTimeAsync(15_000);
+    await request(context, 'добавь хлеб', { offset: 30_000 });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    // «Добавь хлеб» needs no thinking, so the aside drops «думаю».
+    expect(spoken(context)[0].content).toBe('Кстати, яблоки в фокусе, голден в фокусе.');
+  });
+
+  it('speaks a late answer as soon as the voice is quiet, without waiting for a question', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[say('В фокусе отчёт.')]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'что в фокусе');
+    await vi.advanceTimersByTimeAsync(4_000);
+
+    expect(spoken(context).map(message => message.content)).toEqual(['В фокусе отчёт.']);
+  });
+
+  it('speaks a late failure without waiting for a question, once the voice is quiet', async () => {
+    vi.useFakeTimers();
+    const context = harness({ applyAck: { status: 'rejected', reason: 'нет такой задачи' }, backend: [[fn('editItem', { taskId: 'нет', title: 'Новое' })]], backendDelayMs: 3_300 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'переименуй её');
+    await vi.advanceTimersByTimeAsync(3_200);
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Ща.', start_ms: 4_100, end_ms: 4_300 });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(spoken(context)).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(spoken(context).map(message => message.content)).toEqual(['Кстати, не вышло: нет такой задачи']);
+  });
+
+  it('keeps the voice\'s table current as quiet context', async () => {
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Focus' })]] });
     await context.host.start({ sdp: 'offer-sdp' });
     context.setItems([task('rs', null, 'Open', 'Яблоки'), task('rt', 'rs', 'Focus', 'Голден')]);
-    context.socket.deliver(functionCall('setStatus', { taskId: 'rt', status: 'Focus' }));
+    await request(context, 'голден в фокус');
     await settle();
 
-    const append = context.socket.sent.find(message => message.type === 'session.instructions.append');
-    expect(append.content).toContain('* rt F');
-    expect(append.delegation_id).toBeNull();
-  });
-
-  it('reports a rejected command back to the model instead of claiming success', async () => {
-    const context = harness({ applyAck: { status: 'rejected', reason: 'Задача не найдена' } });
-    await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(functionCall('editItem', { taskId: 'нет', title: 'Новое' }));
-    await settle();
-
-    const result = context.socket.sent.find(message => message.type === 'response.item.create');
-    expect(JSON.parse(result.item.output)).toEqual({ status: 'rejected', reason: 'Задача не найдена' });
-  });
-
-  it('answers an unsupported operation without touching the document', async () => {
-    const context = harness();
-    await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(functionCall('deleteItem', { taskId: 'rt' }));
-    await settle();
-
-    expect(context.applied).toHaveLength(0);
-    const result = context.socket.sent.find(message => message.type === 'response.item.create');
-    expect(JSON.parse(result.item.output).status).toBe('rejected');
-  });
-
-  it('serves the frontier without a document change', async () => {
-    const context = harness();
-    await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(functionCall('getFrontier', {}));
-    await settle();
-
-    expect(context.applied).toHaveLength(0);
-    const result = context.socket.sent.find(message => message.type === 'response.item.create');
-    expect(JSON.parse(result.item.output).frontier[0].taskTitle).toBe('Голден');
+    const delta = context.socket.sent.find(message => message.type === 'session.thinking.append' && message.delegation_id === null);
+    expect(delta.content).toContain('* rt F');
   });
 });
 
-describe('prompt edits by the model', () => {
-  const settle = () => new Promise(resolve => setTimeout(resolve, 0));
-  const promptCall = (name, args) => ({
-    type: 'response.event', delegation_id: 'item_2',
-    event: { type: 'response.output_item.done', item: { type: 'function_call', call_id: 'call_9', name, arguments: JSON.stringify(args) } }
-  });
-
+describe('prompt edits by Sol', () => {
   it('appends a rule to the voice prompt and applies it in the running session', async () => {
-    const context = harness();
+    const context = harness({ backend: [[fn('setVoicePrompt', { mode: 'append', text: 'Отвечай короче.' })]] });
     await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(promptCall('setVoicePrompt', { mode: 'append', text: 'Отвечай короче.' }));
+    await request(context, 'да, меняй');
     await settle();
 
     expect(await context.host.settings.prompt('voice')).toContain('Отвечай короче.');
     const append = context.socket.sent.find(message => message.type === 'session.instructions.append' && message.content.includes('Отвечай короче.'));
     expect(append).toBeTruthy();
+    expect(spoken(context).map(message => message.content)).toEqual(['Промпт изменён']);
   });
 
-  it('updates the backend prompt in place, which the session allows', async () => {
-    const context = harness();
+  it('uses its own new prompt from the very next request', async () => {
+    const context = harness({ backend: [[fn('setBackendPrompt', { mode: 'replace', text: 'Новый промпт Sol.' })], [], [say('ок')]] });
     await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(promptCall('setBackendPrompt', { mode: 'replace', text: 'Новый бэкенд-промпт.' }));
+    await request(context, 'да, меняй');
+    await settle();
+    await request(context, 'а теперь проверь', { offset: 5_000 });
     await settle();
 
-    const update = context.socket.sent.find(message => message.type === 'session.update');
-    expect(update.session.delegation.responses.instructions).toBe('Новый бэкенд-промпт.');
+    expect(backendCalls(context)[2].body.instructions.startsWith('Новый промпт Sol.')).toBe(true);
   });
 
-  it('lets the model read a prompt before replacing it', async () => {
-    const context = harness();
+  it('reads a prompt before replacing it', async () => {
+    const context = harness({ backend: [[fn('getVoicePrompt', {})], [say('Сейчас там правила голоса.')]] });
     await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(promptCall('getVoicePrompt', {}));
+    await request(context, 'что в промпте голоса');
     await settle();
 
-    const result = context.socket.sent.find(message => message.type === 'response.item.create');
-    expect(JSON.parse(result.item.output).prompt).toBe(DEFAULT_VOICE_PROMPT);
+    expect(JSON.parse(backendCalls(context)[1].body.input[0].output).prompt).toBe(DEFAULT_VOICE_PROMPT);
   });
 
   it('keeps both texts of the edit so it can be read back and undone', async () => {
-    const context = harness();
+    const context = harness({ backend: [[fn('setVoicePrompt', { mode: 'replace', text: 'Переписанный промпт.' })]] });
     await context.host.start({ sdp: 'offer-sdp' });
-    context.socket.deliver(promptCall('setVoicePrompt', { mode: 'replace', text: 'Переписанный промпт.' }));
+    await request(context, 'да, меняй');
     await settle();
 
     const [version] = await context.host.settings.history();
@@ -329,7 +628,7 @@ describe('replaying a dialogue against the voice layer', () => {
 
     expect(sent[0].url).toContain('/responses');
     expect(sent[0].body.instructions).toContain('rt\trs\tO\tГолден');
-    expect(sent[0].body.instructions).toContain('Выбор задачи');
+    expect(sent[0].body.instructions).toContain('SpawnThinking');
     // The voice layer holds no tools of its own, so none are offered here either.
     expect(sent[0].body.tools).toBeUndefined();
     expect(sent[0].body.store).toBe(false);

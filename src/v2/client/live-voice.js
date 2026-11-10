@@ -69,18 +69,30 @@ export function createLiveVoice({
   async function start() {
     if (session) return;
     setStatus('Подключение…', 'connecting');
-    let media;
-    try { media = await mediaDevices.getUserMedia({ audio: true }); }
-    catch { setStatus('Нет доступа к микрофону', 'idle'); return; }
-
-    const peer = peerFactory({});
+    // Safari and iOS allow playback only from inside the tap itself. The element is created
+    // and started here, before the first await; made after the microphone prompt, it stayed
+    // silent while the model was answering.
     const audio = documentRef.createElement('audio');
     audio.autoplay = true;
+    audio.playsInline = true;
+    audio.setAttribute('playsinline', '');
     audio.hidden = true;
     documentRef.body.append(audio);
+    // The early call only unlocks the element: with no source yet some browsers refuse it.
+    // Only a refusal once the model's audio is there means the person hears nothing.
+    const play = (report) => Promise.resolve(audio.play?.()).catch(() => {
+      if (report && session?.audio === audio) setStatus('Браузер не включил звук. Нажмите кнопку ещё раз.', 'live');
+    });
+    play(false);
+
+    let media;
+    try { media = await mediaDevices.getUserMedia({ audio: true }); }
+    catch { audio.remove(); setStatus('Нет доступа к микрофону', 'idle'); return; }
+
+    const peer = peerFactory({});
     session = { peer, media, audio, channel: null };
 
-    peer.addEventListener('track', event => { audio.srcObject = event.streams[0]; });
+    peer.addEventListener('track', event => { audio.srcObject = event.streams[0]; play(true); });
     for (const track of media.getTracks()) peer.addTrack(track, media);
     const channel = peer.createDataChannel('oai-events');
     session.channel = channel;

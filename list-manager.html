@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-c86b15ee253d8f91">
+<meta name="preview-build-hash" content="v02-73ef053d8921f806">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1000,7 +1000,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 
 	        <label class="settings-field" style="margin-top: 18px;">
 	          <span>Бэкенд-модель</span>
-	          <input type="text" id="live-backend-model" placeholder="gpt-5.6-luna" autocomplete="off" autocapitalize="none" spellcheck="false">
+	          <input type="text" id="live-backend-model" placeholder="gpt-6.1-sol" autocomplete="off" autocapitalize="none" spellcheck="false">
 	        </label>
 	        <button id="live-backend-model-save" class="settings-primary" type="button">Сохранить</button>
 	        <div id="live-backend-model-status" class="settings-status" aria-live="polite"></div>
@@ -1104,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-c86b15ee253d8f91";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-73ef053d8921f806";
 </script>
 <script>
 (() => {
@@ -1619,6 +1619,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       this.nodes = /* @__PURE__ */ new Map();
       this.backStack = [];
       this.pending = /* @__PURE__ */ new Map();
+      this.inFlight = /* @__PURE__ */ new Set();
       try {
         for (const body of JSON.parse(this.readStorage("voicelist.v02.pending") || "[]")) this.pending.set(body.key.seq, body);
       } catch {
@@ -1877,7 +1878,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         ...this.viewContext.actionId ? { actionId: this.viewContext.actionId } : {}
       };
     }
-    async submit(input) {
+    async submit(input, { awaitingResult = false } = {}) {
       if (typeof input.text === "string" && !input.text.trim()) return null;
       const body = {
         key: { clientKey: this.clientKey, seq: ++this.seq },
@@ -1888,12 +1889,14 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       this.pending.set(body.key.seq, body);
       this.savePending();
       this.pollNow();
-      return this.deliver(body);
+      return this.deliver(body, { awaitingResult });
     }
     savePending() {
       this.writeStorage("voicelist.v02.pending", JSON.stringify([...this.pending.values()]));
     }
-    async deliver(body) {
+    async deliver(body, { awaitingResult = false } = {}) {
+      if (this.inFlight.has(body.key.seq)) return null;
+      this.inFlight.add(body.key.seq);
       try {
         const receipt = await this.request("/api/v2/input", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (receipt.requestId) this.requests.set(receipt.requestId, body);
@@ -1901,7 +1904,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         this.savePending();
         if (receipt.status === "rejected" || receipt.error) throw Object.assign(new Error(receipt.error?.message || receipt.error || "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u043E\u0442\u043A\u043B\u043E\u043D\u0435\u043D\u0430"), { status: 400 });
         this.editorDirty = false;
-        await this.loadDocument();
+        if (!(awaitingResult && receipt.status === "accepted")) await this.loadDocument();
         return receipt;
       } catch (error) {
         if (error.status >= 400 && error.status < 500) {
@@ -1910,6 +1913,8 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         }
         this.showToast(error.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u043C \u043F\u043E\u0441\u043B\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F.");
         throw error;
+      } finally {
+        this.inFlight.delete(body.key.seq);
       }
     }
     async flush() {
@@ -1920,7 +1925,8 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
     }
     async command(command, taskId = null, payload = {}, target = null) {
       try {
-        const receipt = await this.submit({ context: this.context(target || (taskId ? { id: `task:${taskId}` } : null)), command: { command, actId: taskId, actType: taskId ? "task" : "list", payload } });
+        const receipt = await this.submit({ context: this.context(target || (taskId ? { id: `task:${taskId}` } : null)), command: { command, actId: taskId, actType: taskId ? "task" : "list", payload } }, { awaitingResult: true });
+        if (!receipt) return null;
         return receipt.status === "accepted" ? await this.waitForCompletion(receipt.requestId) : receipt;
       } catch (error) {
         this.showToast(error.message);
@@ -2716,21 +2722,29 @@ ${text}`;
     async function start() {
       if (session) return;
       setStatus("\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435\u2026", "connecting");
+      const audio = documentRef.createElement("audio");
+      audio.autoplay = true;
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "");
+      audio.hidden = true;
+      documentRef.body.append(audio);
+      const play = (report) => Promise.resolve(audio.play?.()).catch(() => {
+        if (report && session?.audio === audio) setStatus("\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0438\u043B \u0437\u0432\u0443\u043A. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443 \u0435\u0449\u0451 \u0440\u0430\u0437.", "live");
+      });
+      play(false);
       let media;
       try {
         media = await mediaDevices.getUserMedia({ audio: true });
       } catch {
+        audio.remove();
         setStatus("\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u043C\u0438\u043A\u0440\u043E\u0444\u043E\u043D\u0443", "idle");
         return;
       }
       const peer = peerFactory({});
-      const audio = documentRef.createElement("audio");
-      audio.autoplay = true;
-      audio.hidden = true;
-      documentRef.body.append(audio);
       session = { peer, media, audio, channel: null };
       peer.addEventListener("track", (event) => {
         audio.srcObject = event.streams[0];
+        play(true);
       });
       for (const track of media.getTracks()) peer.addTrack(track, media);
       const channel = peer.createDataChannel("oai-events");
@@ -3661,7 +3675,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-c86b15ee253d8f91";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-73ef053d8921f806";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
