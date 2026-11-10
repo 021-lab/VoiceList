@@ -151,6 +151,12 @@ describe('logging', () => {
       .toEqual(['переименуй первый', 'а ещё добавь второй']);
   });
 
+  it('keeps the delegation marker out of the recorded words', async () => {
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: '<|SpawnThinking|> Заметка.', start_ms: 0, end_ms: 300 });
+    context.socket.deliver({ type: 'session.closed', reason: 'client' });
+    expect(context.rows.filter(row => row.event.type === 'vl.speech').map(row => row.event.text)).toEqual(['Заметка.']);
+  });
+
   it('starts a new record when the other speaker begins', async () => {
     context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'привет', start_ms: 0, end_ms: 100 });
     context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'слушаю', start_ms: 120, end_ms: 300 });
@@ -206,7 +212,8 @@ describe('delegated requests', () => {
     const [call] = backendCalls(context);
     expect(call.body.model).toBe('gpt-6.1-sol');
     expect(call.body.instructions).toContain('rt\trs\tO\tГолден');
-    expect(call.body.input).toEqual([{ role: 'user', content: 'поставь голден на паузу' }]);
+    expect(call.body.input[0]).toEqual({ role: 'user', content: 'поставь голден на паузу' });
+    expect(call.body.input.at(-1)).toMatchObject({ role: 'developer', content: expect.stringContaining('Выполнено сервером в этом разговоре: ничего') });
     expect(context.applied[0].command).toMatchObject({ command: 'setStatus', actId: 'rt', payload: { status: 'Pause' } });
     // The backend's own closing words after a write are not spoken: the server already said it.
     expect(spoken(context).map(message => message.content)).toEqual(['Голден на паузе']);
@@ -306,6 +313,76 @@ describe('delegated requests', () => {
     await settle();
 
     expect(context.signals).toEqual([1]);
+  });
+
+  it('does what the person said while a request was being worked on, if the voice did not hand it over', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [
+      [fn('setStatus', { taskId: 'rt', status: 'Done' })], [],
+      [fn('setStatus', { taskId: 'rs', status: 'Done' }, 'call_2')], []
+    ], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'билеты я купил');
+    await vi.advanceTimersByTimeAsync(500);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'яблоки тоже', start_ms: 1_200, end_ms: 1_800 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Да, отмечаю.', start_ms: 1_900, end_ms: 2_300 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(context.applied.map(entry => entry.command.actId)).toEqual(['rt', 'rs']);
+    const followUp = backendCalls(context)[2].body;
+    expect(followUp.input.at(-1).content).toContain('Выполнено сервером в этом разговоре: Голден готово');
+    expect(context.rows.some(row => row.event.type === 'vl.follow_up')).toBe(true);
+  });
+
+  it('takes up a request said meanwhile even when the voice does not answer it at all', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], [], [fn('setStatus', { taskId: 'rs', status: 'Done' }, 'call_2')], []], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(500);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'яблоки тоже', start_ms: 1_200, end_ms: 1_800 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(context.applied.map(entry => entry.command.actId)).toEqual(['rt', 'rs']);
+  });
+
+  it('leaves words begun after the request was done to the voice: no backend call for «спасибо»', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], []] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(200);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'спасибо', start_ms: 5_000, end_ms: 5_400 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Пожалуйста.', start_ms: 5_500, end_ms: 6_000 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(backendCalls(context)).toHaveLength(2);
+    expect(context.rows.some(row => row.event.type === 'vl.follow_up')).toBe(false);
+  });
+
+  it('asks aloud when a request taken up meanwhile needs a choice', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], [], [say('Какие яблоки — в саду или в магазине?')]], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(500);
+    context.socket.deliver({ type: 'session.input_transcript.delta', delta: 'и яблоки тоже', start_ms: 1_200, end_ms: 1_800 });
+    context.socket.deliver({ type: 'session.output_transcript.delta', delta: 'Угу.', start_ms: 1_900, end_ms: 2_100 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(spoken(context).map(message => message.content)).toContain('Какие яблоки — в саду или в магазине?');
+  });
+
+  it('leaves to a newer handover what the person said meanwhile', async () => {
+    vi.useFakeTimers();
+    const context = harness({ backend: [[fn('setStatus', { taskId: 'rt', status: 'Done' })], [], [say('ок')]], backendDelayMs: 1_000 });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'голден готов');
+    await vi.advanceTimersByTimeAsync(500);
+    await request(context, 'а что в фокусе', { offset: 2_000 });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(context.rows.some(row => row.event.type === 'vl.follow_up')).toBe(false);
   });
 
   it('refuses an unsupported operation without touching the document', async () => {

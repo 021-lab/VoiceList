@@ -27,6 +27,21 @@ const QUIET_WAIT_CAP_MS = 6_000;
  *  be answering by itself. */
 const ASIDE_GRACE_MS = 1_500;
 
+/** How many of the server's own changes the backend is reminded of. */
+const DONE_KEPT = 12;
+
+const doneNote = (done) => `Выполнено сервером в этом разговоре: ${done.length ? done.join('; ') : 'ничего'}. `
+  + 'Только это действительно сделано: слова голоса «отмечаю», «готово» — не выполнение.';
+
+/** Quiet for this long after the person's last words means their turn is over. */
+const SPEECH_ENDED_MS = 1_000;
+
+/** How long after a request the server keeps checking for words begun during it. */
+const FOLLOW_UP_WINDOW_MS = 30_000;
+
+/** How many times the server takes up what was said during a request before it stops. */
+const MAX_FOLLOW_UPS = 3;
+
 /** The tail of a request can still be in transcription when the handover arrives. */
 const TRANSCRIPT_GRACE_MS = 400;
 
@@ -122,7 +137,7 @@ export class LiveHost {
 
     this.session = {
       id, socket: null, outgoing: 0, seq: 0, rows: snapshotRows(items), speech: null, closing: false,
-      dialog: [], handedOver: 0, lastUserStartMs: -1, delegations: 0, voiceAt: 0, userAt: 0, handoverMs: -1, spoken: Promise.resolve(), held: []
+      dialog: [], done: [], work: Promise.resolve(), handedOver: 0, lastUserStartMs: -1, delegations: 0, voiceAt: 0, userAt: 0, handoverMs: -1, spoken: Promise.resolve(), held: []
     };
 
     // The session record carries the prompt versions and the model name: an entry from last
@@ -175,13 +190,14 @@ export class LiveHost {
     const endMs = Number.isFinite(event?.end_ms) ? event.end_ms : null;
     const silence = speech && startMs != null && speech.endMs != null && startMs - speech.endMs > SILENCE_GAP_MS;
     if (speech && (speech.role !== role || silence)) this.flushSpeech();
-    if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs };
+    if (!this.session.speech) this.session.speech = { role, text: '', startMs, endMs, startedAt: Date.now() };
     if (role === 'user' && startMs != null) this.session.lastUserStartMs = Math.max(this.session.lastUserStartMs, startMs);
     if (role === 'assistant') this.session.voiceAt = Date.now();
     // The request itself was speech too; only words after the last handover are someone
     // talking now.
     else if (startMs == null || startMs > this.session.handoverMs) this.session.userAt = Date.now();
     this.session.speech.text += String(event?.delta ?? '');
+    this.session.speech.lastAt = Date.now();
     if (endMs != null) this.session.speech.endMs = endMs;
   }
 
@@ -189,10 +205,11 @@ export class LiveHost {
     const speech = this.session?.speech;
     if (!speech) return;
     this.session.speech = null;
-    const text = speech.text.trim();
+    // The voice's delegation marker shows up in its transcript; it is protocol, not words.
+    const text = speech.text.replaceAll('<|SpawnThinking|>', '').trim();
     if (!text) return;
     this.record({ type: 'vl.speech', role: speech.role, text, start_ms: speech.startMs, end_ms: speech.endMs });
-    this.session.dialog.push({ role: speech.role, text });
+    this.session.dialog.push({ role: speech.role, text, startedAt: speech.startedAt });
     if (speech.role === 'user') this.offerAside(this.session);
     // The same turn goes on the bus, where the change it causes will point back at it. The
     // session log keeps its own copy with the timeline; the bus keeps the words. Turns are
@@ -382,22 +399,98 @@ export class LiveHost {
     const order = ++session.delegations;
     session.handoverMs = Math.max(session.handoverMs, offsetMs ?? -1);
     session.userAt = 0;
-    const startedAt = Date.now();
     if (!session.dialog.slice(session.handedOver).some(turn => turn.role === 'user')) {
       await new Promise(resolve => setTimeout(resolve, TRANSCRIPT_GRACE_MS));
       if (this.session === session) this.flushSpeech();
     }
-    const turns = session.dialog.slice(session.handedOver);
-    session.handedOver = session.dialog.length;
     const movedOn = () => this.session !== session || session.delegations > order || session.lastUserStartMs > (offsetMs ?? Infinity);
-    // Turns are written to the journal one after another; the change has to point at this one.
-    await this.turns;
+    // Requests are worked on one at a time, each taking the turns nobody has taken yet: with
+    // two paths taking turns side by side, one request could be done twice.
+    const run = async () => {
+      if (this.session !== session) return;
+      // Counted from the start of the work, not from the handover: time spent waiting for the
+      // previous request is not this request being slow.
+      const startedAt = Date.now();
+      const turns = session.dialog.slice(session.handedOver);
+      session.handedOver = session.dialog.length;
+      const upTo = session.handedOver;
+      if (!turns.some(turn => turn.role === 'user')) {
+        // What it would hand over was already taken up below, while it held back.
+        this.record({ type: 'vl.delegation.empty', delegation_id: delegationId }, 'out');
+        this.append('session.thinking.append', delegationId, 'Новой просьбы нет: сказанное уже выполнено.');
+        return;
+      }
+      // Turns are written to the journal one after another; the change has to point at this one.
+      await this.turns;
+      let reported = false;
+      const deliver = this.reporter(session, delegationId, startedAt, movedOn);
+      const report = (result) => { reported = true; deliver(result); };
+      // The pause after a new question is where held confirmations of earlier requests go:
+      // «Думаю, кстати, …» while the backend works, a plain «Кстати, …» when it will not.
+      const fillPause = (thinking) => {
+        const aside = asideFor(this.unsaid(session), { thinking });
+        session.held = [];
+        if (aside) this.speak(session, delegationId, aside);
+      };
+      try { await this.answer(turns, session, report, fillPause, { upTo }); }
+      catch (error) { report({ failed: true, text: `Не вышло: ${safeError(error).message}` }); }
+      // Nothing to say is not success: a made-up «готово» is worse than an honest failure.
+      if (!reported) report({ failed: true, text: 'Не вышло: ответа нет' });
+      this.followUp(session, delegationId, order, Date.now());
+    };
+    session.work = session.work.then(run, run);
+    await session.work;
+  }
 
-    let reported = false;
-    // A request can yield more than one result: the backend's writes are confirmed at once
-    // and it finishes the rest of the request afterwards. Each result meets the timing rule.
-    const report = (result) => {
-      reported = true;
+  /** While a request is being worked on the voice does not hand over the next one: it takes
+   *  it for part of the task in progress. «Варю послал» said during «билеты купил» was never
+   *  handed over, the voice said it was marked, and the task stayed open. So what the person
+   *  began saying before the request was done is taken up here — after a pause, in case the
+   *  voice hands it over after all. Words begun later are a new turn of the conversation and
+   *  are left to the voice. The voice carries the conversation, so of the backend's words
+   *  only a question is spoken; changes and failures follow the usual rule. */
+  followUp(session, delegationId, order, doneAt, round = 0, until = Date.now() + FOLLOW_UP_WINDOW_MS) {
+    if (round >= MAX_FOLLOW_UPS || Date.now() > until) return;
+    setTimeout(() => {
+      if (this.session !== session) return;
+      // A turn ends when the other side speaks; if the voice stays silent, it ends with the
+      // person's own pause, or a request nobody answered would never be taken up. Waiting for
+      // a long sentence to end does not use up a round.
+      const speech = session.speech;
+      if (speech?.role === 'user' && speech.startedAt < doneAt) {
+        if (Date.now() - speech.lastAt < SPEECH_ENDED_MS) { this.followUp(session, delegationId, order, doneAt, round, until); return; }
+        this.flushSpeech();
+      }
+      const job = async () => {
+        if (this.session !== session) return;
+        const pending = session.dialog.slice(session.handedOver);
+        const cut = pending.findIndex(turn => turn.startedAt >= doneAt);
+        const said = cut < 0 ? pending : pending.slice(0, cut);
+        if (!said.some(turn => turn.role === 'user')) return;
+        session.handedOver += said.length;
+        const takenUpTo = session.handedOver;
+        this.record({ type: 'vl.follow_up', delegation_id: delegationId, turns: said.map(({ role, text }) => ({ role, text })) }, 'out');
+        // Moved on means past these words: a newer handover, or the person speaking again.
+        const startedAt = Date.now();
+        const movedOn = () => this.session !== session || session.delegations > order
+          || session.dialog.slice(takenUpTo).some(turn => turn.role === 'user') || (session.speech?.role === 'user' && session.speech.startedAt > startedAt);
+        const report = this.reporter(session, delegationId, startedAt, movedOn);
+        const spokenIfAsked = (result) => (result.answer && !String(result.text).trim().endsWith('?')
+          ? this.append('session.thinking.append', delegationId, `Ответ, не озвучен: ${result.text}`)
+          : report(result));
+        try { await this.answer(said, session, spokenIfAsked, () => {}, { parser: false, upTo: takenUpTo }); }
+        catch (error) { report({ failed: true, text: `Не вышло: ${safeError(error).message}` }); }
+        this.followUp(session, delegationId, order, Date.now(), round + 1);
+      };
+      const guarded = () => job().catch(error => this.record({ type: 'vl.follow_up.failed', error: safeError(error) }, 'out'));
+      session.work = session.work.then(guarded, guarded);
+    }, ASIDE_GRACE_MS);
+  }
+
+  /** Hands one result to the voice by the owner's timing rule. A request can yield more than
+   *  one: the backend's writes are confirmed at once and it finishes the rest afterwards. */
+  reporter(session, delegationId, startedAt, movedOn) {
+    return (result) => {
       if (this.session !== session || !result?.text) return;
       const elapsedMs = Date.now() - startedAt;
       // The conversation going on means the person, not the voice saying our own aside.
@@ -410,17 +503,6 @@ export class LiveHost {
       // state from the table deltas, and an aside it has already covered is dropped.
       session.held = [...session.held, { text: delivery.content, since: session.dialog.length }].slice(-MAX_HELD);
     };
-    // The pause after a new question is where held confirmations of earlier requests go:
-    // «Думаю, кстати, …» while the backend works, a plain «Кстати, …» when it will not.
-    const fillPause = (thinking) => {
-      const aside = asideFor(this.unsaid(session), { thinking });
-      session.held = [];
-      if (aside) this.speak(session, delegationId, aside);
-    };
-    try { await this.answer(turns, session, report, fillPause); }
-    catch (error) { report({ failed: true, text: `Не вышло: ${safeError(error).message}` }); }
-    // Nothing to say is not success: a made-up «готово» is worse than an honest failure.
-    if (!reported) report({ failed: true, text: 'Не вышло: ответа нет' });
   }
 
   /** A question the voice answers by itself is never handed over, so held confirmations would
@@ -466,27 +548,29 @@ export class LiveHost {
     return this.send({ type, delegation_id: delegationId, content: String(content || '').slice(0, 1_500) });
   }
 
-  async answer(turns, session, report, fillPause = () => {}) {
+  async answer(turns, session, report, fillPause = () => {}, { parser = true, upTo = session.dialog.length } = {}) {
     if (this.session !== session) return;
     const said = turns.filter(turn => turn.role === 'user');
-    const parsed = said.length === 1 ? parseCommand(said[0].text.trim(), null) : { kind: 'many' };
+    // The parser reads one phrase on its own; an aside said during another request («молоко
+    // тоже») means something only next to it, so that goes to the backend.
+    const parsed = parser && said.length === 1 ? parseCommand(said[0].text.trim(), null) : { kind: 'many' };
     const local = parsed.kind === 'one' ? toCommand(parsed.hypothesis, null) : null;
     if (local?.command === 'addChild' && !NOT_A_PLAIN_TITLE.test(local.payload?.title || '')) {
       fillPause(false);
-      const outcome = await this.apply({ ...local, source: 'gpt-live' });
+      const outcome = await this.apply({ ...local, source: 'gpt-live' }, session);
       report(outcome.status === 'rejected'
         ? { by: 'parser', failed: true, text: `Не вышло: ${outcome.reason}` }
         : { by: 'parser', failed: false, text: outcome.confirm });
       return;
     }
     fillPause(true);
-    await this.askBackend(session, result => report({ by: 'backend', ...result }));
+    await this.askBackend(session, result => report({ by: 'backend', ...result }), upTo);
   }
 
   /** Writes run here and are confirmed by the server in a few words the moment they land; the
    *  backend's own pass after them only continues a request that holds more than one change.
    *  Its closing words after writes are dropped: the server has already said them. */
-  async askBackend(session, report) {
+  async askBackend(session, report, upTo = session.dialog.length) {
     if (!this.apiKey) fail('MODEL_UNAVAILABLE', 'Ключ OpenAI не настроен');
     const [backendPrompt, backendModel, reasoningEffort, items] = await Promise.all([
       this.settings.prompt('backend'), this.settings.backendModel(), this.settings.reasoningEffort(), this.services.readItems()
@@ -501,7 +585,10 @@ export class LiveHost {
       ...(this.store ? {} : { include: ['reasoning.encrypted_content'] }),
       ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {})
     };
-    let input = buildSolInput(session.dialog.slice(-DIALOG_TURNS));
+    // The voice says «отмечаю» about things it never handed over, so the backend gets the
+    // record of what the server really did, both to do the rest and not to do anything twice.
+    // Only what was said up to this request: later words are someone else's turn.
+    let input = [...buildSolInput(session.dialog.slice(Math.max(0, upTo - DIALOG_TURNS), upTo)), { role: 'developer', content: doneNote(session.done) }];
     let previous = null;
     let wrote = false;
     for (let pass = 0; pass < MAX_BACKEND_PASSES; pass++) {
@@ -530,7 +617,7 @@ export class LiveHost {
       const failures = [];
       for (const call of calls) {
         let outcome;
-        try { outcome = await this.invoke(call); }
+        try { outcome = await this.invoke(call, session); }
         catch (error) { outcome = { status: 'rejected', reason: safeError(error).message }; }
         if (outcome.status === 'rejected') failures.push(outcome.reason);
         else if (outcome.confirm) confirmations.push(outcome.confirm);
@@ -547,15 +634,16 @@ export class LiveHost {
     }
   }
 
-  async invoke(call) {
+  async invoke(call, session = this.session) {
     if (call.name === 'getFrontier') return { status: 'ok', frontier: await this.services.readFrontier() };
     if (PROMPT_TOOLS.has(call.name)) return this.invokePrompt(call);
-    return this.apply(toTaskCommand(call.name, call.arguments));
+    return this.apply(toTaskCommand(call.name, call.arguments), session);
   }
 
-  async apply(command) {
+  async apply(command, session = this.session) {
+    if (!session || this.session !== session) return { status: 'rejected', reason: 'Сессия закончилась' };
     const ack = await this.services.applyCommand(
-      command, { clientKey: `gpt-live:${this.sessionId}`, seq: ++this.session.seq }, this.session?.utterance || null
+      command, { clientKey: `gpt-live:${session.id}`, seq: ++session.seq }, session.utterance || null
     );
     if (ack?.status === 'rejected') return { status: 'rejected', reason: ack.reason || 'Операция отклонена' };
     // Open pages learn of a change only from this signal: without it a task added by voice
@@ -563,7 +651,11 @@ export class LiveHost {
     this.services.changed?.();
     const items = await this.services.readItems();
     await this.syncSnapshot(items);
-    return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId, confirm: confirmText(command, items) };
+    const confirm = confirmText(command, items);
+    // A bare «Сделал» says nothing about what was done, so the record names the operation too.
+    const what = [command.command, command.actId, command.payload?.title || command.payload?.status || command.payload?.deadline].filter(Boolean).join(' ');
+    session.done = [...session.done, `${confirm} (${what})`].slice(-DONE_KEPT);
+    return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId, confirm };
   }
 
   async invokePrompt(call) {
@@ -571,6 +663,7 @@ export class LiveHost {
     if (call.name.startsWith('get')) return { status: 'ok', target, prompt: await this.settings.prompt(target) };
     const result = await this.settings.writePrompt(target, { mode: call.arguments.mode, text: call.arguments.text, source: 'model' });
     if (result.changed) await this.applyPromptChange(target, result.prompt, call.arguments);
+    if (result.changed && this.session) this.session.done = [...this.session.done, `Промпт ${target === 'voice' ? 'голоса' : 'Sol'} изменён (${call.arguments.mode})`].slice(-DONE_KEPT);
     return { status: result.changed ? 'applied' : 'unchanged', target, chars: result.prompt.length, confirm: result.changed ? 'Промпт изменён' : 'Промпт уже такой' };
   }
 
