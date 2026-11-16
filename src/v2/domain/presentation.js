@@ -98,8 +98,18 @@ export class Presentation {
     const groups = new Map();
     for (const item of items) { const key = item.parentId || null; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); }
     for (const siblings of groups.values()) siblings.sort((a,b) => a.order - b.order);
+    // The tree shows what is still to do. Archived and done tasks stay out of it, except a
+    // done task that still holds open work: hiding it would hide that work too.
+    const shown = new Map();
+    const inTree = (item) => {
+      if (!shown.has(item.id)) {
+        shown.set(item.id, false);
+        shown.set(item.id, item.status !== 'Archive' && (item.status !== 'Done' || (groups.get(item.id) || []).some(inTree)));
+      }
+      return shown.get(item.id);
+    };
     const task = (item, level = 0, hidden = false) => node('task', 'task:' + item.id, {
-      ...clone(item), taskId: item.id, level, hidden, hasChildren: (groups.get(item.id) || []).some(x => x.status !== 'Archive'),
+      ...clone(item), taskId: item.id, level, hidden, hasChildren: (groups.get(item.id) || []).some(inTree),
       parent: item.parentId ? clone(byId.get(item.parentId)) : { id: '__root__', title: 'Мой список', status: 'Open' },
       allowedActions: ['editItem','setStatus','setParent','setDeadline','setTags','addChild','toggleCollapse','reorderItems']
     });
@@ -159,7 +169,7 @@ export class Presentation {
         props.query = context.query || '';
       } else {
         const walk = (id, level, hidden) => { for (const item of groups.get(id) || []) {
-          if (item.status === 'Archive') continue;
+          if (!inTree(item)) continue;
           rows.push(task(item, level, hidden));
           walk(item.id, level + 1, hidden || item.collapsed);
         }};
