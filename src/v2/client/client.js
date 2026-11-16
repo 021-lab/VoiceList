@@ -407,7 +407,7 @@ export class Client {
     const head = this.node('div', { className: 'item-head' });
     const copy = this.node('div', { className: 'item-copy' });
     const title = this.node('div', { className: 'item-title' });
-    if (p.hasChildren) title.append(this.node('span', { className: 'chevron' }, (this.collapsed.get(p.taskId) ?? p.collapsed) ? '▶' : '▼'));
+    if (p.hasChildren) title.append(this.node('span', { className: 'chevron' }, this.isCollapsed(p.taskId) ? '▶' : '▼'));
     title.append(this.dom.createTextNode(p.title || ''));
     copy.append(title);
     if (p.tags?.length) { const tags = this.node('div', { className: 'item-tags' }); for (const tag of p.tags) tags.append(this.node('span', { className: 'item-tag' }, tag)); copy.append(tags); }
@@ -425,10 +425,11 @@ export class Client {
       const level = Number(wrap.dataset.level);
       while (hiddenAt.length && hiddenAt.at(-1) >= level) hiddenAt.pop();
       wrap.hidden = hiddenAt.length > 0;
-      const node = this.nodes.get(wrap.dataset.componentId);
-      if (this.collapsed.get(wrap.dataset.id) ?? node?.props.collapsed) hiddenAt.push(level);
+      if (this.isCollapsed(wrap.dataset.id)) hiddenAt.push(level);
     }
   }
+  /** The tree opens folded: every branch stays shut until it is opened on this page. */
+  isCollapsed(taskId) { return this.collapsed.get(taskId) ?? true; }
   renderAction(component) {
     const p = component.props; const id = p.actionId || component.id.replace(/^action:/, '');
     this.seenActions.add(id);
@@ -648,7 +649,7 @@ export class Client {
       target.element.before(contextRow); target.element.style.marginLeft = '24px'; return;
     }
     if (target.node?.props.hasChildren) {
-      this.collapsed.set(target.taskId, !(this.collapsed.get(target.taskId) ?? target.node.props.collapsed));
+      this.collapsed.set(target.taskId, !this.isCollapsed(target.taskId));
       this.applyCollapse(); const chevron = target.element.querySelector('.chevron'); if (chevron) chevron.textContent = this.collapsed.get(target.taskId) ? '▶' : '▼';
     } else void this.navigate('edit', { taskId: target.taskId });
   }

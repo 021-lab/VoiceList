@@ -28,6 +28,16 @@ describe('server component Client', () => {
     expect(document.querySelector('.item-title').textContent).toContain('<img');
     expect(document.querySelector('.item-title img')).toBeNull();
   });
+  it('opens the tree folded, whatever the stored state, and unfolds a branch on tap', () => {
+    create(vi.fn());
+    const parent = task('one', { hasChildren: true, collapsed: false });
+    client.render(documentTree([parent, task('child', { parentId: 'one', level: 1 })]));
+    expect(document.querySelector('[data-id="child"]').hidden).toBe(true);
+    expect(document.querySelector('[data-id="one"] .chevron').textContent).toBe('▶');
+    client.tap({ taskId: 'one', node: parent, element: document.querySelector('[data-id="one"]') });
+    expect(document.querySelector('[data-id="child"]').hidden).toBe(false);
+  });
+
   it('collapses and expands server-collapsed branches locally without sending a mutation', () => {
     const fetcher = vi.fn(); create(fetcher);
     const parent = task('one', { hasChildren: true, collapsed: true });

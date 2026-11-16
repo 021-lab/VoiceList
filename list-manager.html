@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="preview-build-hash" content="v02-73ef053d8921f806">
+<meta name="preview-build-hash" content="v02-e9beebda4e146536">
 <title>Список</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1104,7 +1104,7 @@ header h1 { flex: 1; font-size: 20px; font-weight: 700; color: #1a1a2e; }
 </div>
 
 <script>
-window.__LIST_MANAGER_BUILD_HASH__ = "v02-73ef053d8921f806";
+window.__LIST_MANAGER_BUILD_HASH__ = "v02-e9beebda4e146536";
 </script>
 <script>
 (() => {
@@ -2123,7 +2123,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
       const head = this.node("div", { className: "item-head" });
       const copy = this.node("div", { className: "item-copy" });
       const title = this.node("div", { className: "item-title" });
-      if (p.hasChildren) title.append(this.node("span", { className: "chevron" }, this.collapsed.get(p.taskId) ?? p.collapsed ? "\u25B6" : "\u25BC"));
+      if (p.hasChildren) title.append(this.node("span", { className: "chevron" }, this.isCollapsed(p.taskId) ? "\u25B6" : "\u25BC"));
       title.append(this.dom.createTextNode(p.title || ""));
       copy.append(title);
       if (p.tags?.length) {
@@ -2150,9 +2150,12 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         const level = Number(wrap.dataset.level);
         while (hiddenAt.length && hiddenAt.at(-1) >= level) hiddenAt.pop();
         wrap.hidden = hiddenAt.length > 0;
-        const node = this.nodes.get(wrap.dataset.componentId);
-        if (this.collapsed.get(wrap.dataset.id) ?? node?.props.collapsed) hiddenAt.push(level);
+        if (this.isCollapsed(wrap.dataset.id)) hiddenAt.push(level);
       }
+    }
+    /** The tree opens folded: every branch stays shut until it is opened on this page. */
+    isCollapsed(taskId) {
+      return this.collapsed.get(taskId) ?? true;
     }
     renderAction(component) {
       const p = component.props;
@@ -2435,7 +2438,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3p
         return;
       }
       if (target.node?.props.hasChildren) {
-        this.collapsed.set(target.taskId, !(this.collapsed.get(target.taskId) ?? target.node.props.collapsed));
+        this.collapsed.set(target.taskId, !this.isCollapsed(target.taskId));
         this.applyCollapse();
         const chevron = target.element.querySelector(".chevron");
         if (chevron) chevron.textContent = this.collapsed.get(target.taskId) ? "\u25B6" : "\u25BC";
@@ -3675,7 +3678,7 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   async function bootstrap() {
     const client = new Client();
     window.__voiceListClient = client;
-    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-73ef053d8921f806";
+    document.documentElement.dataset.previewBuildHash = false ? "v02-dev" : "v02-e9beebda4e146536";
     await client.connect();
     const $ = (id) => document.getElementById(id);
     const live = createLiveVoice({
