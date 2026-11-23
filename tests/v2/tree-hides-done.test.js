@@ -17,6 +17,11 @@ describe('the task tree', () => {
     expect(shown.map(row => row.taskId)).toEqual(['done', 'child']);
   });
 
+  it('drops a done task that holds only notes, and keeps notes under open tasks', () => {
+    const shown = rows([task('hotel', null, 'Done'), task('dates', 'hotel', 'Info'), task('open', null, 'Open', 20), task('note', 'open', 'Info')]);
+    expect(shown.map(row => row.taskId)).toEqual(['open', 'note']);
+  });
+
   it('shows no chevron on a task whose subtasks are all done', () => {
     const [parent] = rows([task('parent', null, 'Open'), task('child', 'parent', 'Done')]);
     expect(parent.hasChildren).toBe(false);

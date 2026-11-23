@@ -99,15 +99,18 @@ export class Presentation {
     for (const item of items) { const key = item.parentId || null; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); }
     for (const siblings of groups.values()) siblings.sort((a,b) => a.order - b.order);
     // The tree shows what is still to do. Archived and done tasks stay out of it, except a
-    // done task that still holds open work: hiding it would hide that work too.
-    const shown = new Map();
-    const inTree = (item) => {
-      if (!shown.has(item.id)) {
-        shown.set(item.id, false);
-        shown.set(item.id, item.status !== 'Archive' && (item.status !== 'Done' || (groups.get(item.id) || []).some(inTree)));
+    // done task that still holds open work: hiding it would hide that work too. Notes are not
+    // work — a done task holding only notes («Локация: Нисеко») goes with them.
+    const working = new Map();
+    const holdsWork = (item) => {
+      if (!working.has(item.id)) {
+        working.set(item.id, false);
+        working.set(item.id, item.status !== 'Archive'
+          && (!['Done', 'Info'].includes(item.status) || (groups.get(item.id) || []).some(holdsWork)));
       }
-      return shown.get(item.id);
+      return working.get(item.id);
     };
+    const inTree = (item) => item.status !== 'Archive' && (item.status !== 'Done' || (groups.get(item.id) || []).some(holdsWork));
     const task = (item, level = 0, hidden = false) => node('task', 'task:' + item.id, {
       ...clone(item), taskId: item.id, level, hidden, hasChildren: (groups.get(item.id) || []).some(inTree),
       parent: item.parentId ? clone(byId.get(item.parentId)) : { id: '__root__', title: 'Мой список', status: 'Open' },
