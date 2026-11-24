@@ -636,6 +636,7 @@ export class LiveHost {
 
   async invoke(call, session = this.session) {
     if (call.name === 'getFrontier') return { status: 'ok', frontier: await this.services.readFrontier() };
+    if (call.name === 'getHistory') return { status: 'ok', history: await this.services.readHistory() };
     if (PROMPT_TOOLS.has(call.name)) return this.invokePrompt(call);
     return this.apply(toTaskCommand(call.name, call.arguments), session);
   }

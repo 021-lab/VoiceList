@@ -23,6 +23,7 @@ function harness({ tokenOk = true, ack = { status: 'applied', newTarget: 'rt' } 
     services: {
       readItems: async () => [task('rs', null, 'Open', 'Яблоки'), task('rt', 'rs', 'Open', 'Голден')],
       readFrontier: async () => [{ taskId: 'rt', taskTitle: 'Голден' }],
+      readHistory: async () => '— разговор Gemini gm_1 —\n02:19 Человек: послать деньги Маше',
       applyCommand: async (command, message) => { applied.push({ command, message }); return ack; }
     }
   });
@@ -99,6 +100,14 @@ describe('running a tool call', () => {
     await host.mintToken();
     const [result] = await host.invokeAll({ toolCall: { functionCalls: [{ id: 'c4', name: 'getFrontier', args: {} }] } });
     expect(result.response.frontier).toHaveLength(1);
+    expect(applied).toHaveLength(0);
+  });
+
+  it('reads past conversations without touching the document', async () => {
+    const { host, applied } = harness();
+    await host.mintToken();
+    const [result] = await host.invokeAll({ toolCall: { functionCalls: [{ id: 'c5', name: 'getHistory', args: {} }] } });
+    expect(result.response.history).toContain('послать деньги Маше');
     expect(applied).toHaveLength(0);
   });
 

@@ -45,6 +45,7 @@ function harness({ createOk = true, attachOk = true, applyAck = { status: 'appli
     services: {
       readItems: async () => items,
       readFrontier: async () => [{ taskId: 'rt', taskTitle: 'Голден' }],
+      readHistory: async () => '— разговор Gemini gm_1 —\n02:19 Человек: послать деньги Маше',
       applyCommand: async (command, meta) => { applied.push({ command, meta }); return applyAck; },
       changed: () => { signals.push(applied.length); }
     }
@@ -232,6 +233,16 @@ describe('delegated requests', () => {
     expect(context.applied.map(entry => entry.command.actId)).toEqual(['rt', 'rs']);
     expect(spoken(context).map(message => message.content)).toEqual(['Голден в фокусе', 'Яблоки на паузе']);
     expect(backendCalls(context)[1].body.previous_response_id).toBe('resp_1');
+  });
+
+  it('reads past conversations for the backend, which answers from them', async () => {
+    const context = harness({ backend: [[fn('getHistory', {})], [say('В прошлый раз добавил задачу про деньги Маше.')]] });
+    await context.host.start({ sdp: 'offer-sdp' });
+    await request(context, 'что ты сделал в прошлый раз');
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(JSON.parse(backendCalls(context)[1].body.input[0].output).history).toContain('послать деньги Маше');
+    expect(context.applied).toHaveLength(0);
   });
 
   it('takes another pass after a read, because the answer depends on it', async () => {

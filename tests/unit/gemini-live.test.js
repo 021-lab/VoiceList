@@ -44,6 +44,17 @@ describe('the connect config', () => {
     expect(config.generationConfig.speechConfig.languageCode).toBe('ru-RU');
   });
 
+  it('gives Gemini the shared task rules: what blocks a goal goes inside it, the past is in the journal', () => {
+    const instruction = buildGeminiSetup({ items: sample, prompt: 'Своя редакция' }).systemInstruction.parts[0].text;
+    expect(instruction).toContain('getHistory');
+    expect(instruction).not.toContain('Промпты голоса и Sol');
+  });
+
+  it('makes the model wait for the history: its answer is nothing but what the history says', () => {
+    const history = buildGeminiSetup({ items: sample }).tools[0].functionDeclarations.find(tool => tool.name === 'getHistory');
+    expect(history.behavior).toBe('BLOCKING');
+  });
+
   it('keeps a saved prompt instead of the built-in one', () => {
     const config = buildGeminiSetup({ items: sample, prompt: 'Своя редакция' });
     expect(config.systemInstruction.parts[0].text).toContain('Своя редакция');

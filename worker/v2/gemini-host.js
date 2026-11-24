@@ -176,7 +176,7 @@ export class GeminiHost {
     this.record({ type: 'gm.tool.call', name: call.name, arguments: call.arguments || {}, callId: call.id || '' }, 'in', sessionId);
 
     // A read changes nothing and its answer goes stale, so only changes are guarded.
-    const key = call.name === 'getFrontier' ? null : changeKey(call.name, call.arguments);
+    const key = ['getFrontier', 'getHistory'].includes(call.name) ? null : changeKey(call.name, call.arguments);
     const seen = key ? this.recent.get(key) : null;
     if (seen && this.now().getTime() - seen.at < REPEAT_WINDOW_MS) {
       this.record({ type: 'gm.tool.repeat', name: call.name, callId: call.id || '', response: seen.response }, 'out', sessionId);
@@ -187,6 +187,8 @@ export class GeminiHost {
     try {
       if (call.name === 'getFrontier') {
         response = { status: 'ok', frontier: await this.services.readFrontier() };
+      } else if (call.name === 'getHistory') {
+        response = { status: 'ok', history: await this.services.readHistory() };
       } else {
         const command = toTaskCommand(call.name, call.arguments || {}, 'gemini-live');
         // The journal key is the call's own id, not a counter.

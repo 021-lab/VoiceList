@@ -1,5 +1,6 @@
 import { Agent } from 'agents';
 import { DocumentRuntime } from '../../src/v2/domain/document-runtime.js';
+import { formatHistory } from '../../src/v2/domain/history.js';
 import { safeError, fail } from '../../src/v2/domain/contracts.js';
 import { CompatibilityPort } from './compatibility.js';
 import { handleMcpRequest } from './mcp.js';
@@ -121,6 +122,8 @@ export class ListDocumentDO extends Agent {
     if (this.live?.active) this.live.syncSnapshot().catch(() => {});
   }
 
+  /** Past conversations for the voice models: a new session remembers nothing on its own. */
+  readHistory() { const journal = this.runtime.journal; return formatHistory(journal.entries, journal.technical, this.runtime.graph.read().items); }
   liveHost() {
     if (!this.live) this.live = new LiveHost({
       log: this.liveLog,
@@ -130,6 +133,7 @@ export class ListDocumentDO extends Agent {
       services: {
         readItems: async () => this.runtime.graph.read().items,
         readFrontier: async () => this.getTaskFrontier(),
+        readHistory: async () => this.readHistory(),
         applyCommand: async (command, message, corrects) => this.port.applyCommand(command, {message, corrects}),
         recordSpeech: (speech) => this.runtime.recordSpeech(speech),
         changed: () => this.broadcastState()
@@ -145,6 +149,7 @@ export class ListDocumentDO extends Agent {
       services: {
         readItems: async () => this.runtime.graph.read().items,
         readFrontier: async () => this.getTaskFrontier(),
+        readHistory: async () => this.readHistory(),
         applyCommand: async (command, message, corrects) => this.port.applyCommand(command, {message, corrects}),
         recordSpeech: (speech) => this.runtime.recordSpeech(speech)
       }

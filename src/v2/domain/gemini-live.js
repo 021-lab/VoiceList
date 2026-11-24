@@ -4,7 +4,7 @@
  *  The browser talks to Google directly, but the session is not the browser's to define: the
  *  worker mints an ephemeral token that carries the model, the instructions and the tools as
  *  constraints, and the client can only open a socket against them. */
-import { LIVE_TOOLS, formatTaskSnapshot } from './live-session.js';
+import { LIVE_TOOLS, TASK_RULES, formatTaskSnapshot } from './live-session.js';
 import { fail } from './contracts.js';
 import { GEMINI_MODEL, GEMINI_TOKENS_URL, GEMINI_VOICE, GEMINI_LANGUAGE } from './gemini-protocol.js';
 
@@ -147,9 +147,13 @@ export function geminiFunctionDeclarations(tools = LIVE_TOOLS) {
  *  gets: that block opens with "you have no tools of your own, these run through a backend"
  *  and lists operations generated for the other engine, four of which are not declared here.
  *  Gemini holds its tools itself, and the declarations are their own description — telling
- *  the model otherwise leaves it to reconcile the contradiction on its own. */
+ *  the model otherwise leaves it to reconcile the contradiction on its own.
+ *
+ *  The task rules are the ones GPT-Live and Sol follow: without them Gemini put «разблокировать
+ *  аккаунт, а потом послать деньги» into two unrelated root tasks and told a new session it had
+ *  no past. */
 export function composeGeminiInstructions(prompt, snapshot) {
-  return [String(prompt || '').trim(), '', '<tasks>', snapshot, '</tasks>'].join('\n');
+  return [String(prompt || '').trim(), '', 'Правила работы с задачами:', TASK_RULES, '', '<tasks>', snapshot, '</tasks>'].join('\n');
 }
 
 /** The setup a session starts with — the same object either side would send as its first
