@@ -29,4 +29,16 @@ export const clientStyles = `
 .task-page-subtask{cursor:pointer}.v02-action-label{font-weight:600}.action-log-row{cursor:pointer}.list-item-wrapper{touch-action:pan-y}
 button:focus-visible,a:focus-visible{outline:3px solid #007aff;outline-offset:3px}.v02-action-page small{color:#555}
 @media(max-width:520px){.v02-action-body{padding:16px 12px 28px}.v02-journal-record{border-radius:14px;padding-right:13px}.v02-command-field{grid-template-columns:1fr;gap:3px}.v02-correction-form{align-items:stretch;flex-direction:column}.v02-correction-form button{align-self:flex-end}}
+.v02-grok{margin-top:20px;background:#fff;border-radius:14px;padding:14px}.v02-grok h3{margin:0 0 10px;font-size:17px}
+.v02-grok-thread{display:flex;flex-direction:column;gap:10px}.v02-grok-message{padding:9px 12px;border-radius:12px;background:#f0f2f5}
+.v02-grok-message[data-role=grok]{background:#eef5ff}.v02-grok-message[data-role=system]{background:none;padding:0 4px;color:#8e8e93}
+.v02-grok-meta{font-size:12px;color:#8e8e93;margin-bottom:3px}.v02-grok-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.v02-grok-working,.v02-grok-status{font-size:13px;color:#8e8e93}.v02-grok-retry{margin-top:6px;border:1px solid #007aff;background:none;color:#007aff;border-radius:8px;padding:4px 10px;font:inherit}
+.v02-grok-form{display:flex;flex-direction:column;gap:8px;margin-top:12px}.v02-grok-form textarea{min-height:64px;font:inherit;padding:10px;border-radius:10px;border:1px solid #d0d4da}
+.v02-grok-form button{align-self:flex-end}.v02-grok-form button:disabled{opacity:.5}
+.v02-grok-summary{margin:-4px 0 6px 12px;padding:6px 10px;border-left:3px solid #8e8e93;font-size:13px;color:#3a3a3c;cursor:pointer}
+.v02-grok-summary-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.v02-grok-time{font-size:11px;color:#8e8e93}.v02-grok-working.v02-grok-summary,.v02-grok-summary.v02-grok-working{color:#8e8e93}.v02-grok-error{border-left-color:#ff3b30;color:#ff3b30}
+.v02-grok-actions{display:flex;justify-content:space-between;align-items:center;gap:8px}.v02-grok-open{color:#007aff;text-decoration:none;font-size:15px}.v02-grok-open[aria-disabled=true]{opacity:.4;pointer-events:none}
+.v02-grok-pages{margin-top:10px}.v02-grok-page{padding:4px 0}.v02-grok-page a{color:#007aff}.v02-grok-page small{color:#8e8e93}
 `;

@@ -7,6 +7,8 @@ import { handleOpenAIKeySetup, handleOpenAIKeyStatus } from '../openai-key-setup
 import { isMcpHostAllowed } from './mcp.js';
 import { PROMPT_TARGETS } from '../../src/v2/domain/live-settings.js';
 import { readBoundedJson } from './model.js';
+import { bearer, readBoundedText, sameToken, REPLY_LIMIT_BYTES } from './grok.js';
+import { servePagesHost, readPageBody, isPageId } from './grok-pages.js';
 import { safeError, fail } from '../../src/v2/domain/contracts.js';
 export { ListDocumentDO };
 const json = (data,status=200) => Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -30,6 +32,9 @@ async function readAudio(request, limit = 4_000_000) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // The pages domain is a worker of its own: one page by id, or 404. Nothing below runs there.
+    const page = await servePagesHost(request, env);
+    if (page) return page;
     if (url.pathname === '/health') return new Response('ok\n',{headers:{'Cache-Control':'no-store'}});
     if (url.pathname === '/live-log') return new Response(LIVE_LOG_PAGE,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
     if (url.pathname === '/bench') return new Response(BENCH_PAGE,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-store'}});
@@ -169,6 +174,36 @@ export default {
         const destination = await getAgentByName(env.LIST_DOCUMENT, target, hint ? {locationHint:hint} : undefined);
         const written = await destination.importEverything(payload);
         return json({from:env.DOCUMENT_NAME || 'main', target, locationHint:hint || null, exported:payload.counts, imported:written});
+      }
+      // Grok: our call goes out to the routine's webhook, its answer comes back here. The bot
+      // sends no Origin, so the same-origin gate above lets it through; its token is the gate.
+      if (url.pathname === '/api/grok/delegate' && request.method === 'POST') {
+        const result = await stub.delegateToGrok(await readBoundedJson(request,32000), `${url.origin}/api/grok/reply`);
+        return json(result.body, result.status);
+      }
+      if (url.pathname === '/api/grok/reply' && request.method === 'POST') {
+        const token = bearer(request);
+        const body = await readBoundedText(request, REPLY_LIMIT_BYTES);
+        const result = await stub.receiveGrokReply({token, raw:body.text, tooLarge:body.tooLarge});
+        return json(result.body, result.status);
+      }
+      if (url.pathname === '/api/grok/thread' && request.method === 'GET') {
+        const result = await stub.readGrokThread({token:bearer(request), taskId:url.searchParams.get('taskId') || '', replyUrl:`${url.origin}/api/grok/reply`});
+        return json(result.body, result.status);
+      }
+      // Pages: the token is checked here, before up to ten megabytes are read.
+      if (url.pathname === '/api/grok/pages' || url.pathname.startsWith('/api/grok/pages/')) {
+        if (!await sameToken(bearer(request), env.GROK_REPLY_TOKEN)) return json({error:'Неверный токен'},401);
+        const id = url.pathname.slice('/api/grok/pages/'.length);
+        if (request.method === 'DELETE' && id) { const result = await stub.removeGrokPage(id); return result.status === 204 ? new Response(null,{status:204}) : json(result.body, result.status); }
+        if (!['POST','PUT'].includes(request.method) || (request.method === 'POST') === Boolean(id)) return missing();
+        if (request.method === 'PUT' && !isPageId(id)) return json({error:'Страница не найдена'},404);
+        const body = await readPageBody(request);
+        if (body.tooLarge) return json({error:'Страница больше 10 МБ'},413);
+        const result = request.method === 'POST'
+          ? await stub.publishGrokPage({taskId:url.searchParams.get('taskId') || null, title:url.searchParams.get('title') || '', bytes:body.bytes})
+          : await stub.replaceGrokPage(id, body.bytes);
+        return json(result.body, result.status);
       }
       if (url.pathname === '/api/tasks/tree.json') return json({tasks:await stub.getTaskTree()});
       if (url.pathname === '/api/tasks/frontier.json') return json({frontier:await stub.getTaskFrontier()});

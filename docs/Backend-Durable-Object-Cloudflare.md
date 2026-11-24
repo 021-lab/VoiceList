@@ -107,6 +107,10 @@ source: gpt-live или gemini-live, смотря какой кнопкой на
 | GET, POST /api/live/gemini/session, POST …/session/stop | Эфемерный токен сессии Gemini и её остановка. |
 | POST /api/live/gemini/tools | Исполнение вызовов инструментов Gemini; браузер только ретранслирует результат. |
 | POST /api/live/gemini/frames | Зеркалирование кадров сессии Gemini в лог. |
+| POST /api/grok/delegate | Поручение Грок-боту по задаче: запись в тред и вызов вебхука рутины. Контракт — docs/Grok-Delegation.md. |
+| POST /api/grok/reply | Ответ Грок-бота в тред задачи; `Authorization: Bearer GROK_REPLY_TOKEN`, `done: true` закрывает задачу через журнал. |
+| GET /api/grok/thread | Задача и тред для бота, когда разговор идёт в его приложении; Bearer GROK_REPLY_TOKEN. |
+| POST /api/grok/pages, PUT и DELETE /api/grok/pages/<id> | Страницы, которые публикует бот (R2 `GROK_PAGES`); отдаются только на домене страниц как `GET /p/<id>`. |
 | GET /ws с Upgrade: websocket | Канал чтения и изменения документа. |
 | GET /live-log, GET /bench | Страница лога голосовых сессий и стенд задержек. |
 | GET /api/v2/where, /api/v2/bench, /api/v2/profile, POST /api/v2/relocate | Служебные: расстояние до объекта, замеры, профиль одной команды, перенос документа в другой объект. |

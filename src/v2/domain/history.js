@@ -3,7 +3,7 @@
  *  of the one before it; asked «что ты сделал?» it answered that there had been nothing. The
  *  journal has all of it. Pure: entries in, lines out. */
 
-const SOURCES = { 'gpt-live': 'GPT-Live', 'gemini-live': 'Gemini', agent: 'текст', user: 'текст', schedule: 'расписание' };
+const SOURCES = { 'gpt-live': 'GPT-Live', 'gemini-live': 'Gemini', agent: 'текст', user: 'текст', schedule: 'расписание', grok: 'Грок' };
 const VERBS = {
   addItem: 'добавить', addChild: 'добавить внутрь', setStatus: 'статус', setDeadline: 'срок', editItem: 'переименовать',
   setParent: 'перенести', setTags: 'метка', deleteItem: 'удалить', reorderItems: 'переставить', undo: 'отменить последнее',

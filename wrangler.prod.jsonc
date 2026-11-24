@@ -14,9 +14,11 @@
   "compatibility_date": "2026-08-06",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "routes": [{ "pattern": "vlist-v02-prod.smileme.ai", "custom_domain": true }],
+  // The second domain serves only the pages Grok publishes (GET /p/<id>); see docs/Grok-Delegation.md.
+  "routes": [{ "pattern": "vlist-v02-prod.smileme.ai", "custom_domain": true }, { "pattern": "vlist-pages.smileme.ai", "custom_domain": true }],
+  "r2_buckets": [{ "binding": "GROK_PAGES", "bucket_name": "vlist-grok-pages-prod" }],
   "durable_objects": { "bindings": [{ "name": "LIST_DOCUMENT", "class_name": "ListDocumentDO" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ListDocumentDO"] }],
   "observability": { "enabled": true },
-  "vars": { "AGENT_MODEL": "gemini-3.8-flash", "MCP_ALLOWED_HOSTS": "vlist-v02-prod.smileme.ai" }
+  "vars": { "AGENT_MODEL": "gemini-3.8-flash", "MCP_ALLOWED_HOSTS": "vlist-v02-prod.smileme.ai", "GROK_PAGES_HOST": "vlist-pages.smileme.ai", "GROK_BOT_ID": "" }
 }

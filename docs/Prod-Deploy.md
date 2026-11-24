@@ -54,6 +54,23 @@ Durable Object принадлежит воркеру, а не версии, по
 - в интерфейсе: настройки → ключ OpenAI (разовая установка открыта, пока ключа нет);
 - с машины, где есть wrangler: `wrangler secret put OPENAI_API_KEY --config wrangler.prod.jsonc`.
 
+### Грок-бот: делегирование и страницы
+
+До первого выката с этой функцией — иначе `wrangler deploy` откажет из-за отсутствующего бакета:
+
+1. Создать бакеты R2: `wrangler r2 bucket create vlist-grok-pages-prod` и
+   `wrangler r2 bucket create vlist-grok-pages-dev`.
+2. Домены страниц `vlist-pages.smileme.ai` (прод) и `vlist-pages-dev.smileme.ai` (дев) прописаны
+   в `routes` как custom domain: `wrangler deploy` сам привяжет их к зоне `smileme.ai`.
+3. Секреты (по шагам рутины из `docs/Grok-Bot-Routine.md`):
+   `wrangler secret put GROK_WEBHOOK_URL --config wrangler.prod.jsonc`, то же для
+   `GROK_WEBHOOK_KEY` и `GROK_REPLY_TOKEN`; для дева — `--config wrangler.dev.jsonc`.
+4. `GROK_BOT_ID` — переменная в `vars` конфига: id бота из Share → Copy link. Пусто — глубокая
+   ссылка открывает основного бота.
+
+Без секретов блок «Грок» на карточке пишет «Грок не подключён»; без бакета или домена
+публикация страниц отвечает `503`.
+
 ## Доступ
 
 Прод открыт так же, как дев: аутентификации нет. Любой, кто знает адрес, может открыть

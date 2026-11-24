@@ -10,6 +10,8 @@ import { RuntimeStorage } from './runtime-storage.js';
 import { LiveLog } from './live-log.js';
 import { LiveHost } from './live-host.js';
 import { GeminiHost } from './gemini-host.js';
+import { GrokThreads, GrokDelegation, withGrok } from './grok.js';
+import { GrokPages } from './grok-pages.js';
 import {
   LiveSettings, VOICE_PROMPT_KEY, BACKEND_PROMPT_KEY, BACKEND_MODEL_KEY, REASONING_KEY,
   GEMINI_PROMPT_KEY, GEMINI_MODEL_KEY, CORRECTION_MODEL_KEY, PROMPT_HISTORY_KEY, DEFAULT_CORRECTION_MODEL
@@ -32,6 +34,21 @@ export class ListDocumentDO extends Agent {
     this.runtimeStorage = new RuntimeStorage(this.ctx.storage);
     this.liveLog = new LiveLog(this.ctx.storage);
     this.liveSettings = new LiveSettings(this.ctx.storage);
+    this.grokThreads = new GrokThreads(this.ctx.storage);
+    this.grok = new GrokDelegation({
+      threads: this.grokThreads, env: this.env,
+      readItems: async () => this.runtime.graph.read().items,
+      applyCommand: async (command, message) => this.port.applyCommand(command, {message}),
+      log: (event, options) => this.liveLog.append(event, options),
+      changed: () => this.broadcastState()
+    });
+    // A page is part of what the task card shows, so publishing one moves the Grok mark too.
+    this.grokPages = new GrokPages({
+      storage: this.ctx.storage, env: this.env,
+      readItems: async () => this.runtime.graph.read().items,
+      log: (event, options) => this.liveLog.append(event, options),
+      changed: () => { this.grokThreads.touch(); this.broadcastState(); }
+    });
     this.initializeRuntime(this.runtimeStorage.load());
     // Durable wake-up recovers the append/enqueue gap or an exhausted SDK queue retry.
     await this.scheduleEvery(60, 'recoverPending');
@@ -58,8 +75,16 @@ export class ListDocumentDO extends Agent {
     if (receipt.status === 'accepted') await this.queue('processPending', {});
     return receipt;
   }
-  getDocument(context) { return this.runtime.getDocument(context); }
-  follow(cursor, clientKey) { return this.runtime.follow(cursor, clientKey); }
+  getDocument(context) { return withGrok(this.runtime.getDocument(context), this.grokThreads, this.grok.configured(), {pages:this.grokPages, botId:this.env.GROK_BOT_ID || ''}); }
+  /** The Grok mark travels with every update, so a page learns that a thread moved even when
+   *  the document itself did not. */
+  follow(cursor, clientKey) { return {...this.runtime.follow(cursor, clientKey), grok:this.grokThreads.mark()}; }
+  delegateToGrok(input, replyUrl) { return this.grok.delegate(input, replyUrl); }
+  receiveGrokReply(reply) { return this.grok.reply(reply); }
+  readGrokThread(query) { return this.grok.readThread(query); }
+  publishGrokPage(page) { return this.grokPages.publish(page); }
+  replaceGrokPage(id, bytes) { return this.grokPages.replace(id, bytes); }
+  removeGrokPage(id) { return this.grokPages.remove(id); }
   async processPending() {
     await this.runtime.processPending();
     this.broadcastState();
@@ -267,6 +292,8 @@ export class ListDocumentDO extends Agent {
       version: 1,
       runtime,
       settings,
+      grok: this.grokThreads.exportAll(),
+      grokPages: this.grokPages.exportAll(),
       counts: { items: runtime.graph.items.length, entries: runtime.entries.length, settings: Object.keys(settings).length }
     };
   }
@@ -279,6 +306,9 @@ export class ListDocumentDO extends Agent {
     if (existing && existing.graph?.items?.length > 1) fail('CONFLICT','В целевом объекте уже есть документ');
     await this.runtimeStorage.save(payload.runtime);
     for (const [key, value] of Object.entries(payload.settings || {})) await this.ctx.storage.put(key, value);
+    this.grokThreads.importAll(payload.grok);
+    // Page bodies stay in R2, which both objects share; only the index moves.
+    this.grokPages.importAll(payload.grokPages);
     this.initializeRuntime(this.runtimeStorage.load());
     const loaded = this.runtime.exportState();
     return { items: loaded.graph.items.length, entries: loaded.entries.length, revision: loaded.graph.revision };

@@ -28,6 +28,9 @@ const deadlineMenu = [
   [30, 'Месяц', '#3a6ff0', outlineIcon('M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z')]
 ];
 const tagMenu = ['Важное', 'Срочно', 'Купить', 'Дом', 'Работа', 'Отложить'];
+const grokTime = (at) => { const date = new Date(at); return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+// STALE_SENDING_MS in worker/v2/grok.js: after this the server marks a lost call stale.
+const GROK_STALE_MS = 30_000;
 const point = (event) => ({ x: event.clientX, y: event.clientY });
 const walk = (node, fn) => { if (!node) return; fn(node); for (const child of node.children || []) walk(child, fn); };
 
@@ -149,6 +152,7 @@ export class Client {
   disconnect() {
     this.connected = false;
     clearTimeout(this.pollTimer);
+    clearTimeout(this.grokStaleTimer);
     this.closeSocket();
     this.gesture.cancel();
     this.dragController?.cancel();
@@ -165,7 +169,9 @@ export class Client {
     try {
       await this.flush();
       const update = await this.request(`/api/v2/updates?${new URLSearchParams({ cursor, clientKey: this.clientKey })}`);
-      const changed = update.nextCursor !== undefined && String(update.nextCursor) !== String(this.cursor);
+      // A Grok thread lives beside the document, so its movement has a mark of its own.
+      const changed = (update.nextCursor !== undefined && String(update.nextCursor) !== String(this.cursor))
+        || (update.grok !== undefined && this.document && update.grok !== this.document.grok);
       for (const event of update.events || []) {
         if (event.requestId && ['result', 'outcome', 'action-result'].includes(event.type)) this.outcomes.set(event.requestId, event);
       }
@@ -415,6 +421,7 @@ export class Client {
     const badge = this.node('span', { className: 'status-badge' }, p.status || 'Open'); badge.style.setProperty('--badge-color', colors[p.status] || colors.Open);
     side.append(badge, this.node('div', { className: 'item-index' + (this.viewContext.view === 'frontier' ? ' item-deadline' : '') }, this.viewContext.view === 'frontier' ? deadlineDaysLabel(p.deadline) : p.index || ''));
     head.append(copy, side); row.append(head); wrap.append(row);
+    if (p.grok) wrap.append(this.renderGrokSummary(p.taskId, p.grok));
     row.onkeydown = (event) => { if (event.key === 'Enter') void this.navigate('edit', { taskId: p.taskId }); };
     row.ondblclick = () => this.navigate('edit', { taskId: p.taskId });
     return wrap;
@@ -434,7 +441,7 @@ export class Client {
     const p = component.props; const id = p.actionId || component.id.replace(/^action:/, '');
     this.seenActions.add(id);
     const row = this.node('div', { className: 'action-log-row', 'data-log-id': id, 'data-component-id': component.id, tabIndex: 0 });
-    const origin = { 'gemini-live': 'Gemini', 'gpt-live': 'GPT-Live', schedule: 'Расписание' }[p.source] || '';
+    const origin = { 'gemini-live': 'Gemini', 'gpt-live': 'GPT-Live', schedule: 'Расписание', grok: 'Грок' }[p.source] || '';
     row.append(
       this.node('div', { className: 'action-log-label' }, p.heard || p.transcript || p.text || 'Реплика пользователя'),
       this.node('div', { className: 'action-log-status' }, p.status || ''),
@@ -562,6 +569,106 @@ export class Client {
       row.append(this.node('span', {}, child.title), this.node('small', {}, child.status));
       row.onclick = () => this.navigate('edit', { taskId: child.id || child.taskId }); children.append(row);
     }
+    this.renderGrok(p);
+  }
+  /** Under a frontier task: the last word of its Grok thread. A tap opens the card on it. */
+  renderGrokSummary(taskId, summary) {
+    // The block belongs to its task: holding it speaks about that task, a tap opens the card.
+    const block = this.node('div', { className: `v02-grok-summary v02-grok-${summary.kind}`, 'data-component-id': `task:${taskId}`, 'data-grok': taskId, role: 'button', tabIndex: 0 });
+    block.append(this.node('div', { className: 'v02-grok-summary-text' }, summary.text), this.node('div', { className: 'v02-grok-time' }, grokTime(summary.at)));
+    block.onkeydown = (event) => { if (event.key === 'Enter') void this.openGrok(taskId); };
+    return block;
+  }
+  openGrok(taskId) { return this.navigate('edit', { taskId, focus: 'grok' }); }
+  /** The Grok block of the task card. It is built once and kept: a reply redraws the thread,
+   *  and the field keeps whatever is being typed into it. */
+  renderGrok(p) {
+    let section = this.$('task-page-grok');
+    if (!section) {
+      section = this.node('section', { id: 'task-page-grok', className: 'v02-grok' });
+      const form = this.node('form', { className: 'v02-grok-form' });
+      const input = this.node('textarea', { id: 'grok-input', placeholder: 'Что поручить Гроку?', 'aria-label': 'Поручение Гроку' });
+      const send = this.node('button', { id: 'grok-send', type: 'submit', className: 'v02-primary' }, 'Делегировать Гроку');
+      // A deep link into the bot's app: the task goes into its field, the person sends it.
+      const open = this.node('a', { id: 'grok-open', className: 'v02-grok-open', target: '_blank', rel: 'noopener' }, 'Открыть в Гроке');
+      const actions = this.node('div', { className: 'v02-grok-actions' }); actions.append(open, send);
+      form.append(input, actions);
+      form.onsubmit = (event) => { event.preventDefault(); void this.delegateToGrok(); };
+      section.append(this.node('h3', {}, 'Грок'), this.node('div', { id: 'grok-thread', className: 'v02-grok-thread' }),
+        this.node('div', { id: 'grok-pages', className: 'v02-grok-pages' }), this.node('div', { id: 'grok-status', className: 'v02-grok-status' }), form);
+      this.$('task-page').querySelector('.task-page-body').append(section);
+    }
+    const grok = p.grok;
+    section.hidden = p.mode === 'add' || !p.taskId || !grok;
+    if (section.hidden) return;
+    if (section.dataset.taskId !== p.taskId) { this.$('grok-input').value = ''; section.dataset.taskId = p.taskId; }
+    this.$('grok-status').textContent = grok.configured ? '' : 'Грок не подключён';
+    this.$('grok-send').disabled = !grok.configured || Boolean(this.grokSending);
+    const open = this.$('grok-open');
+    if (grok.link) { open.href = grok.link; open.removeAttribute('aria-disabled'); } else { open.removeAttribute('href'); open.setAttribute('aria-disabled', 'true'); }
+    const pages = this.$('grok-pages'); pages.replaceChildren();
+    if (grok.pages?.length) {
+      pages.append(this.node('div', { className: 'v02-section-label' }, 'Страницы Грока'));
+      for (const page of grok.pages) {
+        const item = this.node('div', { className: 'v02-grok-page', 'data-page-id': page.id });
+        item.append(this.node('a', { href: page.url, target: '_blank', rel: 'noopener noreferrer' }, page.title), this.node('small', {}, ` · ${grokTime(page.updatedAt || page.createdAt)}`));
+        pages.append(item);
+      }
+    }
+    const thread = this.$('grok-thread'); thread.replaceChildren();
+    const messages = grok.messages || [];
+    const lastSpoken = messages.filter(message => message.role !== 'system').at(-1);
+    for (const message of messages) {
+      const row = this.node('div', { className: `v02-grok-message`, 'data-role': message.role, 'data-message-id': message.id });
+      if (message.role === 'system') row.append(this.node('small', {}, message.text));
+      else {
+        row.append(this.node('div', { className: 'v02-grok-meta' }, `${message.role === 'grok' ? 'Грок' : 'Вы'} · ${grokTime(message.at)}`));
+        row.append(this.grokText(message.text));
+      }
+      const stale = Boolean(message.stale);
+      if (message.role === 'user' && (message.state === 'failed' || stale)) {
+        const retry = this.node('button', { type: 'button', className: 'v02-grok-retry', disabled: !grok.configured }, 'Повторить');
+        retry.onclick = () => this.delegateToGrok({ messageId: message.id, text: message.text });
+        row.append(retry);
+      }
+      thread.append(row);
+      if (message === lastSpoken && message.role === 'user' && message.state !== 'failed' && !stale) thread.append(this.node('div', { className: 'v02-grok-working' }, 'Грок работает…'));
+    }
+    // A call still out may be lost with a restart; the server says so once it is stale, and
+    // only a fresh document can show that.
+    clearTimeout(this.grokStaleTimer);
+    if (messages.some(message => message.state === 'sending' && !message.stale)) this.grokStaleTimer = setTimeout(() => { if (this.viewContext.view === 'edit') void this.loadDocument(); }, GROK_STALE_MS + 1000);
+    // Opened from the frontier: shown once, not on every reply that redraws the card.
+    if (this.viewContext.focus === 'grok') { delete this.viewContext.focus; section.scrollIntoView?.({ block: 'start' }); }
+  }
+  /** Grok writes plain text. It is shown as text, with line breaks kept and links made
+   *  clickable; nothing it sends is parsed as markup. */
+  grokText(text) {
+    const block = this.node('div', { className: 'v02-grok-text' });
+    let at = 0;
+    for (const match of String(text).matchAll(/https?:\/\/[^\s<>"']+/g)) {
+      let url = match[0].replace(/[.,;:!?»]+$/u, '');
+      // A closing bracket belongs to the link only when the link opened one (wiki/Mercury_(planet)).
+      while (url.endsWith(')') && (url.match(/\(/g) || []).length < (url.match(/\)/g) || []).length) url = url.slice(0, -1).replace(/[.,;:!?»]+$/u, '');
+      block.append(this.dom.createTextNode(text.slice(at, match.index)));
+      block.append(this.node('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, url));
+      at = match.index + url.length;
+    }
+    block.append(this.dom.createTextNode(text.slice(at)));
+    return block;
+  }
+  async delegateToGrok(retry = null) {
+    const taskId = this.editorNode?.props.taskId; const input = this.$('grok-input');
+    const text = (retry?.text ?? input.value).trim();
+    if (!taskId || !text || this.grokSending) return;
+    this.grokSending = true; this.$('grok-send').disabled = true;
+    try {
+      await this.request('/api/grok/delegate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, messageId: retry?.messageId || this.win.crypto.randomUUID(), text }) });
+      if (!retry && this.$('task-page-grok').dataset.taskId === taskId) input.value = '';
+    } catch (error) { this.showToast(error.message); }
+    finally { this.grokSending = false; this.$('grok-send').disabled = !this.editorNode?.props.grok?.configured; }
+    await this.loadDocument();
   }
   async saveTask() {
     const p = this.editorNode?.props; if (!p) return;
@@ -639,6 +746,7 @@ export class Client {
   }
   tap(target) {
     if (!target.taskId || target.element.closest('#task-page')) return;
+    if (target.element.dataset.grok) { void this.openGrok(target.element.dataset.grok); return; }
     if (this.viewContext.view === 'frontier' && target.node?.props.parent) {
       const existing = target.element.previousElementSibling;
       if (existing?.classList.contains('frontier-parent-wrapper')) { existing.remove(); target.element.style.marginLeft = '0px'; return; }
