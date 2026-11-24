@@ -27,6 +27,10 @@ export function confirmText(command, items = []) {
   const title = (id) => spoken(items.find(item => item.id === id)?.title);
   const subject = title(command?.actId);
   switch (command?.command) {
+    case 'addTree': {
+      const steps = command.payload?.tree?.children || [];
+      return `Добавил: ${spoken(command.payload?.tree?.title)}, внутри ${spoken(steps[0]?.title)}${steps.length > 1 ? ` и ещё ${steps.length - 1}` : ''}`;
+    }
     case 'addItem':
     case 'addChild':
       return command.payload?.status === 'Info' ? 'Заметка добавлена' : `Добавил: ${spoken(command.payload?.title)}`;

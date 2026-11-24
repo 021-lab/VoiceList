@@ -142,6 +142,14 @@ export const LIVE_TOOLS = [
     parameters: { type: 'object', properties: { parentId: taskId, title: { type: 'string', description: 'Название задачи.' } }, required: ['parentId', 'title'], additionalProperties: false }
   },
   {
+    type: 'function', name: 'addTaskWithSubtasks', description: 'Создать задачу сразу с подзадачами — шагами к ней. Для связанных задач: цель и то, что нужно сделать до неё.',
+    parameters: { type: 'object', properties: {
+      parentId: { type: ['string', 'null'], description: 'Где создать задачу: id из таблицы, "inbox" или null для корня.' },
+      title: { type: 'string', description: 'Задача-цель.' },
+      subtasks: { type: 'array', items: { type: 'string' }, description: 'Подзадачи по порядку: шаги к цели.' }
+    }, required: ['parentId', 'title', 'subtasks'], additionalProperties: false }
+  },
+  {
     type: 'function', name: 'addInfo', description: 'Добавить заметку внутрь задачи: дочерняя задача со статусом Info.',
     parameters: { type: 'object', properties: { parentId: taskId, title: { type: 'string', description: 'Текст заметки.' } }, required: ['parentId', 'title'], additionalProperties: false }
   },
@@ -208,12 +216,13 @@ export const TASK_RULES = `
   корень» или «новый проект».
 - Даты — YYYY-MM-DD от «Сегодня»: завтра +1 день, день недели — ближайший следующий.
 - Каждое изменение — один вызов; все вызовы просьбы — сразу, в одном ответе, по порядку,
-  кроме тех, которым нужен id новой задачи из результата. Удаления нет: предложи архив.
+  кроме тех, которым нужен id новой задачи из результата (срок, статус, заметка для неё).
+  Удаления нет: предложи архив.
 - Условие и цель: «нужно A, а потом B», «сначала A, потом B», «чтобы B, нужно A» — B цель,
-  A шаг к ней. A — подзадача B, не наоборот и не рядом. «Разблокировать аккаунт, а потом
-  послать деньги Маше» → задача «Послать деньги Маше», внутри неё «Разблокировать аккаунт».
-  Сначала создай B, возьми его id из результата, затем addChild(B, A). B уже в таблице —
-  сразу addChild(B, A).
+  A шаг к ней. A — подзадача B, не наоборот и не рядом. Новая цель — одним вызовом
+  addTaskWithSubtasks: «разблокировать аккаунт, а потом послать деньги Маше» →
+  addTaskWithSubtasks("inbox", "Послать деньги Маше", ["Разблокировать аккаунт"]).
+  Цель уже в таблице — addChild(цель, A).
 - О прошлых разговорах («что ты сделал», «что я говорил», «что было раньше») — прочитай
   getHistory. Не отвечай, что прошлого нет и доступа к нему нет.
 `.trim();
@@ -329,6 +338,13 @@ function buildTaskCommand(name, args, source) {
       return { actId: 'list', actType: 'list', command: 'addItem', payload: { title: requireText(args.title, 'title') }, source };
     case 'addChild':
       return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { title: requireText(args.title, 'title') }, source };
+    case 'addTaskWithSubtasks': {
+      const subtasks = Array.isArray(args.subtasks) ? args.subtasks.map(item => String(item ?? '').trim()).filter(Boolean) : [];
+      if (!subtasks.length) fail('INVALID_INPUT', 'Нет подзадач');
+      const parentId = args.parentId == null || args.parentId === 'list' ? null : requireText(args.parentId, 'parentId');
+      return { actId: parentId, actType: parentId ? 'task' : 'list', command: 'addTree',
+        payload: { tree: { title: requireText(args.title, 'title'), children: subtasks.map(title => ({ title, children: [] })) } }, source };
+    }
     case 'addInfo':
       return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { title: requireText(args.title, 'title'), status: 'Info' }, source };
     case 'setStatus': {

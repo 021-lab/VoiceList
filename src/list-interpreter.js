@@ -51,6 +51,7 @@ function buildLabel(command, payload = {}) {
   if (command === 'toggleCollapse') return 'Переключено сворачивание';
   if (command === 'reorderItems') return 'Изменён порядок списка';
   if (command === 'importWorkflowyTree') return `Импортировано дерево Workflowy: ${payload.tree?.title || 'без названия'}`;
+  if (command === 'addTree') return `Создана задача с подзадачами: ${payload.tree?.title || 'без названия'}`;
   if (command === 'logFallbackUtterance') return `Нераспознано: ${payload.text || 'пустая фраза'}`;
   if (command === 'undo') return 'Выполнен undo';
   return command;
@@ -257,6 +258,14 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
           parentId: null,
           tree: payload.tree,
           order: nextOrder(nextItems, null)
+        });
+        if (!rootId) return noChange();
+      } else if (input.command === 'addTree') {
+        // A task and its steps in one change, so the steps need no id of a parent that does not
+        // exist yet, and one undo removes them together.
+        const parentId = input.actId && input.actId !== 'list' ? input.actId : null;
+        const rootId = appendImportedTree({
+          createItemId, existingIds, input, nextItems, parentId, tree: payload.tree, order: topOrder(nextItems, parentId)
         });
         if (!rootId) return noChange();
       } else if (input.command === 'logFallbackUtterance') {

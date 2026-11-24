@@ -38,7 +38,7 @@ export const inputSchema = z.object({
 );
 
 // 'replaceItems' — TEMPORARY (перенос v1 → v2), см. task-graph.js; после переезда удалить.
-export const graphCommands = new Set(['addItem', 'addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem', 'reorderItems', 'importWorkflowyTree', 'replaceItems']);
+export const graphCommands = new Set(['addItem', 'addChild', 'editItem', 'setStatus', 'setParent', 'setTags', 'setDeadline', 'toggleCollapse', 'deleteItem', 'reorderItems', 'importWorkflowyTree', 'addTree', 'replaceItems']);
 export const uiCommands = {
   showList: 'list', showFrontier: 'frontier', showActionLog: 'log', showSearch: 'search',
   showAddModal: 'edit', showEditModal: 'edit', showNestModal: 'edit', viewItem: 'edit',

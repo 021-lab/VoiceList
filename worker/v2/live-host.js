@@ -654,7 +654,7 @@ export class LiveHost {
     await this.syncSnapshot(items);
     const confirm = confirmText(command, items);
     // A bare «Сделал» says nothing about what was done, so the record names the operation too.
-    const what = [command.command, command.actId, command.payload?.title || command.payload?.status || command.payload?.deadline].filter(Boolean).join(' ');
+    const what = [command.command, command.actId, command.payload?.title || command.payload?.tree?.title || command.payload?.status || command.payload?.deadline].filter(Boolean).join(' ');
     session.done = [...session.done, `${confirm} (${what})`].slice(-DONE_KEPT);
     return { status: 'applied', operation: command.command, target: ack?.newTarget || command.actId, confirm };
   }

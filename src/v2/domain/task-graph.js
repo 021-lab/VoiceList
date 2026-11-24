@@ -68,7 +68,9 @@ export class TaskGraph {
       const { command, actId, payload } = input;
       if (!graphCommands.has(command)) fail('UNSUPPORTED_COMMAND', 'Команда не поддерживается графом');
       const target = next.find(x => x.id === actId);
-      if (!['addItem', 'importWorkflowyTree', 'reorderItems', 'replaceItems'].includes(command) && !target) fail('NOT_FOUND', 'Задача не найдена');
+      // A new tree may go to the root; under a task, the task has to exist.
+      const rootless = ['addItem', 'importWorkflowyTree', 'reorderItems', 'replaceItems'].includes(command) || (command === 'addTree' && (!actId || actId === 'list'));
+      if (!rootless && !target) fail('NOT_FOUND', 'Задача не найдена');
       if (actId === 'inbox' && ['editItem', 'deleteItem', 'setParent'].includes(command)) fail('PROTECTED', 'Входящие нельзя изменить этой командой');
       if (command === 'editItem' && !('title' in payload)) fail('INVALID_INPUT', 'В команде переименования нет нового названия');
       if ((['addItem', 'addChild'].includes(command) || (command === 'editItem' && 'title' in payload)) && (typeof payload.title !== 'string' || !payload.title.trim())) fail('INVALID_INPUT', 'Введите название');

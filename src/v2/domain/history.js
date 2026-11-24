@@ -42,6 +42,7 @@ function describe(command, titles, entry, technical) {
   const verb = VERBS[name] || name || 'действие';
   if (name === 'undo' || name === 'rollbackAction') return verb;
   if (name === 'addItem' || name === 'addChild') return [verb, quoted(p.title), p.status === 'Info' ? '(заметка)' : '', name === 'addChild' ? `в ${target}` : ''].filter(Boolean).join(' ');
+  if (name === 'addTree') return `добавить ${quoted(p.tree?.title)} с подзадачами ${(p.tree?.children || []).map(child => quoted(child.title, 60)).join(', ')}${command.actId ? ` в ${target}` : ''}`;
   if (name === 'editItem') return `${verb} ${target} → ${quoted(p.title)}`;
   if (name === 'setParent') return `${verb} ${target} ${p.parentId == null ? 'в корень' : `под ${quoted(titles.get(p.parentId), 60) || 'удалённую задачу'}`}`;
   if (name === 'setDeadline') return `${verb} ${target} ${p.deadline || 'снят'}`;

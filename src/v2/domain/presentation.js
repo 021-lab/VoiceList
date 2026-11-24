@@ -11,7 +11,7 @@ const commandLabels = {
   setStatus: 'Изменить статус', setParent: 'Изменить вложенность', setTags: 'Изменить теги',
   setDeadline: 'Изменить срок', toggleCollapse: 'Свернуть или развернуть задачу',
   deleteItem: 'Удалить задачу', reorderItems: 'Изменить порядок задач',
-  importWorkflowyTree: 'Импортировать дерево задач',
+  importWorkflowyTree: 'Импортировать дерево задач', addTree: 'Добавить задачу с подзадачами',
   replaceItems: 'Заменить список задач', // TEMPORARY (перенос v1 → v2)
   rollbackAction: 'Откатить действие и все его корректировки', undo: 'Откатить действие и все его корректировки',
   showList: 'Открыть список', showFrontier: 'Открыть фронтир', showActionLog: 'Открыть журнал действий',
@@ -61,6 +61,10 @@ function commandFields(command, byId) {
       value: `${item.parentId == null ? 'Корень списка' : `в ${textValue(item.parentId, byId)}`}, позиция ${Number(item.order) || index + 1}`
     }));
   }
+  if (command?.command === 'addTree') return [
+    { label: 'Задача', value: payload.tree?.title || 'Без названия' },
+    { label: 'Подзадачи', value: (payload.tree?.children || []).map(child => child.title).join(', ') }
+  ];
   if (command?.command === 'importWorkflowyTree') return [{
     label: 'Дерево', value: `${payload.tree?.title || 'Без названия'} · ${countTree(payload.tree)} элементов`
   }];
