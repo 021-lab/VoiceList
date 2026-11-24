@@ -20,7 +20,7 @@ describe('задача сразу с подзадачами', () => {
     const graph = new TaskGraph();
     graph.apply([toTaskCommand('addTaskWithSubtasks', { parentId: null, title: 'Заказать шлем', subtasks: ['Измерить голову'] })], 0);
     expect(children(graph, null)[0].title).toBe('Заказать шлем');
-    graph.apply([{ command: 'addTree', actId: 'list', actType: 'list', payload: { tree: { title: 'Корневая', children: [{ title: 'Шаг', children: [] }] } } }], graph.revision);
+    graph.apply([{ command: 'addTree', actId: 'list', actType: 'list', payload: { title: 'Корневая', subtasks: ['Шаг'] } }], graph.revision);
     expect(children(graph, null)[0].title).toBe('Корневая');
   });
 

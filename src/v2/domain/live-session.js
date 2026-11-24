@@ -343,7 +343,7 @@ function buildTaskCommand(name, args, source) {
       if (!subtasks.length) fail('INVALID_INPUT', 'Нет подзадач');
       const parentId = args.parentId == null || args.parentId === 'list' ? null : requireText(args.parentId, 'parentId');
       return { actId: parentId, actType: parentId ? 'task' : 'list', command: 'addTree',
-        payload: { tree: { title: requireText(args.title, 'title'), children: subtasks.map(title => ({ title, children: [] })) } }, source };
+        payload: { title: requireText(args.title, 'title'), subtasks }, source };
     }
     case 'addInfo':
       return { actId: requireText(args.parentId, 'parentId'), actType: 'task', command: 'addChild', payload: { title: requireText(args.title, 'title'), status: 'Info' }, source };

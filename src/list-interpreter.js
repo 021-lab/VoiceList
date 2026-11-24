@@ -51,7 +51,7 @@ function buildLabel(command, payload = {}) {
   if (command === 'toggleCollapse') return 'Переключено сворачивание';
   if (command === 'reorderItems') return 'Изменён порядок списка';
   if (command === 'importWorkflowyTree') return `Импортировано дерево Workflowy: ${payload.tree?.title || 'без названия'}`;
-  if (command === 'addTree') return `Создана задача с подзадачами: ${payload.tree?.title || 'без названия'}`;
+  if (command === 'addTree') return `Создана задача с подзадачами: ${payload.title || 'без названия'}`;
   if (command === 'logFallbackUtterance') return `Нераспознано: ${payload.text || 'пустая фраза'}`;
   if (command === 'undo') return 'Выполнен undo';
   return command;
@@ -264,10 +264,18 @@ export function createInterpreter({ createItemId = randomId, createLogId = creat
         // A task and its steps in one change, so the steps need no id of a parent that does not
         // exist yet, and one undo removes them together.
         const parentId = input.actId && input.actId !== 'list' ? input.actId : null;
-        const rootId = appendImportedTree({
-          createItemId, existingIds, input, nextItems, parentId, tree: payload.tree, order: topOrder(nextItems, parentId)
+        const title = String(payload.title || '').trim();
+        const subtasks = (Array.isArray(payload.subtasks) ? payload.subtasks : []).map(item => String(item || '').trim()).filter(Boolean);
+        if (!title || !subtasks.length) return noChange();
+        const goalId = createItemId(existingIds, input);
+        existingIds.add(goalId);
+        nextItems.push({ id: goalId, parentId, order: topOrder(nextItems, parentId), status: 'Open', title, collapsed: false, tags: [] });
+        subtasks.forEach((subtask, index) => {
+          const id = createItemId(existingIds, input);
+          existingIds.add(id);
+          // Steps keep the order they were said in.
+          nextItems.push({ id, parentId: goalId, order: (index + 1) * 10, status: 'Open', title: subtask, collapsed: false, tags: [] });
         });
-        if (!rootId) return noChange();
       } else if (input.command === 'logFallbackUtterance') {
         logOnly = true;
       } else if (input.command === 'undo') {

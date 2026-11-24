@@ -62,8 +62,8 @@ function commandFields(command, byId) {
     }));
   }
   if (command?.command === 'addTree') return [
-    { label: 'Задача', value: payload.tree?.title || 'Без названия' },
-    { label: 'Подзадачи', value: (payload.tree?.children || []).map(child => child.title).join(', ') }
+    { label: 'Задача', value: payload.title || 'Без названия' },
+    { label: 'Подзадачи', value: (payload.subtasks || []).join(', ') }
   ];
   if (command?.command === 'importWorkflowyTree') return [{
     label: 'Дерево', value: `${payload.tree?.title || 'Без названия'} · ${countTree(payload.tree)} элементов`
