@@ -46,6 +46,7 @@ describe('the connect config', () => {
 
   it('gives Gemini the shared task rules: what blocks a goal goes inside it, the past is in the journal', () => {
     const instruction = buildGeminiSetup({ items: sample, prompt: 'Своя редакция' }).systemInstruction.parts[0].text;
+    expect(instruction).toContain('A — подзадача B');
     expect(instruction).toContain('getHistory');
     expect(instruction).not.toContain('Промпты голоса и Sol');
   });
